@@ -1,0 +1,50 @@
+import {
+  Activity, Landmark, ShoppingCart, ShoppingBag, ReceiptText, Package, BookOpen,
+  FileBarChart, Building2, BadgePercent, WalletCards, FolderKanban, Bot, Files,
+  CheckSquare, Users, Settings, ShieldCheck, LayoutDashboard, Boxes, BellRing,
+  Plug, ScrollText, Calculator, GitBranch, Coins,
+} from 'lucide-react';
+import type { NavItem } from '@/types/app';
+
+export const primaryNavigation: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'banking', label: 'Banking', icon: Landmark, children: [
+    { id: 'banking', label: 'Bank accounts' }, { id: 'transactions', label: 'Transactions' }, { id: 'reconciliation', label: 'Reconciliation' },
+  ]},
+  { id: 'sales', label: 'Sales', icon: ShoppingCart, children: [
+    { id: 'customers', label: 'Customers' }, { id: 'quotations', label: 'Quotations' }, { id: 'invoices', label: 'Invoices' }, { id: 'payments', label: 'Payments received' }, { id: 'credit-notes', label: 'Credit notes' }, { id: 'receivables', label: 'Receivables' },
+  ]},
+  { id: 'purchases', label: 'Purchases', icon: ShoppingBag, children: [
+    { id: 'suppliers', label: 'Suppliers' }, { id: 'purchase-requests', label: 'Purchase requests' }, { id: 'purchase-orders', label: 'Purchase orders' }, { id: 'bills', label: 'Bills' }, { id: 'supplier-payments', label: 'Supplier payments' }, { id: 'payables', label: 'Payables' },
+  ]},
+  { id: 'expenses', label: 'Expenses', icon: ReceiptText },
+  { id: 'inventory', label: 'Inventory', icon: Package, children: [
+    { id: 'products', label: 'Products & services' }, { id: 'warehouses', label: 'Warehouses' }, { id: 'stock-movements', label: 'Stock movements' }, { id: 'stock-adjustments', label: 'Adjustments' },
+  ]},
+  { id: 'accounting', label: 'Accounting', icon: BookOpen, children: [
+    { id: 'chart-of-accounts', label: 'Chart of accounts' }, { id: 'journals', label: 'Journal entries' }, { id: 'general-ledger', label: 'General ledger' }, { id: 'trial-balance', label: 'Trial balance' },
+  ]},
+  { id: 'reports', label: 'Reports', icon: FileBarChart },
+  { id: 'assets', label: 'Fixed assets', icon: Building2 },
+  { id: 'budgets', label: 'Budgeting', icon: Calculator },
+  { id: 'tax', label: 'Tax', icon: BadgePercent },
+  { id: 'payroll', label: 'Payroll', icon: WalletCards },
+  { id: 'projects', label: 'Projects', icon: FolderKanban },
+];
+
+export const secondaryNavigation: NavItem[] = [
+  { id: 'analytics', label: 'Analytics', icon: Activity },
+  { id: 'ai-assistant', label: 'Cephas AI', icon: Bot },
+  { id: 'documents', label: 'Documents', icon: Files },
+  { id: 'approvals', label: 'Approvals', icon: CheckSquare },
+  { id: 'notifications', label: 'Notifications', icon: BellRing },
+  { id: 'branches', label: 'Branches & centres', icon: GitBranch },
+  { id: 'currencies', label: 'Currencies', icon: Coins },
+  { id: 'users', label: 'Users & roles', icon: Users },
+  { id: 'audit-logs', label: 'Audit logs', icon: ScrollText },
+  { id: 'integrations', label: 'Integrations', icon: Plug },
+  { id: 'security', label: 'Security', icon: ShieldCheck },
+  { id: 'settings', label: 'Settings', icon: Settings },
+];
+
+export const allNavigation = [...primaryNavigation, ...secondaryNavigation];
