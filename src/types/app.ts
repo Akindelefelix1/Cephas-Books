@@ -21,7 +21,12 @@ export interface ModuleDefinition {
   title: string;
   description: string;
   action: string;
-  stats: Array<{ label: string; value: string; change?: string; tone?: 'positive' | 'warning' | 'danger' }>;
+  stats: Array<{
+    label: string;
+    value: string;
+    change?: string;
+    tone?: 'positive' | 'warning' | 'danger';
+  }>;
   columns: TableColumn[];
   rows: TableRow[];
   filters?: string[];

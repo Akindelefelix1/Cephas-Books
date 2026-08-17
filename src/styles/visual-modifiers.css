@@ -1,0 +1,102 @@
+/* Static visual data belongs in named modifiers rather than component inline styles. */
+.plan-usage {
+  width: 72%;
+}
+
+.bar-height-1 {
+  height: 42%;
+}
+.bar-height-2 {
+  height: 58%;
+}
+.bar-height-3 {
+  height: 50%;
+}
+.bar-height-4 {
+  height: 68%;
+}
+.bar-height-5 {
+  height: 74%;
+}
+.bar-height-6 {
+  height: 91%;
+}
+.bar-height-7 {
+  height: 83%;
+}
+.bar-height-8 {
+  height: 97%;
+}
+.bar-height-9 {
+  height: 75%;
+}
+.bar-height-10 {
+  height: 88%;
+}
+.bar-height-11 {
+  height: 96%;
+}
+.bar-height-12 {
+  height: 100%;
+}
+
+.account-marker--1 {
+  background: #1233cc;
+}
+.account-marker--2 {
+  background: #00baff;
+}
+.account-marker--3 {
+  background: #8b5cf6;
+}
+
+.ageing-current {
+  width: 38%;
+}
+.ageing-30 {
+  width: 25%;
+}
+.ageing-60 {
+  width: 18%;
+}
+.ageing-90 {
+  width: 12%;
+}
+.ageing-older {
+  width: 7%;
+}
+
+.account-type-marker--1 {
+  background: #1233cc;
+}
+.account-type-marker--2 {
+  background: #00baff;
+}
+.account-type-marker--3 {
+  background: #8b5cf6;
+}
+.account-type-marker--4 {
+  background: #16a34a;
+}
+.account-type-marker--5 {
+  background: #f59e0b;
+}
+
+.report-bar-1 {
+  height: 42%;
+}
+.report-bar-2 {
+  height: 68%;
+}
+.report-bar-3 {
+  height: 55%;
+}
+.report-bar-4 {
+  height: 82%;
+}
+.report-bar-5 {
+  height: 74%;
+}
+.report-bar-6 {
+  height: 93%;
+}
