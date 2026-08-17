@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Camera,
   ChevronRight,
@@ -10,6 +10,7 @@ import {
   WalletCards,
 } from 'lucide-react';
 import { LandingPage } from '@/pages/LandingPage';
+import { MarketingDetailPage } from '@/pages/MarketingDetailPage';
 import { AuthPage, OnboardingPage } from '@/pages/AuthPages';
 import { AppShell } from '@/layouts/AppShell';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -26,16 +27,22 @@ import {
 import { NotificationsPage, SettingsPage, UsersPage } from '@/pages/AdminPages';
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
+import type { MarketingView } from '@/types/app';
 
 export function App() {
   const [view, setView] = useState<View>('landing');
   const [active, setActive] = useState('dashboard');
   const [quick, setQuick] = useState(false);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [view]);
   const navigate = (id: string) => {
     setActive(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   if (view === 'landing') return <LandingPage onView={setView} />;
+  if (['platform', 'solutions', 'pricing', 'security', 'resources'].includes(view))
+    return <MarketingDetailPage page={view as MarketingView} onView={setView} />;
   if (view === 'login' || view === 'register' || view === 'forgot' || view === 'mfa')
     return <AuthPage mode={view} onView={setView} />;
   if (view === 'onboarding') return <OnboardingPage onComplete={() => setView('app')} />;

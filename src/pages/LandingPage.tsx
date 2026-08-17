@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/brand/Logo';
+import { MarketingFooter } from '@/components/marketing/MarketingFooter';
 import type { View } from '@/types/app';
 
 export function LandingPage({ onView }: { onView: (view: View) => void }) {
@@ -25,11 +26,21 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
       <header className="marketing-nav">
         <Logo />
         <nav className={menu ? 'open' : ''}>
-          <a href="#features">Platform</a>
-          <a href="#solutions">Solutions</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#security">Security</a>
-          <a href="#resources">Resources</a>
+          <button className="marketing-link" onClick={() => onView('platform')}>
+            Platform
+          </button>
+          <button className="marketing-link" onClick={() => onView('solutions')}>
+            Solutions
+          </button>
+          <button className="marketing-link" onClick={() => onView('pricing')}>
+            Pricing
+          </button>
+          <button className="marketing-link" onClick={() => onView('security')}>
+            Security
+          </button>
+          <button className="marketing-link" onClick={() => onView('resources')}>
+            Resources
+          </button>
           <button className="text-button" onClick={() => onView('login')}>
             Sign in
           </button>
@@ -338,38 +349,7 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
           </button>
         </section>
       </main>
-      <footer className="marketing-footer">
-        <div>
-          <Logo />
-          <p>
-            Manage money. Control operations.
-            <br />
-            Understand your business.
-          </p>
-        </div>
-        <div>
-          <strong>Product</strong>
-          <a>Accounting</a>
-          <a>Inventory</a>
-          <a>Banking</a>
-          <a>AI Assistant</a>
-        </div>
-        <div>
-          <strong>Company</strong>
-          <a>About</a>
-          <a>Partners</a>
-          <a>Contact</a>
-          <a>Careers</a>
-        </div>
-        <div>
-          <strong>Resources</strong>
-          <a>Help centre</a>
-          <a>API docs</a>
-          <a>Security</a>
-          <a>Status</a>
-        </div>
-        <small>© 2026 Cephas Technologies. All rights reserved.</small>
-      </footer>
+      <MarketingFooter onView={onView} />
     </div>
   );
 }

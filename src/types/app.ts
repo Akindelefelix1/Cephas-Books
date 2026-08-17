@@ -1,6 +1,9 @@
 import type { LucideIcon } from 'lucide-react';
 
-export type View = 'landing' | 'login' | 'register' | 'forgot' | 'mfa' | 'onboarding' | 'app';
+export type MarketingView = 'platform' | 'solutions' | 'pricing' | 'security' | 'resources';
+
+export type View =
+  'landing' | MarketingView | 'login' | 'register' | 'forgot' | 'mfa' | 'onboarding' | 'app';
 
 export interface NavItem {
   id: string;

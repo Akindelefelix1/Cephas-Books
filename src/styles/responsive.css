@@ -120,6 +120,24 @@
   .platform-band {
     grid-template-columns: 1fr;
   }
+  .detail-hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 35px;
+  }
+  .detail-hero__copy > p {
+    margin-inline: auto;
+  }
+  .detail-hero .landing-actions,
+  .detail-note {
+    justify-content: center;
+  }
+  .detail-hero__visual {
+    min-height: 360px;
+  }
+  .detail-features > div {
+    grid-template-columns: 1fr;
+  }
   .pricing-grid {
     grid-template-columns: 1fr;
     max-width: 500px;
@@ -165,6 +183,17 @@
   }
   .landing-hero h1 {
     font-size: 3.1rem;
+  }
+  .detail-hero {
+    padding-top: 65px;
+  }
+  .detail-hero__copy h1 {
+    font-size: 3.15rem;
+  }
+  .detail-hero__visual {
+    min-height: 300px;
+    transform: scale(0.82);
+    margin: -25px 0;
   }
   .landing-actions,
   .hero-trust {
