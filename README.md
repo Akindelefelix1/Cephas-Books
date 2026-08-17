@@ -1,4 +1,4 @@
-# Cephas Accounting
+# Cephas Books
 
 A responsive React and TypeScript frontend for an AI-powered financial management platform.
 
