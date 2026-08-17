@@ -20,6 +20,9 @@ import {
 import { useState } from 'react';
 import { Logo } from '@/components/brand/Logo';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
+import { MarketingMotion } from '@/components/marketing/MarketingMotion';
+import financeLeader from '@/assets/marketing/finance-leader.png';
+import financeTeam from '@/assets/marketing/finance-team.png';
 import type { MarketingView, View } from '@/types/app';
 
 type PageContent = {
@@ -183,9 +186,11 @@ export function MarketingDetailPage({
   const [menu, setMenu] = useState(false);
   const content = pages[page];
   const HeroIcon = content.icon;
+  const heroImage = page === 'solutions' || page === 'resources' ? financeTeam : financeLeader;
 
   return (
     <div className="marketing marketing-detail">
+      <MarketingMotion />
       <header className="marketing-nav">
         <Logo />
         <nav className={menu ? 'open' : ''}>
@@ -234,14 +239,19 @@ export function MarketingDetailPage({
             </span>
           </div>
           <div className="detail-hero__visual">
-            <div className="detail-orbit detail-orbit--one" />
-            <div className="detail-orbit detail-orbit--two" />
-            <div className="detail-icon">
+            <img src={heroImage} alt="Cephas Books customers making informed business decisions" />
+            <div className="detail-icon detail-icon--photo">
               <HeroIcon />
             </div>
-            <span className="detail-chip detail-chip--one">Clear</span>
-            <span className="detail-chip detail-chip--two">Connected</span>
-            <span className="detail-chip detail-chip--three">Secure</span>
+            <div className="detail-mini-chart">
+              <span>
+                <small>Business health</small>
+                <strong>Excellent</strong>
+              </span>
+              <svg viewBox="0 0 180 55" aria-hidden="true">
+                <path d="M2 48 C28 44 34 29 58 34 S92 27 108 20 S140 23 178 5" />
+              </svg>
+            </div>
           </div>
         </section>
 

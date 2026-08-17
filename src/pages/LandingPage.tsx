@@ -14,15 +14,19 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Logo } from '@/components/brand/Logo';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
+import { MarketingMotion } from '@/components/marketing/MarketingMotion';
+import financeLeader from '@/assets/marketing/finance-leader.png';
+import financeTeam from '@/assets/marketing/finance-team.png';
 import type { View } from '@/types/app';
 
 export function LandingPage({ onView }: { onView: (view: View) => void }) {
   const [menu, setMenu] = useState(false);
   return (
     <div className="marketing">
+      <MarketingMotion />
       <header className="marketing-nav">
         <Logo />
         <nav className={menu ? 'open' : ''}>
@@ -59,9 +63,7 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
               <Sparkles size={14} />
               Built for the way Africa does business <ChevronRight size={14} />
             </div>
-            <h1>
-              Your entire financial operation, <em>finally in sync.</em>
-            </h1>
+            <TypewriterHeading />
             <p>
               Accounting, cash flow, inventory, tax, payroll, and business intelligence—connected in
               one secure financial operating system.
@@ -173,6 +175,103 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
             <span>paystack</span>
             <span>FLUTTERWAVE</span>
             <span>Reliance</span>
+          </div>
+        </section>
+        <section className="visual-story">
+          <div className="visual-story__heading">
+            <div>
+              <span className="section-kicker">Clarity you can act on</span>
+              <h2>Real people. Real decisions. One live financial picture.</h2>
+            </div>
+            <p>
+              Give every decision-maker a shared view of performance—from today’s cash position to
+              the next quarter’s opportunity.
+            </p>
+          </div>
+          <div className="visual-story__grid">
+            <article className="photo-card photo-card--large">
+              <img src={financeLeader} alt="Business leader reviewing financial reports" />
+              <div className="photo-card__caption">
+                <span>Live financial control</span>
+                <strong>Know what changed—and why.</strong>
+              </div>
+            </article>
+            <article className="insight-chart insight-chart--line">
+              <header>
+                <div>
+                  <small>REVENUE MOMENTUM</small>
+                  <strong>₦48.2m</strong>
+                </div>
+                <span>+18.4%</span>
+              </header>
+              <svg viewBox="0 0 520 240" role="img" aria-label="Revenue increasing over six months">
+                <defs>
+                  <linearGradient id="story-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stopColor="#1233cc" stopOpacity=".26" />
+                    <stop offset="1" stopColor="#1233cc" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <g className="chart-gridlines">
+                  <path d="M10 45H510M10 105H510M10 165H510M10 225H510" />
+                </g>
+                <path
+                  className="story-chart-area"
+                  d="M10 205 C70 185 88 150 145 162 S235 142 278 112 S360 128 405 78 S472 70 510 35 V225 H10Z"
+                />
+                <path
+                  className="story-chart-line"
+                  d="M10 205 C70 185 88 150 145 162 S235 142 278 112 S360 128 405 78 S472 70 510 35"
+                />
+              </svg>
+              <footer>
+                <span>Mar</span>
+                <span>Apr</span>
+                <span>May</span>
+                <span>Jun</span>
+                <span>Jul</span>
+                <span>Aug</span>
+              </footer>
+            </article>
+            <article className="insight-chart insight-chart--donut">
+              <header>
+                <div>
+                  <small>CASH ALLOCATION</small>
+                  <strong>Healthy balance</strong>
+                </div>
+                <span>Live</span>
+              </header>
+              <div className="donut-layout">
+                <div
+                  className="donut"
+                  aria-label="Cash allocation: operations 52%, growth 31%, reserve 17%"
+                >
+                  <span>
+                    ₦26.9m<small>available</small>
+                  </span>
+                </div>
+                <ul>
+                  <li>
+                    <i />
+                    Operations <b>52%</b>
+                  </li>
+                  <li>
+                    <i />
+                    Growth <b>31%</b>
+                  </li>
+                  <li>
+                    <i />
+                    Reserve <b>17%</b>
+                  </li>
+                </ul>
+              </div>
+            </article>
+            <article className="photo-card">
+              <img src={financeTeam} alt="Business team collaborating around financial insights" />
+              <div className="photo-card__caption">
+                <span>Built for collaboration</span>
+                <strong>Keep the whole team moving together.</strong>
+              </div>
+            </article>
           </div>
         </section>
         <section className="landing-section" id="features">
@@ -351,5 +450,45 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
       </main>
       <MarketingFooter onView={onView} />
     </div>
+  );
+}
+
+function TypewriterHeading() {
+  const first = 'Your entire financial operation, ';
+  const accent = 'finally in sync.';
+  const fullText = first + accent;
+  const [reducedMotion] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+  const [length, setLength] = useState(() => (reducedMotion ? fullText.length : 0));
+  const [complete, setComplete] = useState(reducedMotion);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+
+    let current = 0;
+    const timer = window.setInterval(() => {
+      current += 1;
+      setLength(current);
+      if (current >= fullText.length) {
+        window.clearInterval(timer);
+        window.setTimeout(() => setComplete(true), 900);
+      }
+    }, 48);
+
+    return () => window.clearInterval(timer);
+  }, [fullText.length, reducedMotion]);
+
+  const firstText = fullText.slice(0, Math.min(length, first.length));
+  const accentText = fullText.slice(first.length, length);
+
+  return (
+    <h1 className={`typewriter-heading ${complete ? 'is-complete' : ''}`} aria-label={fullText}>
+      <span aria-hidden="true">
+        {firstText}
+        <em>{accentText}</em>
+        <i className="typewriter-caret" />
+      </span>
+    </h1>
   );
 }
