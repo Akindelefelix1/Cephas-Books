@@ -238,6 +238,12 @@
   .notification-layout {
     grid-template-columns: 1fr;
   }
+  .profile-page {
+    grid-template-columns: 1fr;
+  }
+  .profile-summary {
+    position: static;
+  }
   .reports-layout {
     grid-template-columns: 1fr;
   }
@@ -609,6 +615,36 @@
     grid-template-columns: 1fr;
     gap: 10px;
   }
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kpi-grid .kpi-card {
+    min-width: 0;
+    padding: 12px;
+  }
+  .kpi-grid .kpi-card header {
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 0.62rem;
+  }
+  .kpi-grid .kpi-card header i {
+    width: 27px;
+    height: 27px;
+  }
+  .kpi-grid .kpi-card header svg {
+    width: 16px;
+    height: 16px;
+  }
+  .kpi-grid .kpi-card > strong {
+    font-size: clamp(0.86rem, 4vw, 1.08rem);
+    white-space: nowrap;
+  }
+  .kpi-grid .kpi-card footer {
+    font-size: 0.56rem;
+  }
+  .kpi-grid .kpi-card footer > span {
+    display: none;
+  }
   .stat-card,
   .kpi-card {
     padding: 14px;
@@ -899,6 +935,44 @@
   .notification-item > button {
     grid-column: 2;
     justify-self: start;
+  }
+  .profile-summary {
+    padding: 22px 18px;
+  }
+  .profile-summary dl {
+    margin-top: 4px;
+  }
+  .profile-section {
+    padding: 18px 16px;
+  }
+  .profile-section .form-grid {
+    gap: 14px;
+  }
+  .profile-section__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .profile-section__actions .button {
+    width: 100%;
+  }
+  .profile-security-row {
+    padding-block: 14px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .profile-security-row > .button,
+  .profile-security-row > .text-button {
+    width: 100%;
+    justify-content: center;
+  }
+  .profile-logout {
+    padding: 18px 16px;
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .profile-logout > button {
+    width: 100%;
+    justify-content: center;
   }
   .command-backdrop {
     padding: 10px;

@@ -646,10 +646,23 @@
   overflow: hidden;
 }
 .notification-item {
+  width: 100%;
   display: flex;
+  align-items: flex-start;
   gap: 12px;
   padding: 16px 18px;
+  border: 0;
   border-bottom: 1px solid #e9ecf1;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.notification-item:hover {
+  background: #f8faff;
+}
+.notification-item.is-read {
+  opacity: 0.68;
 }
 .notification-item > span {
   width: 35px;
@@ -693,4 +706,186 @@
 .notification-prefs > p {
   color: #858e9f;
   font-size: 0.67rem;
+}
+.notification-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.notification-preview > span {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #1233cc;
+  background: #edf0ff;
+}
+.notification-preview > span.success {
+  color: #148b5b;
+  background: #e6f8ef;
+}
+.notification-preview > span.warning {
+  color: #be7900;
+  background: #fff4da;
+}
+.notification-preview small {
+  color: #8790a3;
+}
+.notification-preview p {
+  margin: 8px 0 18px;
+  color: #4d566c;
+  line-height: 1.6;
+}
+.notification-preview button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #1233cc;
+  font-weight: 750;
+  cursor: pointer;
+}
+.profile-page {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.profile-summary {
+  position: sticky;
+  top: 85px;
+  padding: 26px 22px;
+  text-align: center;
+}
+.profile-avatar-large {
+  width: 82px;
+  height: 82px;
+  margin: 0 auto 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  color: #fff;
+  background: linear-gradient(145deg, #1233cc, #00baff);
+  font-size: 1.35rem;
+  font-weight: 850;
+  box-shadow: 0 14px 30px #1233cc2d;
+}
+.profile-summary h2 {
+  margin: 0 0 5px;
+  font-size: 1.05rem;
+}
+.profile-summary > p,
+.profile-summary > span {
+  display: block;
+  margin: 0 0 5px;
+  color: #778196;
+  font-size: 0.72rem;
+}
+.profile-summary > .button {
+  width: 100%;
+  margin: 20px 0;
+  font-size: 0.72rem;
+}
+.profile-summary dl {
+  margin: 0;
+  border-top: 1px solid #e7ebf2;
+}
+.profile-summary dl div {
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #edf0f5;
+  text-align: left;
+}
+.profile-summary dt,
+.profile-summary dd {
+  margin: 0;
+  font-size: 0.65rem;
+}
+.profile-summary dt { color: #858ea0; }
+.profile-summary dd { color: #293247; font-weight: 700; }
+.profile-content {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.profile-section {
+  padding: 24px;
+}
+.profile-section > header {
+  margin-bottom: 22px;
+  padding-bottom: 17px;
+  border-bottom: 1px solid #e8ecf3;
+}
+.profile-section h2,
+.profile-logout h2 {
+  margin: 0 0 5px;
+  font-size: 0.95rem;
+}
+.profile-section header p,
+.profile-logout p {
+  margin: 0;
+  color: #818a9d;
+  font-size: 0.68rem;
+}
+.profile-section__actions {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+.profile-section__actions span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #15865a;
+  font-size: 0.68rem;
+}
+.profile-security-row {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #edf0f5;
+}
+.profile-security-row:last-child { border-bottom: 0; }
+.profile-security-row > span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.profile-security-row > span > svg { color: #1233cc; }
+.profile-security-row strong,
+.profile-security-row small { display: block; }
+.profile-security-row strong { font-size: 0.72rem; }
+.profile-security-row small { margin-top: 4px; color: #848da0; font-size: 0.62rem; }
+.profile-security-row .button { font-size: 0.68rem; }
+.profile-logout {
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-color: #f2d7da;
+}
+.profile-logout > button {
+  min-height: 40px;
+  padding: 9px 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #efc7cc;
+  border-radius: 9px;
+  color: #c73747;
+  background: #fff7f8;
+  font-weight: 750;
+  cursor: pointer;
 }

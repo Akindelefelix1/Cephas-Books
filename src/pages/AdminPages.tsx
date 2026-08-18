@@ -10,6 +10,7 @@ import {
   Globe2,
   KeyRound,
   LockKeyhole,
+  LogOut,
   Mail,
   MapPin,
   MessageSquare,
@@ -17,6 +18,7 @@ import {
   Plus,
   ShieldCheck,
   Smartphone,
+  UserRound,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -540,6 +542,28 @@ export function NotificationsPage() {
     [MessageSquare, 'SMS', false],
     [MessageSquare, 'WhatsApp', false],
   ];
+  type Category = 'All' | 'Financial' | 'Approvals' | 'System';
+  type Notice = (typeof notices)[number];
+  const noticeCategories: Record<string, Exclude<Category, 'All'>> = {
+    'Payment received': 'Financial',
+    'Invoice overdue': 'Financial',
+    'Approval requested': 'Approvals',
+    'Low inventory': 'System',
+    'New login detected': 'System',
+  };
+  const [category, setCategory] = useState<Category>('All');
+  const [selected, setSelected] = useState<Notice | null>(null);
+  const [read, setRead] = useState<string[]>([]);
+  const [channelState, setChannelState] = useState<Record<string, boolean>>(
+    Object.fromEntries(channels.map(([, name, on]) => [name, on])),
+  );
+  const filteredNotices = notices.filter(
+    ([, title]) => category === 'All' || noticeCategories[title] === category,
+  );
+  const openNotice = (notice: Notice) => {
+    setSelected(notice);
+    setRead((items) => (items.includes(notice[1]) ? items : [...items, notice[1]]));
+  };
   return (
     <>
       <PageHeader
@@ -549,15 +573,24 @@ export function NotificationsPage() {
       <div className="notification-layout">
         <section className="panel notification-feed">
           <div className="tabs">
-            <button className="active">
-              All <span>8</span>
-            </button>
-            <button>Financial</button>
-            <button>Approvals</button>
-            <button>System</button>
+            {(['All', 'Financial', 'Approvals', 'System'] as Category[]).map((item) => (
+              <button
+                className={category === item ? 'active' : ''}
+                onClick={() => setCategory(item)}
+                key={item}
+              >
+                {item} {item === 'All' && <span>{notices.length - read.length}</span>}
+              </button>
+            ))}
           </div>
-          {notices.map(([Icon, title, desc, time, tone]) => (
-            <div className="notification-item" key={title}>
+          {filteredNotices.map((notice) => {
+            const [Icon, title, desc, time, tone] = notice;
+            return (
+            <button
+              className={`notification-item ${read.includes(title) ? 'is-read' : ''}`}
+              onClick={() => openNotice(notice)}
+              key={title}
+            >
               <span className={tone}>
                 <Icon />
               </span>
@@ -566,25 +599,135 @@ export function NotificationsPage() {
                 <p>{desc}</p>
                 <small>{time}</small>
               </div>
-              <i />
-            </div>
-          ))}
+              {!read.includes(title) && <i />}
+            </button>
+          )})}
         </section>
         <aside className="panel notification-prefs">
           <h2>Delivery channels</h2>
           <p>Choose how urgent updates reach you.</p>
-          {channels.map(([Icon, name, on]) => (
+          {channels.map(([Icon, name]) => (
             <div className="setting-toggle" key={name}>
               <Icon />
               <span>
                 <strong>{name}</strong>
               </span>
-              <button className={on ? 'on' : ''}>
+              <button
+                className={channelState[name] ? 'on' : ''}
+                onClick={() =>
+                  setChannelState((values) => ({ ...values, [name]: !values[name] }))
+                }
+                role="switch"
+                aria-checked={channelState[name]}
+                aria-label={`${name} notifications`}
+              >
                 <i />
               </button>
             </div>
           ))}
         </aside>
+      </div>
+      <Modal
+        open={Boolean(selected)}
+        onClose={() => setSelected(null)}
+        title={selected?.[1] ?? 'Notification'}
+        subtitle={selected ? `${noticeCategories[selected[1]]} · ${selected[3]}` : undefined}
+        footer={<button className="button" onClick={() => setSelected(null)}>Done</button>}
+      >
+        {selected && (
+          <div className="notification-preview">
+            <span className={selected[4]}>{(() => { const Icon = selected[0]; return <Icon />; })()}</span>
+            <div>
+              <small>{noticeCategories[selected[1]]}</small>
+              <p>{selected[2]}</p>
+              <button onClick={() => setSelected(null)}>
+                Open related record <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </>
+  );
+}
+
+export function ProfilePage({ onLogout }: { onLogout: () => void }) {
+  const [saved, setSaved] = useState(false);
+  const saveProfile = () => {
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1800);
+  };
+
+  return (
+    <>
+      <PageHeader
+        title="My profile"
+        description="Manage your personal details, account security, and workspace preferences."
+      />
+      <div className="profile-page">
+        <aside className="panel profile-summary">
+          <div className="profile-avatar-large">TA</div>
+          <h2>Tobi Adeyemi</h2>
+          <p>Finance Manager</p>
+          <span>Acme Holdings</span>
+          <button className="button button--secondary"><UserRound size={16} /> Change photo</button>
+          <dl>
+            <div><dt>Member since</dt><dd>March 2024</dd></div>
+            <div><dt>Last sign-in</dt><dd>Today, 09:42</dd></div>
+            <div><dt>Account status</dt><dd><Badge>Active</Badge></dd></div>
+          </dl>
+        </aside>
+
+        <div className="profile-content">
+          <section className="panel profile-section">
+            <header><div><h2>Personal information</h2><p>Used for your account and workspace activity.</p></div></header>
+            <div className="form-grid">
+              <label>First name<input defaultValue="Tobi" /></label>
+              <label>Last name<input defaultValue="Adeyemi" /></label>
+              <label>Work email<input type="email" defaultValue="tobi@acme.ng" /></label>
+              <label>Phone number<input type="tel" defaultValue="+234 801 234 5678" /></label>
+              <label>Job title<input defaultValue="Finance Manager" /></label>
+              <label>Department<input defaultValue="Finance & Operations" /></label>
+            </div>
+            <div className="profile-section__actions">
+              {saved && <span><Check size={15} /> Changes saved</span>}
+              <button className="button" onClick={saveProfile}>Save changes</button>
+            </div>
+          </section>
+
+          <section className="panel profile-section">
+            <header><div><h2>Workspace & regional settings</h2><p>Your organisation, language, and local display preferences.</p></div></header>
+            <div className="form-grid">
+              <label>Company<input value="Acme Holdings" readOnly /></label>
+              <label>Role<input value="Finance Manager" readOnly /></label>
+              <label>Language<select defaultValue="English"><option>English</option></select></label>
+              <label>Time zone<select defaultValue="Africa/Lagos"><option>Africa/Lagos (WAT)</option></select></label>
+              <label>Currency<select defaultValue="NGN"><option>NGN — Nigerian Naira</option></select></label>
+              <label>Date format<select defaultValue="DD/MM/YYYY"><option>DD/MM/YYYY</option></select></label>
+            </div>
+          </section>
+
+          <section className="panel profile-section profile-security">
+            <header><div><h2>Security</h2><p>Protect your account and review active access.</p></div></header>
+            <div className="profile-security-row">
+              <span><LockKeyhole /><span><strong>Password</strong><small>Last changed 42 days ago</small></span></span>
+              <button className="button button--secondary">Change password</button>
+            </div>
+            <div className="profile-security-row">
+              <span><ShieldCheck /><span><strong>Two-factor authentication</strong><small>Authenticator app is enabled</small></span></span>
+              <Badge>Enabled</Badge>
+            </div>
+            <div className="profile-security-row">
+              <span><Smartphone /><span><strong>Active session</strong><small>Windows · Lagos, Nigeria · Current device</small></span></span>
+              <button className="text-button">Review sessions</button>
+            </div>
+          </section>
+
+          <section className="panel profile-logout">
+            <div><h2>Sign out</h2><p>End your current Cephas Books session on this device.</p></div>
+            <button onClick={onLogout}><LogOut size={17} /> Log out</button>
+          </section>
+        </div>
       </div>
     </>
   );

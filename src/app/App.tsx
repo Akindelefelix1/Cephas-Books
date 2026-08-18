@@ -24,7 +24,7 @@ import {
   ReportsPage,
   SimpleFeaturePage,
 } from '@/pages/SpecialPages';
-import { NotificationsPage, SettingsPage, UsersPage } from '@/pages/AdminPages';
+import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
 import type { MarketingView } from '@/types/app';
@@ -58,6 +58,7 @@ export function App() {
     if (active === 'ai-assistant') return <AIAssistantPage />;
     if (active === 'users') return <UsersPage />;
     if (active === 'notifications') return <NotificationsPage />;
+    if (active === 'profile') return <ProfilePage onLogout={() => setView('landing')} />;
     if (['settings', 'security', 'integrations', 'branches', 'currencies'].includes(active))
       return <SettingsPage type={active} />;
     if (['budgets', 'tax', 'payroll', 'approvals', 'documents', 'audit-logs'].includes(active))
