@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, Check, Eye, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import type { View } from '@/types/app';
 
@@ -9,6 +10,7 @@ export function AuthPage({
   mode: 'login' | 'register' | 'forgot' | 'mfa';
   onView: (v: View) => void;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
   const content = {
     login: {
       title: 'Welcome back',
@@ -72,7 +74,7 @@ export function AuthPage({
           </div>
           {mode === 'register' && (
             <div className="social-buttons">
-              <button>G&nbsp; Continue with Google</button>
+              <button><GoogleLogo /> Continue with Google</button>
               <button>▦&nbsp; Microsoft</button>
             </div>
           )}
@@ -98,8 +100,8 @@ export function AuthPage({
             <div className="form-stack">
               {mode === 'register' && (
                 <label>
-                  Full name
-                  <input placeholder="e.g. Tobi Adeyemi" />
+                  Company name
+                  <input placeholder="e.g. Acme Holdings" />
                 </label>
               )}
               <label>
@@ -114,8 +116,19 @@ export function AuthPage({
                   Password
                   <div className="input-icon">
                     <LockKeyhole size={17} />
-                    <input type="password" placeholder="At least 8 characters" />
-                    <Eye size={17} />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="At least 8 characters"
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
+                    >
+                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
                   </div>
                 </label>
               )}
@@ -132,8 +145,8 @@ export function AuthPage({
           )}
           {mode === 'register' && (
             <label className="terms">
-              <input type="checkbox" defaultChecked />I agree to the Terms of Service and Privacy
-              Policy.
+              <input type="checkbox" defaultChecked />
+              <span>I agree to the Terms of Service and Privacy Policy.</span>
             </label>
           )}
           <button className="button auth-submit" onClick={submit}>
@@ -154,6 +167,17 @@ export function AuthPage({
         </div>
       </main>
     </div>
+  );
+}
+
+function GoogleLogo() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path fill="#4285f4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.01v2.55h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z" />
+      <path fill="#34a853" d="M12 22c2.7 0 4.98-.9 6.63-2.42l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.05v2.62A10 10 0 0 0 12 22Z" />
+      <path fill="#fbbc05" d="M6.39 13.87A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.87V7.51H3.05A10 10 0 0 0 2 12c0 1.61.38 3.14 1.05 4.49l3.34-2.62Z" />
+      <path fill="#ea4335" d="M12 6c1.47 0 2.79.51 3.83 1.5l2.87-2.88A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.95 5.51l3.34 2.62C7.18 7.76 9.39 6 12 6Z" />
+    </svg>
   );
 }
 
