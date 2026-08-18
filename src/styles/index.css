@@ -4,7 +4,6 @@
 @import './modules.css';
 @import './admin.css';
 @import './visual-modifiers.css';
-@import './responsive.css';
 * {
   box-sizing: border-box;
 }

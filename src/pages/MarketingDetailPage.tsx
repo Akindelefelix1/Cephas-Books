@@ -224,19 +224,39 @@ export function MarketingDetailPage({
             <button
               key={item.id}
               className={`marketing-link ${page === item.id ? 'active' : ''}`}
-              onClick={() => onView(item.id)}
+              onClick={() => {
+                setMenu(false);
+                onView(item.id);
+              }}
             >
               {item.label}
             </button>
           ))}
-          <button className="text-button" onClick={() => onView('login')}>
+          <button
+            className="text-button"
+            onClick={() => {
+              setMenu(false);
+              onView('login');
+            }}
+          >
             Sign in
           </button>
-          <button className="button button--small" onClick={() => onView('register')}>
+          <button
+            className="button button--small"
+            onClick={() => {
+              setMenu(false);
+              onView('register');
+            }}
+          >
             Start free
           </button>
         </nav>
-        <button className="mobile-menu" onClick={() => setMenu(!menu)} aria-label="Toggle menu">
+        <button
+          className="mobile-menu"
+          onClick={() => setMenu(!menu)}
+          aria-label={menu ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={menu}
+        >
           {menu ? <X /> : <Menu />}
         </button>
       </header>

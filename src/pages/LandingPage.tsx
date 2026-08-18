@@ -52,7 +52,12 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
             Start free
           </button>
         </nav>
-        <button className="mobile-menu" onClick={() => setMenu(!menu)}>
+        <button
+          className="mobile-menu"
+          onClick={() => setMenu(!menu)}
+          aria-label={menu ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={menu}
+        >
           {menu ? <X /> : <Menu />}
         </button>
       </header>
