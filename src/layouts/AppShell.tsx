@@ -21,9 +21,13 @@ interface AppShellProps extends PropsWithChildren {
 
 export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [expanded, setExpanded] = useState<string[]>(['sales']);
+  const [expanded, setExpanded] = useState<string[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = (id: string) => {
+    const parent = allNavigation.find((item) => item.children?.some((child) => child.id === id));
+    if (parent) {
+      setExpanded((value) => (value.includes(parent.id) ? value : [...value, parent.id]));
+    }
     onNavigate(id);
     setMobileOpen(false);
   };
@@ -35,6 +39,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
         <div className="nav-entry" key={item.id}>
           <button
             className={`nav-item ${isParentActive ? 'active' : ''}`}
+            aria-expanded={item.children ? expanded.includes(item.id) : undefined}
             onClick={() =>
               item.children
                 ? setExpanded((value) =>
