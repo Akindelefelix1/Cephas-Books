@@ -21,8 +21,11 @@ import { useState } from 'react';
 import { Logo } from '@/components/brand/Logo';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
 import { MarketingMotion } from '@/components/marketing/MarketingMotion';
-import financeLeader from '@/assets/marketing/finance-leader.png';
-import financeTeam from '@/assets/marketing/finance-team.png';
+import platformHero from '@/assets/marketing/platform-hero.png';
+import pricingHero from '@/assets/marketing/pricing-hero.png';
+import resourcesHero from '@/assets/marketing/resources-hero.png';
+import securityHero from '@/assets/marketing/security-hero.png';
+import solutionsHero from '@/assets/marketing/solutions-hero.png';
 import type { MarketingView, View } from '@/types/app';
 
 type PageContent = {
@@ -33,6 +36,29 @@ type PageContent = {
   note: string;
   icon: LucideIcon;
   features: Array<{ icon: LucideIcon; title: string; text: string }>;
+};
+
+const heroImages: Record<MarketingView, { src: string; alt: string }> = {
+  platform: {
+    src: platformHero,
+    alt: 'Finance leader using the Cephas Books platform in a modern office',
+  },
+  solutions: {
+    src: solutionsHero,
+    alt: 'Retail business owner managing her operation with a tablet',
+  },
+  pricing: {
+    src: pricingHero,
+    alt: 'Founder comparing business software plans at his desk',
+  },
+  security: {
+    src: securityHero,
+    alt: 'Security professional protecting financial data in a secure workspace',
+  },
+  resources: {
+    src: resourcesHero,
+    alt: 'Business team learning together in a bright meeting room',
+  },
 };
 
 const pages: Record<MarketingView, PageContent> = {
@@ -186,7 +212,7 @@ export function MarketingDetailPage({
   const [menu, setMenu] = useState(false);
   const content = pages[page];
   const HeroIcon = content.icon;
-  const heroImage = page === 'solutions' || page === 'resources' ? financeTeam : financeLeader;
+  const heroImage = heroImages[page];
 
   return (
     <div className="marketing marketing-detail">
@@ -239,19 +265,11 @@ export function MarketingDetailPage({
             </span>
           </div>
           <div className="detail-hero__visual">
-            <img src={heroImage} alt="Cephas Books customers making informed business decisions" />
+            <img src={heroImage.src} alt={heroImage.alt} />
             <div className="detail-icon detail-icon--photo">
               <HeroIcon />
             </div>
-            <div className="detail-mini-chart">
-              <span>
-                <small>Business health</small>
-                <strong>Excellent</strong>
-              </span>
-              <svg viewBox="0 0 180 55" aria-hidden="true">
-                <path d="M2 48 C28 44 34 29 58 34 S92 27 108 20 S140 23 178 5" />
-              </svg>
-            </div>
+            <HeroChart page={page} />
           </div>
         </section>
 
@@ -290,6 +308,67 @@ export function MarketingDetailPage({
         </section>
       </main>
       <MarketingFooter onView={onView} />
+    </div>
+  );
+}
+
+function HeroChart({ page }: { page: MarketingView }) {
+  if (page === 'solutions') {
+    return (
+      <div className="detail-mini-chart detail-mini-chart--bars">
+        <span><small>Branch performance</small><strong>+24%</strong></span>
+        <div className="hero-bars" aria-label="Branch performance increasing across six periods">
+          {[38, 52, 44, 68, 61, 86].map((height, index) => (
+            <i key={height} style={{ height: `${height}%` }} className={index > 3 ? 'accent' : ''} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (page === 'pricing') {
+    return (
+      <div className="detail-mini-chart detail-mini-chart--plans">
+        <span><small>Best value</small><strong>Professional</strong></span>
+        <div className="hero-plan-chart" aria-label="Relative value of Starter, Professional and Business plans">
+          <i style={{ width: '48%' }}><b>S</b></i>
+          <i className="accent" style={{ width: '92%' }}><b>P</b></i>
+          <i style={{ width: '72%' }}><b>B</b></i>
+        </div>
+      </div>
+    );
+  }
+
+  if (page === 'security') {
+    return (
+      <div className="detail-mini-chart detail-mini-chart--gauge">
+        <span><small>Protection status</small><strong>Secure</strong></span>
+        <div className="hero-gauge" aria-label="Protection score 98 percent">
+          <div><strong>98%</strong><small>protected</small></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (page === 'resources') {
+    return (
+      <div className="detail-mini-chart detail-mini-chart--activity">
+        <span><small>Learning progress</small><strong>12 guides</strong></span>
+        <div className="hero-activity" aria-label="Twelve guides completed this month">
+          {[35, 62, 48, 78, 56, 88, 72].map((height, index) => (
+            <i key={`${height}-${index}`} style={{ height: `${height}%` }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="detail-mini-chart">
+      <span><small>Live cash flow</small><strong>+18.4%</strong></span>
+      <svg viewBox="0 0 180 55" aria-label="Cash flow trending upward">
+        <path d="M2 48 C28 44 34 29 58 34 S92 27 108 20 S140 23 178 5" />
+      </svg>
     </div>
   );
 }
