@@ -433,6 +433,8 @@ p {
 }
 .detail-features article {
   padding: 34px;
+  display: flex;
+  flex-direction: column;
   border: 1px solid #e3e8f1;
   border-radius: 20px;
   background: linear-gradient(145deg, #fff, #f8faff);
@@ -466,6 +468,100 @@ p {
   color: #1233cc;
   font-weight: 750;
   cursor: pointer;
+}
+.feature-chart {
+  min-height: 112px;
+  margin: 8px 0 25px;
+  padding: 14px 15px;
+  border: 1px solid #e2e8f5;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+.feature-chart header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.feature-chart header span,
+.feature-chart--ring small {
+  color: #8892a7;
+  font-size: 0.62rem;
+}
+.feature-chart header strong {
+  color: #1233cc;
+  font-size: 0.78rem;
+}
+.feature-chart--trend svg {
+  width: 100%;
+  height: 63px;
+  margin-top: 5px;
+}
+.feature-chart__area {
+  fill: #e8edff;
+}
+.feature-chart__line {
+  fill: none;
+  stroke: #1233cc;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.feature-chart--bars > div {
+  height: 67px;
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.feature-chart--bars i {
+  flex: 1;
+  border-radius: 4px 4px 1px 1px;
+  background: linear-gradient(180deg, #00baff, #1233cc);
+}
+.feature-chart--ring {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.feature-ring {
+  width: 78px;
+  height: 78px;
+  flex: none;
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(#1233cc 0 84%, #e4e9f6 84%);
+}
+.feature-ring::before {
+  content: '';
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #fff;
+}
+.feature-ring span {
+  grid-area: 1 / 1;
+  z-index: 1;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+.feature-chart--ring p {
+  min-height: 0;
+  margin: 0;
+}
+.feature-chart--ring strong,
+.feature-chart--ring small {
+  display: block;
+}
+.feature-chart--ring strong {
+  margin-bottom: 6px;
+  color: #273149;
+  font-size: 0.72rem;
+}
+.detail-features article > button {
+  margin-top: auto;
 }
 .detail-cta {
   margin-top: 25px;

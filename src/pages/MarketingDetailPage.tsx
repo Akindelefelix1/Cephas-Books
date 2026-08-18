@@ -59,6 +59,34 @@ const heroImages: Record<MarketingView, { src: string; alt: string }> = {
   },
 };
 
+const featureMetrics: Record<MarketingView, Array<{ label: string; value: string }>> = {
+  platform: [
+    { label: 'Match rate', value: '96%' },
+    { label: 'Stock accuracy', value: '92%' },
+    { label: 'Insights answered', value: '84%' },
+  ],
+  solutions: [
+    { label: 'Hours saved', value: '18h' },
+    { label: 'Team adoption', value: '91%' },
+    { label: 'Branches online', value: '12' },
+  ],
+  pricing: [
+    { label: 'Essential value', value: '72%' },
+    { label: 'Most selected', value: '64%' },
+    { label: 'Scale readiness', value: '89%' },
+  ],
+  security: [
+    { label: 'Access protected', value: '98%' },
+    { label: 'Reviews cleared', value: '94%' },
+    { label: 'Actions logged', value: '100%' },
+  ],
+  resources: [
+    { label: 'Issues resolved', value: '93%' },
+    { label: 'Guides completed', value: '24' },
+    { label: 'Useful insights', value: '88%' },
+  ],
+};
+
 const pages: Record<MarketingView, PageContent> = {
   platform: {
     eyebrow: 'The Cephas Books platform',
@@ -301,7 +329,7 @@ export function MarketingDetailPage({
             <h2>Everything you need, without the clutter.</h2>
           </header>
           <div>
-            {content.features.map((feature) => {
+            {content.features.map((feature, index) => {
               const Icon = feature.icon;
               return (
                 <article key={feature.title}>
@@ -310,6 +338,7 @@ export function MarketingDetailPage({
                   </span>
                   <h3>{feature.title}</h3>
                   <p>{feature.text}</p>
+                  <FeatureChart index={index} metric={featureMetrics[page][index]} />
                   <button onClick={() => onView('register')}>
                     Learn more <ArrowRight size={15} />
                   </button>
@@ -330,6 +359,40 @@ export function MarketingDetailPage({
         </section>
       </main>
       <MarketingFooter onView={onView} />
+    </div>
+  );
+}
+
+function FeatureChart({ index, metric }: { index: number; metric: { label: string; value: string } }) {
+  if (index === 1) {
+    return (
+      <div className="feature-chart feature-chart--bars" role="img" aria-label={`${metric.label}: ${metric.value}`}>
+        <header><span>{metric.label}</span><strong>{metric.value}</strong></header>
+        <div>
+          {[42, 58, 51, 73, 68, 91].map((height, barIndex) => (
+            <i key={`${height}-${barIndex}`} style={{ height: `${height}%` }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (index === 2) {
+    return (
+      <div className="feature-chart feature-chart--ring" role="img" aria-label={`${metric.label}: ${metric.value}`}>
+        <div className="feature-ring"><span>{metric.value}</span></div>
+        <p><strong>{metric.label}</strong><small>Live operational data</small></p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="feature-chart feature-chart--trend" role="img" aria-label={`${metric.label}: ${metric.value}`}>
+      <header><span>{metric.label}</span><strong>{metric.value}</strong></header>
+      <svg viewBox="0 0 240 72" preserveAspectRatio="none" aria-hidden="true">
+        <path className="feature-chart__area" d="M0 64 C35 59 42 38 74 45 S118 51 142 29 S188 35 240 8 V72 H0Z" />
+        <path className="feature-chart__line" d="M0 64 C35 59 42 38 74 45 S118 51 142 29 S188 35 240 8" />
+      </svg>
     </div>
   );
 }
