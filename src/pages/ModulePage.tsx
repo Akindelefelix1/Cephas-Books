@@ -5,11 +5,13 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import type { ModuleDefinition } from '@/types/app';
+import { confirmAction } from '@/utils/actions';
 
 export function ModulePage({ definition }: { definition: ModuleDefinition }) {
   const [modal, setModal] = useState(false);
   const [tab, setTab] = useState(definition.tabs?.[0] ?? 'All');
   const [query, setQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const filteredRows = useMemo(() => {
     const firstTab = definition.tabs?.[0];
     const normalizedQuery = query.trim().toLowerCase();
@@ -55,15 +57,30 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
           </div>
           <div>
             {definition.filters?.slice(0, 2).map((filter) => (
-              <button className="filter-button" key={filter}>
+              <button
+                className={`filter-button ${activeFilter === filter ? 'active' : ''}`}
+                key={filter}
+                onClick={() => setActiveFilter((value) => (value === filter ? null : filter))}
+              >
                 {filter}
                 <ChevronDown size={14} />
               </button>
             ))}
-            <button className="filter-button">
+            <button
+              className="filter-button"
+              onClick={() => confirmAction('All available filters are shown above')}
+            >
               <Filter size={15} /> Filters
             </button>
-            <button className="icon-button">
+            <button
+              className="icon-button"
+              aria-label="Reset table view"
+              onClick={() => {
+                setQuery('');
+                setActiveFilter(null);
+                setTab(definition.tabs?.[0] ?? 'All');
+              }}
+            >
               <SlidersHorizontal size={17} />
             </button>
           </div>
@@ -140,6 +157,10 @@ function GenericForm({ title }: { title: string }) {
 }
 
 function InvoiceForm() {
+  const [lineItems, setLineItems] = useState([
+    ['Business software licence', '2', '₦500,000', 'VAT 7.5%', '₦1,000,000'],
+    ['Implementation service', '1', '₦250,000', 'VAT 7.5%', '₦250,000'],
+  ]);
   return (
     <div className="invoice-form">
       <div className="form-grid">
@@ -186,17 +207,18 @@ function InvoiceForm() {
           <span>Tax</span>
           <span>Amount</span>
         </div>
-        {[
-          ['Business software licence', '2', '₦500,000', 'VAT 7.5%', '₦1,000,000'],
-          ['Implementation service', '1', '₦250,000', 'VAT 7.5%', '₦250,000'],
-        ].map((row, i) => (
+        {lineItems.map((row, i) => (
           <div className="invoice-item-row" key={i}>
             {row.map((x, j) => (
               <input key={j} defaultValue={x} />
             ))}
           </div>
         ))}
-        <button>+ Add line item</button>
+        <button
+          onClick={() => setLineItems((items) => [...items, ['', '1', '₦0', 'VAT 7.5%', '₦0']])}
+        >
+          + Add line item
+        </button>
       </div>
       <div className="invoice-bottom">
         <label>

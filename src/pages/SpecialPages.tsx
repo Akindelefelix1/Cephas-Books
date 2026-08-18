@@ -27,6 +27,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
+import { confirmAction, downloadText } from '@/utils/actions';
 
 const ledgerRows = [
   {
@@ -139,8 +140,18 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
                 Debits and credits are balanced
               </footer>
             </div>
-            <button className="button">Confirm match</button>
-            <button className="button button--secondary">Find another match</button>
+            <button
+              className="button"
+              onClick={() => confirmAction('Bank transaction matched and reconciled')}
+            >
+              Confirm match
+            </button>
+            <button
+              className="button button--secondary"
+              onClick={() => confirmAction('Showing alternative transaction matches')}
+            >
+              Find another match
+            </button>
           </div>
         </section>
         <Modal
@@ -158,7 +169,12 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
             <Upload />
             <strong>Drop your bank statement here</strong>
             <p>CSV, OFX, QIF, CAMT.053 or PDF up to 25 MB</p>
-            <button className="button button--secondary">Choose file</button>
+            <button
+              className="button button--secondary"
+              onClick={() => confirmAction('Select a statement using the upload field')}
+            >
+              Choose file
+            </button>
           </div>
         </Modal>
       </>
@@ -187,7 +203,11 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
           <article className="bank-card" key={x[0]}>
             <header>
               <span className={`bank-logo bank-logo--${i}`}>{x[0].slice(0, 2)}</span>
-              <button className="icon-button">
+              <button
+                className="icon-button"
+                aria-label={`Open ${x[0]} account`}
+                onClick={() => confirmAction(`${x[0]} selected`)}
+              >
                 <MoreHorizontal />
               </button>
             </header>
@@ -206,7 +226,10 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
       <section className="panel register-panel">
         <div className="table-toolbar">
           <h2>Recent bank transactions</h2>
-          <button className="filter-button">
+          <button
+            className="filter-button"
+            onClick={() => confirmAction('Showing transactions from all accounts')}
+          >
             All accounts <ChevronDown />
           </button>
         </div>
@@ -258,7 +281,10 @@ export function AccountingPage({ type }: { type: string }) {
               <Search />
               <input placeholder="Search accounts by name or code…" />
             </div>
-            <button className="filter-button">
+            <button
+              className="filter-button"
+              onClick={() => confirmAction('Showing active accounts')}
+            >
               Active accounts <ChevronDown />
             </button>
           </div>
@@ -283,7 +309,11 @@ export function AccountingPage({ type }: { type: string }) {
                 <small>{x[2]}</small>
               </span>
               <b>{x[3]}</b>
-              <button className="row-action">
+              <button
+                className="row-action"
+                aria-label={`Open ${x[1]}`}
+                onClick={() => confirmAction(`${x[1]} account selected`)}
+              >
                 <MoreHorizontal />
               </button>
             </div>
@@ -373,7 +403,12 @@ export function AccountingPage({ type }: { type: string }) {
           subtitle="Total debits must equal total credits before this journal can be posted."
           footer={
             <>
-              <button className="button button--secondary">Save draft</button>
+              <button
+                className="button button--secondary"
+                onClick={() => confirmAction('Journal saved as draft')}
+              >
+                Save draft
+              </button>
               <button className="button" onClick={() => setModal(false)}>
                 Submit for review
               </button>
@@ -424,7 +459,9 @@ export function AccountingPage({ type }: { type: string }) {
                 <input defaultValue={x === 2 ? '100,000.00' : ''} />
               </div>
             ))}
-            <button>+ Add line</button>
+            <button onClick={() => confirmAction('A new journal line was added')}>
+              + Add line
+            </button>
             <footer>
               <span>Total</span>
               <b>₦100,000.00</b>
@@ -450,21 +487,27 @@ export function AccountingPage({ type }: { type: string }) {
         }
       />
       <section className="report-controls">
-        <button>
+        <button onClick={() => confirmAction('Date range selector opened')}>
           1 Aug – 17 Aug 2026 <ChevronDown />
         </button>
-        <button>
+        <button onClick={() => confirmAction('Branch filter opened')}>
           All branches <ChevronDown />
         </button>
-        <button>
+        <button onClick={() => confirmAction('Department filter opened')}>
           All departments <ChevronDown />
         </button>
-        <button>
+        <button onClick={() => confirmAction('Additional filters opened')}>
           More filters <Settings2 />
         </button>
         <span />
-        <button>Export PDF</button>
-        <button>Export Excel</button>
+        <button
+          onClick={() => downloadText('financial-report.pdf.txt', 'Cephas Books financial report')}
+        >
+          Export PDF
+        </button>
+        <button onClick={() => downloadText('financial-report.csv', 'Account,Debit,Credit')}>
+          Export Excel
+        </button>
       </section>
       {isTrial ? (
         <FinancialStatement type="trial" />
@@ -662,6 +705,7 @@ export function FinancialStatement({
 
 export function ReportsPage({ initial }: { initial?: string }) {
   const [report, setReport] = useState(initial ?? 'centre');
+  const [reportCategory, setReportCategory] = useState('All reports');
   const statements = ['profit-loss', 'balance-sheet', 'cash-flow'];
   if (statements.includes(report))
     return (
@@ -677,16 +721,20 @@ export function ReportsPage({ initial }: { initial?: string }) {
           description="Generated from posted accounting transactions in the general ledger."
         />
         <section className="report-controls">
-          <button>
+          <button onClick={() => confirmAction('Report date range opened')}>
             1 Jan – 17 Aug 2026 <ChevronDown />
           </button>
-          <button>
+          <button onClick={() => confirmAction('Consolidation scope opened')}>
             Consolidated <ChevronDown />
           </button>
           <span />
           <button onClick={() => setReport('centre')}>Back to reports</button>
-          <button>Export PDF</button>
-          <button>Export Excel</button>
+          <button onClick={() => downloadText(`${report}.pdf.txt`, `${report} report`)}>
+            Export PDF
+          </button>
+          <button onClick={() => downloadText(`${report}.csv`, 'Account,Amount')}>
+            Export Excel
+          </button>
         </section>
         <FinancialStatement type={report as 'profit-loss' | 'balance-sheet' | 'cash-flow'} />
       </>
@@ -757,7 +805,7 @@ export function ReportsPage({ initial }: { initial?: string }) {
             Higher service revenue and better inventory purchasing contributed ₦2.8m additional
             gross profit.
           </p>
-          <button>
+          <button onClick={() => confirmAction('AI report analysis opened')}>
             View analysis <ArrowRight />
           </button>
         </div>
@@ -782,7 +830,11 @@ export function ReportsPage({ initial }: { initial?: string }) {
             'Custom reports',
             'Scheduled reports',
           ].map((x, i) => (
-            <button className={i === 0 ? 'active' : ''} key={x}>
+            <button
+              className={reportCategory === x ? 'active' : ''}
+              key={x}
+              onClick={() => setReportCategory(x)}
+            >
               {x}
               <span>{[24, 5, 8, 3, 4][i]}</span>
             </button>
@@ -822,7 +874,13 @@ export function AIAssistantPage() {
   return (
     <div className="ai-page">
       <aside>
-        <button className="button">
+        <button
+          className="button"
+          onClick={() => {
+            setQuestion('');
+            setSent(false);
+          }}
+        >
           <Plus />
           New conversation
         </button>
@@ -833,7 +891,14 @@ export function AIAssistantPage() {
           'Q4 cash flow forecast',
           'Marketing spend breakdown',
         ].map((x, i) => (
-          <button className={i === 0 ? 'active' : ''} key={x}>
+          <button
+            className={i === 0 ? 'active' : ''}
+            key={x}
+            onClick={() => {
+              setQuestion(x);
+              setSent(false);
+            }}
+          >
             <MessageSquare />
             {x}
             <MoreHorizontal />
@@ -861,7 +926,11 @@ export function AIAssistantPage() {
               </p>
             </div>
           </div>
-          <button className="icon-button">
+          <button
+            className="icon-button"
+            aria-label="Conversation options"
+            onClick={() => confirmAction('Conversation options opened')}
+          >
             <MoreHorizontal />
           </button>
         </header>
@@ -939,7 +1008,10 @@ export function AIAssistantPage() {
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder="Ask Cephas AI about your business…"
               />
-              <button>
+              <button
+                aria-label="Attach a file"
+                onClick={() => confirmAction('Attachment picker opened')}
+              >
                 <Paperclip />
               </button>
               <button className="send" onClick={() => setSent(true)}>

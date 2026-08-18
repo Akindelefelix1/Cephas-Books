@@ -13,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
+import { confirmAction } from '@/utils/actions';
 
 export function DashboardPage({
   onNavigate,
@@ -37,7 +38,10 @@ export function DashboardPage({
           <span>Here’s how Acme Holdings is performing.</span>
         </div>
         <div>
-          <button className="period-button">
+          <button
+            className="period-button"
+            onClick={() => confirmAction('Reporting period set to this month')}
+          >
             <CalendarDays size={17} />
             This month
             <ChevronDown size={15} />
@@ -96,7 +100,10 @@ export function DashboardPage({
               <h2>Revenue & expenses</h2>
               <p>Income and spending over time</p>
             </div>
-            <button className="select-button">
+            <button
+              className="select-button"
+              onClick={() => confirmAction('Chart range set to the last 6 months')}
+            >
               Last 6 months
               <ChevronDown size={14} />
             </button>
@@ -162,7 +169,11 @@ export function DashboardPage({
               <h2>Cash position</h2>
               <p>Across all bank accounts</p>
             </div>
-            <button className="icon-button">
+            <button
+              className="icon-button"
+              aria-label="Open banking"
+              onClick={() => onNavigate('banking')}
+            >
               <MoreHorizontal size={18} />
             </button>
           </header>
@@ -324,7 +335,9 @@ export function DashboardPage({
               <h2>Recent activity</h2>
               <p>Latest transactions across your business</p>
             </div>
-            <button className="text-button">View all</button>
+            <button className="text-button" onClick={() => onNavigate('transactions')}>
+              View all
+            </button>
           </header>
           <div className="activity-list">
             {transactions.map((t) => (
@@ -352,7 +365,11 @@ export function DashboardPage({
               <Sparkles size={16} />
               CEPHAS AI INSIGHT
             </span>
-            <button className="icon-button">
+            <button
+              className="icon-button"
+              aria-label="Open AI assistant"
+              onClick={() => onNavigate('ai-assistant')}
+            >
               <MoreHorizontal size={18} />
             </button>
           </header>
@@ -375,7 +392,7 @@ export function DashboardPage({
             [Clock3, '6 invoices are overdue', '₦3.12m outstanding', 'Review invoices'],
             [ReceiptText, '8 expenses need approval', 'Oldest waiting 3 days', 'Review approvals'],
             [Wallet, 'Bank reconciliation due', '42 unmatched items', 'Reconcile now'],
-          ].map(([Icon, a, b, c]) => (
+          ].map(([Icon, a, b, c], index) => (
             <div className="task-row" key={String(a)}>
               <i>
                 <Icon size={18} />
@@ -384,7 +401,11 @@ export function DashboardPage({
                 <strong>{String(a)}</strong>
                 <small>{String(b)}</small>
               </span>
-              <button>{String(c)}</button>
+              <button
+                onClick={() => onNavigate(['invoices', 'approvals', 'reconciliation'][index])}
+              >
+                {String(c)}
+              </button>
             </div>
           ))}
         </article>

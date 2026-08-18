@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
+import { confirmAction } from '@/utils/actions';
 import type { View } from '@/types/app';
 
 export function AuthPage({
@@ -83,10 +84,18 @@ export function AuthPage({
           </div>
           {mode === 'register' && (
             <div className="social-buttons">
-              <button>
+              <button
+                onClick={() => confirmAction('Google sign-in requires an authentication provider')}
+              >
                 <GoogleLogo /> Continue with Google
               </button>
-              <button>▦&nbsp; Microsoft</button>
+              <button
+                onClick={() =>
+                  confirmAction('Microsoft sign-in requires an authentication provider')
+                }
+              >
+                ▦&nbsp; Microsoft
+              </button>
             </div>
           )}
           {mode === 'register' && <div className="divider">or use work email</div>}
@@ -174,7 +183,14 @@ export function AuthPage({
               Already have an account? <button onClick={() => onView('login')}>Sign in</button>
             </p>
           )}
-          {mode === 'mfa' && <button className="link-center">Use a recovery code instead</button>}
+          {mode === 'mfa' && (
+            <button
+              className="link-center"
+              onClick={() => confirmAction('Recovery-code entry enabled')}
+            >
+              Use a recovery code instead
+            </button>
+          )}
         </div>
       </main>
     </div>
@@ -301,7 +317,12 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
             </label>
           </div>
           <div className="onboarding-actions">
-            <button className="button button--ghost">Save and exit</button>
+            <button
+              className="button button--ghost"
+              onClick={() => confirmAction('Onboarding progress saved')}
+            >
+              Save and exit
+            </button>
             <button className="button" onClick={onComplete}>
               Continue to financial settings <ArrowRight size={17} />
             </button>

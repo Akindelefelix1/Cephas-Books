@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import {
   Bell,
   Building2,
@@ -27,6 +27,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
+import { confirmAction } from '@/utils/actions';
 
 export function UsersPage() {
   const [modal, setModal] = useState(false);
@@ -75,7 +76,7 @@ export function UsersPage() {
         <aside className="panel role-list">
           <header>
             <h2>Roles</h2>
-            <button>
+            <button aria-label="Add role" onClick={() => confirmAction('Role creator opened')}>
               <Plus />
             </button>
           </header>
@@ -90,7 +91,11 @@ export function UsersPage() {
             ['Auditor', '2', 'Read-only finance'],
             ['Employee', '6', 'Expenses & workflows'],
           ].map((x, i) => (
-            <button className={i === 2 ? 'active' : ''} key={x[0]}>
+            <button
+              className={i === 2 ? 'active' : ''}
+              key={x[0]}
+              onClick={() => confirmAction(`${x[0]} role selected`)}
+            >
               <span>
                 <strong>{x[0]}</strong>
                 <small>{x[2]}</small>
@@ -107,7 +112,12 @@ export function UsersPage() {
             <h2>Accountant permissions</h2>
             <p>Permissions apply across assigned branches.</p>
           </div>
-          <button className="button button--secondary">Edit permissions</button>
+          <button
+            className="button button--secondary"
+            onClick={() => confirmAction('Permission editing enabled')}
+          >
+            Edit permissions
+          </button>
         </header>
         <div className="permission-head">
           <span>Module</span>
@@ -184,7 +194,7 @@ export function SettingsPage({ type = 'settings' }: { type?: string }) {
     ['Security', ShieldCheck, 'MFA, sessions, access policies and backups'],
     ['Integrations', Database, 'Banks, payments, HR, POS and productivity apps'],
   ];
-  const selected =
+  const initialSection =
     type === 'branches'
       ? 1
       : type === 'currencies'
@@ -194,6 +204,7 @@ export function SettingsPage({ type = 'settings' }: { type?: string }) {
           : type === 'integrations'
             ? 7
             : 0;
+  const [selected, setSelected] = useState(initialSection);
   return (
     <>
       <PageHeader
@@ -213,7 +224,11 @@ export function SettingsPage({ type = 'settings' }: { type?: string }) {
       <div className="settings-layout">
         <aside className="settings-nav">
           {sections.map(([name, Icon, desc], i) => (
-            <button className={i === selected ? 'active' : ''} key={String(name)}>
+            <button
+              className={i === selected ? 'active' : ''}
+              key={String(name)}
+              onClick={() => setSelected(i)}
+            >
               <Icon />
               <span>
                 <strong>{String(name)}</strong>
@@ -232,10 +247,52 @@ export function SettingsPage({ type = 'settings' }: { type?: string }) {
             <CurrencySettings />
           ) : selected === 6 ? (
             <SecuritySettings />
-          ) : (
+          ) : selected === 7 ? (
             <Integrations />
+          ) : (
+            <SettingsPlaceholder
+              title={String(sections[selected][0])}
+              description={String(sections[selected][2])}
+            />
           )}
         </section>
+      </div>
+    </>
+  );
+}
+
+function SettingsPlaceholder({ title, description }: { title: string; description: string }) {
+  return (
+    <>
+      <header className="settings-heading">
+        <h2>{title}</h2>
+        <p>{description}</p>
+      </header>
+      <div className="form-grid">
+        <label>
+          Default policy
+          <select>
+            <option>Organisation default</option>
+            <option>Custom</option>
+          </select>
+        </label>
+        <label>
+          Status
+          <select>
+            <option>Enabled</option>
+            <option>Disabled</option>
+          </select>
+        </label>
+        <label className="full">
+          Notes
+          <textarea placeholder={`Add notes for ${title.toLowerCase()}`} />
+        </label>
+      </div>
+      <div className="settings-save">
+        <span>Changes apply across the organisation</span>
+        <button className="button" onClick={() => confirmAction(`${title} settings saved`)}>
+          Save changes
+        </button>
       </div>
     </>
   );
@@ -253,7 +310,11 @@ function OrganisationSettings() {
         <div>
           <strong>Company logo</strong>
           <p>PNG or SVG, at least 256 × 256px.</p>
-          <button>Replace logo</button>
+          <button
+            onClick={() => confirmAction('Choose a new company logo from your profile settings')}
+          >
+            Replace logo
+          </button>
         </div>
       </div>
       <div className="form-grid">
@@ -325,59 +386,190 @@ function OrganisationSettings() {
       </div>
       <div className="settings-save">
         <span>Last saved 2 minutes ago</span>
-        <button className="button">Save changes</button>
+        <button className="button" onClick={() => confirmAction('Organisation settings saved')}>
+          Save changes
+        </button>
       </div>
     </>
   );
 }
+type Branch = { name: string; address: string; details: string; status: string };
+
 function BranchSettings() {
+  const [branches, setBranches] = useState<Branch[]>([
+    {
+      name: 'Lagos Head Office',
+      address: '12 Admiralty Way, Lekki',
+      details: '24 users · 2 warehouses',
+      status: 'Primary',
+    },
+    {
+      name: 'Abuja Branch',
+      address: 'Central Business District',
+      details: '8 users · 1 warehouse',
+      status: 'Active',
+    },
+    {
+      name: 'Ibadan Branch',
+      address: 'Bodija, Ibadan',
+      details: '4 users · 1 warehouse',
+      status: 'Active',
+    },
+    {
+      name: 'Port Harcourt Branch',
+      address: 'GRA Phase 2',
+      details: '3 users · 1 warehouse',
+      status: 'Active',
+    },
+  ]);
+  const [departments, setDepartments] = useState([
+    'Finance',
+    'Sales',
+    'Marketing',
+    'HR',
+    'Operations',
+    'IT',
+    'Production',
+  ]);
+  const [dialog, setDialog] = useState<'branch' | 'department' | null>(null);
+  const [editing, setEditing] = useState<Branch | null>(null);
+  const closeDialog = () => {
+    setDialog(null);
+    setEditing(null);
+  };
+  const saveBranch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const branch = {
+      name: String(data.get('name')),
+      address: String(data.get('address')),
+      details: String(data.get('details') || '0 users · 0 warehouses'),
+      status: editing?.status ?? 'Active',
+    };
+    setBranches((items) =>
+      editing
+        ? items.map((item) => (item.name === editing.name ? branch : item))
+        : [...items, branch],
+    );
+    closeDialog();
+  };
+  const saveDepartment = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = String(new FormData(event.currentTarget).get('name')).trim();
+    if (name && !departments.some((item) => item.toLowerCase() === name.toLowerCase()))
+      setDepartments((items) => [...items, name]);
+    closeDialog();
+  };
   return (
     <>
       <header className="settings-heading">
         <h2>Organisation structure</h2>
         <p>Manage reporting entities, teams, stock locations, and cost allocation.</p>
-        <button className="button">
+        <button className="button" onClick={() => setDialog('branch')}>
           <Plus />
           Add branch
         </button>
       </header>
-      {[
-        ['Lagos Head Office', '12 Admiralty Way, Lekki', '24 users · 2 warehouses', 'Primary'],
-        ['Abuja Branch', 'Central Business District', '8 users · 1 warehouse', 'Active'],
-        ['Ibadan Branch', 'Bodija, Ibadan', '4 users · 1 warehouse', 'Active'],
-        ['Port Harcourt Branch', 'GRA Phase 2', '3 users · 1 warehouse', 'Active'],
-      ].map((x) => (
-        <div className="branch-row" key={x[0]}>
+      {branches.map((branch) => (
+        <div className="branch-row" key={branch.name}>
           <span>
             <Building2 />
           </span>
           <div>
-            <strong>{x[0]}</strong>
+            <strong>{branch.name}</strong>
             <small>
-              {x[1]} · {x[2]}
+              {branch.address} · {branch.details}
             </small>
           </div>
-          <Badge>{x[3]}</Badge>
-          <button className="row-action">
+          <Badge>{branch.status}</Badge>
+          <button
+            className="row-action"
+            aria-label={`Edit ${branch.name}`}
+            onClick={() => {
+              setEditing(branch);
+              setDialog('branch');
+            }}
+          >
             <MoreHorizontal />
           </button>
         </div>
       ))}
       <header className="settings-heading secondary">
         <h2>Departments & cost centres</h2>
-        <button className="button button--secondary">
+        <button className="button button--secondary" onClick={() => setDialog('department')}>
           <Plus />
           Add department
         </button>
       </header>
       <div className="tag-list">
-        {['Finance', 'Sales', 'Marketing', 'HR', 'Operations', 'IT', 'Production'].map((x) => (
-          <span key={x}>
-            {x}
-            <b>×</b>
+        {departments.map((name) => (
+          <span key={name}>
+            {name}
+            <button
+              aria-label={`Remove ${name}`}
+              onClick={() => setDepartments((items) => items.filter((item) => item !== name))}
+            >
+              ×
+            </button>
           </span>
         ))}
       </div>
+      <Modal
+        open={dialog === 'branch'}
+        onClose={closeDialog}
+        title={editing ? 'Edit branch' : 'Add branch'}
+        footer={
+          <>
+            <button className="button button--secondary" onClick={closeDialog}>
+              Cancel
+            </button>
+            <button className="button" type="submit" form="branch-form">
+              Save branch
+            </button>
+          </>
+        }
+      >
+        <form id="branch-form" className="form-grid" onSubmit={saveBranch}>
+          <label className="full">
+            Branch name
+            <input name="name" defaultValue={editing?.name} required />
+          </label>
+          <label className="full">
+            Address
+            <input name="address" defaultValue={editing?.address} required />
+          </label>
+          <label className="full">
+            Capacity summary
+            <input
+              name="details"
+              defaultValue={editing?.details}
+              placeholder="0 users · 0 warehouses"
+            />
+          </label>
+        </form>
+      </Modal>
+      <Modal
+        open={dialog === 'department'}
+        onClose={closeDialog}
+        title="Add department"
+        footer={
+          <>
+            <button className="button button--secondary" onClick={closeDialog}>
+              Cancel
+            </button>
+            <button className="button" type="submit" form="department-form">
+              Add department
+            </button>
+          </>
+        }
+      >
+        <form id="department-form" className="form-grid" onSubmit={saveDepartment}>
+          <label className="full">
+            Department name
+            <input name="name" autoFocus required />
+          </label>
+        </form>
+      </Modal>
     </>
   );
 }
@@ -387,7 +579,7 @@ function CurrencySettings() {
       <header className="settings-heading">
         <h2>Currency management</h2>
         <p>Record foreign transactions and recognise realised or unrealised gains and losses.</p>
-        <button className="button">
+        <button className="button" onClick={() => confirmAction('Currency form opened')}>
           <Plus />
           Add currency
         </button>
@@ -409,7 +601,11 @@ function CurrencySettings() {
             <strong>₦{x[3]}</strong>
           </span>
           <Badge>{x[4]}</Badge>
-          <button className="row-action">
+          <button
+            className="row-action"
+            aria-label={`Edit ${x[0]}`}
+            onClick={() => confirmAction(`${x[0]} currency selected`)}
+          >
             <MoreHorizontal />
           </button>
         </div>
@@ -436,6 +632,9 @@ function SecuritySettings() {
     [Mail, 'Login alerts', 'Notify users of new devices and unusual access', true],
     [ShieldCheck, 'IP allowlist', 'Restrict administrator access to trusted networks', false],
   ];
+  const [enabled, setEnabled] = useState<Record<string, boolean>>(
+    Object.fromEntries(controls.map(([, title, , on]) => [title, on])),
+  );
   return (
     <>
       <header className="settings-heading">
@@ -455,14 +654,19 @@ function SecuritySettings() {
         </span>
         <b>86%</b>
       </div>
-      {controls.map(([Icon, title, desc, on]) => (
+      {controls.map(([Icon, title, desc]) => (
         <div className="setting-toggle" key={title}>
           <Icon />
           <span>
             <strong>{title}</strong>
             <small>{desc}</small>
           </span>
-          <button className={on ? 'on' : ''}>
+          <button
+            className={enabled[title] ? 'on' : ''}
+            role="switch"
+            aria-checked={enabled[title]}
+            onClick={() => setEnabled((items) => ({ ...items, [title]: !items[title] }))}
+          >
             <i />
           </button>
         </div>
@@ -471,6 +675,7 @@ function SecuritySettings() {
   );
 }
 function Integrations() {
+  const [connected, setConnected] = useState(['Cephas POS', 'Cephas HR', 'Paystack', 'GTBank']);
   return (
     <>
       <header className="settings-heading">
@@ -492,9 +697,18 @@ function Integrations() {
               <strong>{x[0]}</strong>
               <small>{x[1]}</small>
             </div>
-            <button className={x[3] === 'Connected' ? 'connected' : ''}>
-              {x[3] === 'Connected' && <Check />}
-              {x[3]}
+            <button
+              className={connected.includes(String(x[0])) ? 'connected' : ''}
+              onClick={() =>
+                setConnected((items) =>
+                  items.includes(String(x[0]))
+                    ? items.filter((item) => item !== x[0])
+                    : [...items, String(x[0])],
+                )
+              }
+            >
+              {connected.includes(String(x[0])) && <Check />}
+              {connected.includes(String(x[0])) ? 'Connected' : 'Connect'}
             </button>
           </article>
         ))}
@@ -678,7 +892,10 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
           <h2>Tobi Adeyemi</h2>
           <p>Finance Manager</p>
           <span>Acme Holdings</span>
-          <button className="button button--secondary">
+          <button
+            className="button button--secondary"
+            onClick={() => confirmAction('Photo chooser opened')}
+          >
             <UserRound size={16} /> Change photo
           </button>
           <dl>
@@ -803,7 +1020,12 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
                   <small>Last changed 42 days ago</small>
                 </span>
               </span>
-              <button className="button button--secondary">Change password</button>
+              <button
+                className="button button--secondary"
+                onClick={() => confirmAction('Password change instructions sent to your email')}
+              >
+                Change password
+              </button>
             </div>
             <div className="profile-security-row">
               <span>
@@ -823,7 +1045,12 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
                   <small>Windows · Lagos, Nigeria · Current device</small>
                 </span>
               </span>
-              <button className="text-button">Review sessions</button>
+              <button
+                className="text-button"
+                onClick={() => confirmAction('You have one active session on this device')}
+              >
+                Review sessions
+              </button>
             </div>
           </section>
 

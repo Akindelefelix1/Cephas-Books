@@ -500,8 +500,12 @@
   background: #f1f3f7;
   font-size: 0.65rem;
 }
-.tag-list b {
+.tag-list button {
   margin-left: 8px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
 }
 .currency-row > b {
   width: 38px;

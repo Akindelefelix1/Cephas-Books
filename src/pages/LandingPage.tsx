@@ -79,7 +79,10 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
               <button className="button button--large" onClick={() => onView('register')}>
                 Start your free trial <ArrowRight size={18} />
               </button>
-              <button className="button button--ghost button--large">
+              <button
+                className="button button--ghost button--large"
+                onClick={() => onView('platform')}
+              >
                 <Play size={17} fill="currentColor" />
                 Watch overview
               </button>
@@ -121,7 +124,7 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
                       <small>FINANCIAL OVERVIEW</small>
                       <strong>Good morning, Tobi</strong>
                     </div>
-                    <button>+ Create</button>
+                    <button onClick={() => onView('register')}>+ Create</button>
                   </div>
                   <div className="preview-stats">
                     <div>

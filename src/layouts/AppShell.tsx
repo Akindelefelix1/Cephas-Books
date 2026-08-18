@@ -99,7 +99,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
           </div>
           <small>7 of 10 seats used</small>
         </div>
-        <button className="organisation">
+        <button className="organisation" onClick={() => navigate('settings')}>
           <span className="avatar avatar--square">AC</span>
           <span>
             <strong>Acme Holdings</strong>
