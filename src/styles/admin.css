@@ -808,8 +808,13 @@
   margin: 0;
   font-size: 0.65rem;
 }
-.profile-summary dt { color: #858ea0; }
-.profile-summary dd { color: #293247; font-weight: 700; }
+.profile-summary dt {
+  color: #858ea0;
+}
+.profile-summary dd {
+  color: #293247;
+  font-weight: 700;
+}
 .profile-content {
   min-width: 0;
   display: grid;
@@ -856,18 +861,32 @@
   gap: 16px;
   border-bottom: 1px solid #edf0f5;
 }
-.profile-security-row:last-child { border-bottom: 0; }
+.profile-security-row:last-child {
+  border-bottom: 0;
+}
 .profile-security-row > span {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.profile-security-row > span > svg { color: #1233cc; }
+.profile-security-row > span > svg {
+  color: #1233cc;
+}
 .profile-security-row strong,
-.profile-security-row small { display: block; }
-.profile-security-row strong { font-size: 0.72rem; }
-.profile-security-row small { margin-top: 4px; color: #848da0; font-size: 0.62rem; }
-.profile-security-row .button { font-size: 0.68rem; }
+.profile-security-row small {
+  display: block;
+}
+.profile-security-row strong {
+  font-size: 0.72rem;
+}
+.profile-security-row small {
+  margin-top: 4px;
+  color: #848da0;
+  font-size: 0.62rem;
+}
+.profile-security-row .button {
+  font-size: 0.68rem;
+}
 .profile-logout {
   padding: 22px 24px;
   display: flex;

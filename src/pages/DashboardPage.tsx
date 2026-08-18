@@ -268,16 +268,32 @@ export function DashboardPage({
           </header>
           <div className="profitability-summary">
             <strong>38.6%</strong>
-            <span><ArrowUpRight size={14} /> 4.2 pts vs last quarter</span>
+            <span>
+              <ArrowUpRight size={14} /> 4.2 pts vs last quarter
+            </span>
           </div>
-          <div className="margin-chart" aria-label="Gross margin increased from 29 to 38.6 percent over six months">
+          <div
+            className="margin-chart"
+            aria-label="Gross margin increased from 29 to 38.6 percent over six months"
+          >
             {[29, 31, 30, 34, 36, 39].map((value, index) => (
-              <i key={value} style={{ height: `${value * 2}%` }} className={index === 5 ? 'active' : ''}>
+              <i
+                key={value}
+                style={{ height: `${value * 2}%` }}
+                className={index === 5 ? 'active' : ''}
+              >
                 <span>{value}%</span>
               </i>
             ))}
           </div>
-          <div className="margin-months"><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span></div>
+          <div className="margin-months">
+            <span>Mar</span>
+            <span>Apr</span>
+            <span>May</span>
+            <span>Jun</span>
+            <span>Jul</span>
+            <span>Aug</span>
+          </div>
         </article>
         <article className="panel budget-panel">
           <header className="panel-header">
@@ -287,11 +303,18 @@ export function DashboardPage({
             </div>
           </header>
           <div className="budget-ring" aria-label="68 percent of operating budget used">
-            <div><strong>68%</strong><small>used</small></div>
+            <div>
+              <strong>68%</strong>
+              <small>used</small>
+            </div>
           </div>
           <div className="budget-values">
-            <span>Spent <b>â‚¦18.4m</b></span>
-            <span>Remaining <b>â‚¦8.6m</b></span>
+            <span>
+              Spent <b>â‚¦18.4m</b>
+            </span>
+            <span>
+              Remaining <b>â‚¦8.6m</b>
+            </span>
           </div>
           <small className="budget-status">On track · 14 days remaining</small>
         </article>

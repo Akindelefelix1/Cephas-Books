@@ -586,22 +586,23 @@ export function NotificationsPage() {
           {filteredNotices.map((notice) => {
             const [Icon, title, desc, time, tone] = notice;
             return (
-            <button
-              className={`notification-item ${read.includes(title) ? 'is-read' : ''}`}
-              onClick={() => openNotice(notice)}
-              key={title}
-            >
-              <span className={tone}>
-                <Icon />
-              </span>
-              <div>
-                <strong>{title}</strong>
-                <p>{desc}</p>
-                <small>{time}</small>
-              </div>
-              {!read.includes(title) && <i />}
-            </button>
-          )})}
+              <button
+                className={`notification-item ${read.includes(title) ? 'is-read' : ''}`}
+                onClick={() => openNotice(notice)}
+                key={title}
+              >
+                <span className={tone}>
+                  <Icon />
+                </span>
+                <div>
+                  <strong>{title}</strong>
+                  <p>{desc}</p>
+                  <small>{time}</small>
+                </div>
+                {!read.includes(title) && <i />}
+              </button>
+            );
+          })}
         </section>
         <aside className="panel notification-prefs">
           <h2>Delivery channels</h2>
@@ -614,9 +615,7 @@ export function NotificationsPage() {
               </span>
               <button
                 className={channelState[name] ? 'on' : ''}
-                onClick={() =>
-                  setChannelState((values) => ({ ...values, [name]: !values[name] }))
-                }
+                onClick={() => setChannelState((values) => ({ ...values, [name]: !values[name] }))}
                 role="switch"
                 aria-checked={channelState[name]}
                 aria-label={`${name} notifications`}
@@ -632,11 +631,20 @@ export function NotificationsPage() {
         onClose={() => setSelected(null)}
         title={selected?.[1] ?? 'Notification'}
         subtitle={selected ? `${noticeCategories[selected[1]]} · ${selected[3]}` : undefined}
-        footer={<button className="button" onClick={() => setSelected(null)}>Done</button>}
+        footer={
+          <button className="button" onClick={() => setSelected(null)}>
+            Done
+          </button>
+        }
       >
         {selected && (
           <div className="notification-preview">
-            <span className={selected[4]}>{(() => { const Icon = selected[0]; return <Icon />; })()}</span>
+            <span className={selected[4]}>
+              {(() => {
+                const Icon = selected[0];
+                return <Icon />;
+              })()}
+            </span>
             <div>
               <small>{noticeCategories[selected[1]]}</small>
               <p>{selected[2]}</p>
@@ -670,62 +678,163 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
           <h2>Tobi Adeyemi</h2>
           <p>Finance Manager</p>
           <span>Acme Holdings</span>
-          <button className="button button--secondary"><UserRound size={16} /> Change photo</button>
+          <button className="button button--secondary">
+            <UserRound size={16} /> Change photo
+          </button>
           <dl>
-            <div><dt>Member since</dt><dd>March 2024</dd></div>
-            <div><dt>Last sign-in</dt><dd>Today, 09:42</dd></div>
-            <div><dt>Account status</dt><dd><Badge>Active</Badge></dd></div>
+            <div>
+              <dt>Member since</dt>
+              <dd>March 2024</dd>
+            </div>
+            <div>
+              <dt>Last sign-in</dt>
+              <dd>Today, 09:42</dd>
+            </div>
+            <div>
+              <dt>Account status</dt>
+              <dd>
+                <Badge>Active</Badge>
+              </dd>
+            </div>
           </dl>
         </aside>
 
         <div className="profile-content">
           <section className="panel profile-section">
-            <header><div><h2>Personal information</h2><p>Used for your account and workspace activity.</p></div></header>
+            <header>
+              <div>
+                <h2>Personal information</h2>
+                <p>Used for your account and workspace activity.</p>
+              </div>
+            </header>
             <div className="form-grid">
-              <label>First name<input defaultValue="Tobi" /></label>
-              <label>Last name<input defaultValue="Adeyemi" /></label>
-              <label>Work email<input type="email" defaultValue="tobi@acme.ng" /></label>
-              <label>Phone number<input type="tel" defaultValue="+234 801 234 5678" /></label>
-              <label>Job title<input defaultValue="Finance Manager" /></label>
-              <label>Department<input defaultValue="Finance & Operations" /></label>
+              <label>
+                First name
+                <input defaultValue="Tobi" />
+              </label>
+              <label>
+                Last name
+                <input defaultValue="Adeyemi" />
+              </label>
+              <label>
+                Work email
+                <input type="email" defaultValue="tobi@acme.ng" />
+              </label>
+              <label>
+                Phone number
+                <input type="tel" defaultValue="+234 801 234 5678" />
+              </label>
+              <label>
+                Job title
+                <input defaultValue="Finance Manager" />
+              </label>
+              <label>
+                Department
+                <input defaultValue="Finance & Operations" />
+              </label>
             </div>
             <div className="profile-section__actions">
-              {saved && <span><Check size={15} /> Changes saved</span>}
-              <button className="button" onClick={saveProfile}>Save changes</button>
+              {saved && (
+                <span>
+                  <Check size={15} /> Changes saved
+                </span>
+              )}
+              <button className="button" onClick={saveProfile}>
+                Save changes
+              </button>
             </div>
           </section>
 
           <section className="panel profile-section">
-            <header><div><h2>Workspace & regional settings</h2><p>Your organisation, language, and local display preferences.</p></div></header>
+            <header>
+              <div>
+                <h2>Workspace & regional settings</h2>
+                <p>Your organisation, language, and local display preferences.</p>
+              </div>
+            </header>
             <div className="form-grid">
-              <label>Company<input value="Acme Holdings" readOnly /></label>
-              <label>Role<input value="Finance Manager" readOnly /></label>
-              <label>Language<select defaultValue="English"><option>English</option></select></label>
-              <label>Time zone<select defaultValue="Africa/Lagos"><option>Africa/Lagos (WAT)</option></select></label>
-              <label>Currency<select defaultValue="NGN"><option>NGN — Nigerian Naira</option></select></label>
-              <label>Date format<select defaultValue="DD/MM/YYYY"><option>DD/MM/YYYY</option></select></label>
+              <label>
+                Company
+                <input value="Acme Holdings" readOnly />
+              </label>
+              <label>
+                Role
+                <input value="Finance Manager" readOnly />
+              </label>
+              <label>
+                Language
+                <select defaultValue="English">
+                  <option>English</option>
+                </select>
+              </label>
+              <label>
+                Time zone
+                <select defaultValue="Africa/Lagos">
+                  <option>Africa/Lagos (WAT)</option>
+                </select>
+              </label>
+              <label>
+                Currency
+                <select defaultValue="NGN">
+                  <option>NGN — Nigerian Naira</option>
+                </select>
+              </label>
+              <label>
+                Date format
+                <select defaultValue="DD/MM/YYYY">
+                  <option>DD/MM/YYYY</option>
+                </select>
+              </label>
             </div>
           </section>
 
           <section className="panel profile-section profile-security">
-            <header><div><h2>Security</h2><p>Protect your account and review active access.</p></div></header>
+            <header>
+              <div>
+                <h2>Security</h2>
+                <p>Protect your account and review active access.</p>
+              </div>
+            </header>
             <div className="profile-security-row">
-              <span><LockKeyhole /><span><strong>Password</strong><small>Last changed 42 days ago</small></span></span>
+              <span>
+                <LockKeyhole />
+                <span>
+                  <strong>Password</strong>
+                  <small>Last changed 42 days ago</small>
+                </span>
+              </span>
               <button className="button button--secondary">Change password</button>
             </div>
             <div className="profile-security-row">
-              <span><ShieldCheck /><span><strong>Two-factor authentication</strong><small>Authenticator app is enabled</small></span></span>
+              <span>
+                <ShieldCheck />
+                <span>
+                  <strong>Two-factor authentication</strong>
+                  <small>Authenticator app is enabled</small>
+                </span>
+              </span>
               <Badge>Enabled</Badge>
             </div>
             <div className="profile-security-row">
-              <span><Smartphone /><span><strong>Active session</strong><small>Windows · Lagos, Nigeria · Current device</small></span></span>
+              <span>
+                <Smartphone />
+                <span>
+                  <strong>Active session</strong>
+                  <small>Windows · Lagos, Nigeria · Current device</small>
+                </span>
+              </span>
               <button className="text-button">Review sessions</button>
             </div>
           </section>
 
           <section className="panel profile-logout">
-            <div><h2>Sign out</h2><p>End your current Cephas Books session on this device.</p></div>
-            <button onClick={onLogout}><LogOut size={17} /> Log out</button>
+            <div>
+              <h2>Sign out</h2>
+              <p>End your current Cephas Books session on this device.</p>
+            </div>
+            <button onClick={onLogout}>
+              <LogOut size={17} /> Log out
+            </button>
           </section>
         </div>
       </div>

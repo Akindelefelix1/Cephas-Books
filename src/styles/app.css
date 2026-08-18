@@ -702,8 +702,13 @@
   display: block;
   font-size: 0.58rem;
 }
-.budget-values span { color: #8790a2; }
-.budget-values b { margin-top: 3px; color: #283146; }
+.budget-values span {
+  color: #8790a2;
+}
+.budget-values b {
+  margin-top: 3px;
+  color: #283146;
+}
 .activity-panel {
   grid-column: span 2;
 }

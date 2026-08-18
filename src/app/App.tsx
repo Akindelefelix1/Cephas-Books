@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
+  ArrowLeft,
   Camera,
   ChevronRight,
   FileText,
   Landmark,
-  Plus,
   ReceiptText,
   ShoppingCart,
   WalletCards,
@@ -71,7 +71,7 @@ export function App() {
       <QuickCreate
         open={quick}
         onClose={() => setQuick(false)}
-        onChoose={(id) => {
+        onComplete={(id) => {
           setQuick(false);
           navigate(id);
         }}
@@ -83,12 +83,13 @@ export function App() {
 function QuickCreate({
   open,
   onClose,
-  onChoose,
+  onComplete,
 }: {
   open: boolean;
   onClose: () => void;
-  onChoose: (id: string) => void;
+  onComplete: (id: string) => void;
 }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const choices = [
     ['Invoice', 'Bill a customer', FileText, 'invoices'],
     ['Expense', 'Record spend or scan receipt', ReceiptText, 'expenses'],
@@ -97,26 +98,131 @@ function QuickCreate({
     ['Transaction', 'Deposit, withdrawal or transfer', Landmark, 'transactions'],
     ['Capture receipt', 'Use camera or upload file', Camera, 'expenses'],
   ];
+  const selected = choices.find((choice) => choice[0] === selectedId);
+  const close = () => {
+    setSelectedId(null);
+    onClose();
+  };
+  const complete = () => {
+    if (!selected) return;
+    setSelectedId(null);
+    onComplete(String(selected[3]));
+  };
   return (
-    <Modal open={open} onClose={onClose} title="Quick create" subtitle="What would you like to do?">
-      <div className="quick-create-grid">
-        {choices.map(([title, desc, Icon, id]) => (
-          <button key={String(title)} onClick={() => onChoose(String(id))}>
-            <i>
-              <Icon />
-            </i>
-            <span>
-              <strong>{String(title)}</strong>
-              <small>{String(desc)}</small>
-            </span>
-            <ChevronRight />
-          </button>
-        ))}
-      </div>
-      <button className="quick-create-more">
-        <Plus />
-        Show all create actions
-      </button>
+    <Modal
+      open={open}
+      onClose={close}
+      title={selected ? `Create ${String(selected[0]).toLowerCase()}` : 'Quick create'}
+      subtitle={selected ? String(selected[1]) : 'What would you like to do?'}
+      wide={Boolean(selected)}
+      footer={
+        selected ? (
+          <>
+            <button className="button button--secondary" onClick={() => setSelectedId(null)}>
+              <ArrowLeft size={16} /> Back
+            </button>
+            <button className="button" type="submit" form="quick-action-form">
+              Save {String(selected[0]).toLowerCase()}
+            </button>
+          </>
+        ) : undefined
+      }
+    >
+      {selected ? (
+        <QuickActionForm action={String(selected[0])} onSubmit={complete} />
+      ) : (
+        <div className="quick-create-grid">
+          {choices.map(([title, desc, Icon]) => (
+            <button key={String(title)} onClick={() => setSelectedId(String(title))}>
+              <i>
+                <Icon />
+              </i>
+              <span>
+                <strong>{String(title)}</strong>
+                <small>{String(desc)}</small>
+              </span>
+              <ChevronRight />
+            </button>
+          ))}
+        </div>
+      )}
     </Modal>
+  );
+}
+
+function QuickActionForm({ action, onSubmit }: { action: string; onSubmit: () => void }) {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSubmit();
+  };
+  if (action === 'Capture receipt') {
+    return (
+      <form id="quick-action-form" className="quick-action-form" onSubmit={submit}>
+        <label className="full upload-field">
+          <input type="file" accept="image/*,.pdf" required />
+          <span>
+            Take a photo or <b>choose a receipt</b>
+          </span>
+          <small>JPG, PNG or PDF · max 10 MB</small>
+        </label>
+        <label>
+          Merchant
+          <input placeholder="Merchant name" required />
+        </label>
+        <label>
+          Amount
+          <input type="number" min="0.01" step="0.01" placeholder="₦ 0.00" required />
+        </label>
+        <label className="full">
+          Notes
+          <textarea placeholder="Add context or notes..." />
+        </label>
+      </form>
+    );
+  }
+
+  const isMoneyIn = action === 'Invoice' || action === 'Payment';
+  const today = new Date().toLocaleDateString('en-CA');
+  return (
+    <form id="quick-action-form" className="quick-action-form" onSubmit={submit}>
+      <label>
+        {isMoneyIn ? 'Customer' : action === 'Transaction' ? 'Account' : 'Supplier / merchant'}
+        <input placeholder={isMoneyIn ? 'Select or enter customer' : 'Enter details'} required />
+      </label>
+      <label>
+        Amount
+        <input type="number" min="0.01" step="0.01" placeholder="₦ 0.00" required />
+      </label>
+      <label>
+        Date
+        <input type="date" defaultValue={today} required />
+      </label>
+      <label>
+        {action === 'Transaction' ? 'Transaction type' : 'Category'}
+        <select>
+          {action === 'Transaction' ? (
+            <>
+              <option>Deposit</option>
+              <option>Withdrawal</option>
+              <option>Transfer</option>
+            </>
+          ) : (
+            <>
+              <option>Sales / services</option>
+              <option>Operations</option>
+              <option>Other</option>
+            </>
+          )}
+        </select>
+      </label>
+      <label className="full">
+        Reference
+        <input placeholder={`${action} reference`} />
+      </label>
+      <label className="full">
+        Description
+        <textarea placeholder="Add notes or context..." />
+      </label>
+    </form>
   );
 }

@@ -305,14 +305,13 @@
   color: #8b93a4;
   margin-top: 3px;
 }
-.quick-create-more {
-  display: flex;
-  margin: 15px auto 0;
-  border: 0;
-  background: none;
-  color: #1233cc;
-  font-size: 0.68rem;
-  font-weight: 700;
+.quick-action-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.quick-action-form .full {
+  grid-column: 1 / -1;
 }
 .command-backdrop {
   position: fixed;

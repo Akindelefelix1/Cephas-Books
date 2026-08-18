@@ -768,6 +768,12 @@
   .quick-create-grid {
     grid-template-columns: 1fr;
   }
+  .quick-action-form {
+    grid-template-columns: 1fr;
+  }
+  .quick-action-form .full {
+    grid-column: auto;
+  }
   .modal__body {
     padding-inline: 15px;
   }

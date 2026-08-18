@@ -130,7 +130,11 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
               <Bell size={19} />
               <i />
             </button>
-            <button className="profile" onClick={() => navigate('profile')} aria-label="Open profile">
+            <button
+              className="profile"
+              onClick={() => navigate('profile')}
+              aria-label="Open profile"
+            >
               <span className="avatar">TA</span>
               <span>
                 <strong>Tobi Adeyemi</strong>

@@ -363,11 +363,24 @@ export function MarketingDetailPage({
   );
 }
 
-function FeatureChart({ index, metric }: { index: number; metric: { label: string; value: string } }) {
+function FeatureChart({
+  index,
+  metric,
+}: {
+  index: number;
+  metric: { label: string; value: string };
+}) {
   if (index === 1) {
     return (
-      <div className="feature-chart feature-chart--bars" role="img" aria-label={`${metric.label}: ${metric.value}`}>
-        <header><span>{metric.label}</span><strong>{metric.value}</strong></header>
+      <div
+        className="feature-chart feature-chart--bars"
+        role="img"
+        aria-label={`${metric.label}: ${metric.value}`}
+      >
+        <header>
+          <span>{metric.label}</span>
+          <strong>{metric.value}</strong>
+        </header>
         <div>
           {[42, 58, 51, 73, 68, 91].map((height, barIndex) => (
             <i key={`${height}-${barIndex}`} style={{ height: `${height}%` }} />
@@ -379,19 +392,41 @@ function FeatureChart({ index, metric }: { index: number; metric: { label: strin
 
   if (index === 2) {
     return (
-      <div className="feature-chart feature-chart--ring" role="img" aria-label={`${metric.label}: ${metric.value}`}>
-        <div className="feature-ring"><span>{metric.value}</span></div>
-        <p><strong>{metric.label}</strong><small>Live operational data</small></p>
+      <div
+        className="feature-chart feature-chart--ring"
+        role="img"
+        aria-label={`${metric.label}: ${metric.value}`}
+      >
+        <div className="feature-ring">
+          <span>{metric.value}</span>
+        </div>
+        <p>
+          <strong>{metric.label}</strong>
+          <small>Live operational data</small>
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="feature-chart feature-chart--trend" role="img" aria-label={`${metric.label}: ${metric.value}`}>
-      <header><span>{metric.label}</span><strong>{metric.value}</strong></header>
+    <div
+      className="feature-chart feature-chart--trend"
+      role="img"
+      aria-label={`${metric.label}: ${metric.value}`}
+    >
+      <header>
+        <span>{metric.label}</span>
+        <strong>{metric.value}</strong>
+      </header>
       <svg viewBox="0 0 240 72" preserveAspectRatio="none" aria-hidden="true">
-        <path className="feature-chart__area" d="M0 64 C35 59 42 38 74 45 S118 51 142 29 S188 35 240 8 V72 H0Z" />
-        <path className="feature-chart__line" d="M0 64 C35 59 42 38 74 45 S118 51 142 29 S188 35 240 8" />
+        <path
+          className="feature-chart__area"
+          d="M0 64 C35 59 42 38 74 45 S118 51 142 29 S188 35 240 8 V72 H0Z"
+        />
+        <path
+          className="feature-chart__line"
+          d="M0 64 C35 59 42 38 74 45 S118 51 142 29 S188 35 240 8"
+        />
       </svg>
     </div>
   );
@@ -401,10 +436,17 @@ function HeroChart({ page }: { page: MarketingView }) {
   if (page === 'solutions') {
     return (
       <div className="detail-mini-chart detail-mini-chart--bars">
-        <span><small>Branch performance</small><strong>+24%</strong></span>
+        <span>
+          <small>Branch performance</small>
+          <strong>+24%</strong>
+        </span>
         <div className="hero-bars" aria-label="Branch performance increasing across six periods">
           {[38, 52, 44, 68, 61, 86].map((height, index) => (
-            <i key={height} style={{ height: `${height}%` }} className={index > 3 ? 'accent' : ''} />
+            <i
+              key={height}
+              style={{ height: `${height}%` }}
+              className={index > 3 ? 'accent' : ''}
+            />
           ))}
         </div>
       </div>
@@ -414,11 +456,23 @@ function HeroChart({ page }: { page: MarketingView }) {
   if (page === 'pricing') {
     return (
       <div className="detail-mini-chart detail-mini-chart--plans">
-        <span><small>Best value</small><strong>Professional</strong></span>
-        <div className="hero-plan-chart" aria-label="Relative value of Starter, Professional and Business plans">
-          <i style={{ width: '48%' }}><b>S</b></i>
-          <i className="accent" style={{ width: '92%' }}><b>P</b></i>
-          <i style={{ width: '72%' }}><b>B</b></i>
+        <span>
+          <small>Best value</small>
+          <strong>Professional</strong>
+        </span>
+        <div
+          className="hero-plan-chart"
+          aria-label="Relative value of Starter, Professional and Business plans"
+        >
+          <i style={{ width: '48%' }}>
+            <b>S</b>
+          </i>
+          <i className="accent" style={{ width: '92%' }}>
+            <b>P</b>
+          </i>
+          <i style={{ width: '72%' }}>
+            <b>B</b>
+          </i>
         </div>
       </div>
     );
@@ -427,9 +481,15 @@ function HeroChart({ page }: { page: MarketingView }) {
   if (page === 'security') {
     return (
       <div className="detail-mini-chart detail-mini-chart--gauge">
-        <span><small>Protection status</small><strong>Secure</strong></span>
+        <span>
+          <small>Protection status</small>
+          <strong>Secure</strong>
+        </span>
         <div className="hero-gauge" aria-label="Protection score 98 percent">
-          <div><strong>98%</strong><small>protected</small></div>
+          <div>
+            <strong>98%</strong>
+            <small>protected</small>
+          </div>
         </div>
       </div>
     );
@@ -438,7 +498,10 @@ function HeroChart({ page }: { page: MarketingView }) {
   if (page === 'resources') {
     return (
       <div className="detail-mini-chart detail-mini-chart--activity">
-        <span><small>Learning progress</small><strong>12 guides</strong></span>
+        <span>
+          <small>Learning progress</small>
+          <strong>12 guides</strong>
+        </span>
         <div className="hero-activity" aria-label="Twelve guides completed this month">
           {[35, 62, 48, 78, 56, 88, 72].map((height, index) => (
             <i key={`${height}-${index}`} style={{ height: `${height}%` }} />
@@ -450,7 +513,10 @@ function HeroChart({ page }: { page: MarketingView }) {
 
   return (
     <div className="detail-mini-chart">
-      <span><small>Live cash flow</small><strong>+18.4%</strong></span>
+      <span>
+        <small>Live cash flow</small>
+        <strong>+18.4%</strong>
+      </span>
       <svg viewBox="0 0 180 55" aria-label="Cash flow trending upward">
         <path d="M2 48 C28 44 34 29 58 34 S92 27 108 20 S140 23 178 5" />
       </svg>
