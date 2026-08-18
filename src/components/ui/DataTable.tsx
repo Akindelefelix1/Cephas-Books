@@ -43,6 +43,13 @@ export function DataTable({ columns, rows }: DataTableProps) {
               </td>
             </tr>
           ))}
+          {rows.length === 0 && (
+            <tr>
+              <td className="table-empty" colSpan={columns.length + 1}>
+                No records match the selected filters.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
       <div className="table-pagination">

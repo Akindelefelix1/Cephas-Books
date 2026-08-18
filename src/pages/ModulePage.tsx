@@ -1,5 +1,5 @@
 import { ChevronDown, Filter, Search, SlidersHorizontal } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DataTable } from '@/components/ui/DataTable';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -9,6 +9,22 @@ import type { ModuleDefinition } from '@/types/app';
 export function ModulePage({ definition }: { definition: ModuleDefinition }) {
   const [modal, setModal] = useState(false);
   const [tab, setTab] = useState(definition.tabs?.[0] ?? 'All');
+  const [query, setQuery] = useState('');
+  const filteredRows = useMemo(() => {
+    const firstTab = definition.tabs?.[0];
+    const normalizedQuery = query.trim().toLowerCase();
+    return definition.rows.filter((row) => {
+      const matchesTab = !definition.tabs || tab === firstTab || String(row.status) === tab;
+      const matchesQuery =
+        !normalizedQuery ||
+        Object.values(row).some((value) => String(value).toLowerCase().includes(normalizedQuery));
+      return matchesTab && matchesQuery;
+    });
+  }, [definition, query, tab]);
+  const tabCount = (name: string) =>
+    name === definition.tabs?.[0]
+      ? definition.rows.length
+      : definition.rows.filter((row) => String(row.status) === name).length;
   return (
     <>
       <PageHeader
@@ -24,13 +40,16 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
             {definition.tabs.map((x) => (
               <button className={tab === x ? 'active' : ''} onClick={() => setTab(x)} key={x}>
                 {x}
-                <span>{x === definition.tabs?.[0] ? '48' : ''}</span>
+                <span>{tabCount(x)}</span>
               </button>
             ))}
           </div>
         )}
         <div className="table-toolbar">
-          <div className="table-search">
+          <div
+            className="table-search"
+            onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
+          >
             <Search size={17} />
             <input placeholder={`Search ${definition.title.toLowerCase()}…`} />
           </div>
@@ -49,7 +68,7 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
             </button>
           </div>
         </div>
-        <DataTable columns={definition.columns} rows={definition.rows} />
+        <DataTable columns={definition.columns} rows={filteredRows} />
       </section>
       <Modal
         open={modal}

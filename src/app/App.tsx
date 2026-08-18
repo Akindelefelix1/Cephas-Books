@@ -49,7 +49,7 @@ export function App() {
   const content = (() => {
     if (active === 'dashboard')
       return <DashboardPage onNavigate={navigate} onCreate={() => setQuick(true)} />;
-    if (modules[active]) return <ModulePage definition={modules[active]} />;
+    if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
     if (active === 'banking' || active === 'transactions') return <BankingPage />;
     if (active === 'reconciliation') return <BankingPage reconciliation />;
     if (['chart-of-accounts', 'journals', 'general-ledger', 'trial-balance'].includes(active))
@@ -63,7 +63,7 @@ export function App() {
       return <SettingsPage type={active} />;
     if (['budgets', 'tax', 'payroll', 'approvals', 'documents', 'audit-logs'].includes(active))
       return <SimpleFeaturePage type={active === 'audit-logs' ? 'audit' : active} />;
-    return <ModulePage definition={getFallbackModule(active)} />;
+    return <ModulePage key={active} definition={getFallbackModule(active)} />;
   })();
   return (
     <AppShell active={active} onNavigate={navigate} onQuickCreate={() => setQuick(true)}>

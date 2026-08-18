@@ -6,6 +6,9 @@
   .activity-panel {
     grid-column: span 2;
   }
+  .profitability-panel {
+    grid-column: span 1;
+  }
   .cash-panel {
     grid-row: auto;
   }
@@ -668,6 +671,12 @@
   .chart-panel,
   .activity-panel {
     grid-column: span 1;
+  }
+  .profitability-panel {
+    grid-column: span 1;
+  }
+  .margin-chart {
+    gap: 7px;
   }
   .main-chart {
     height: 220px;

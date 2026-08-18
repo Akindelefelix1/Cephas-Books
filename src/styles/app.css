@@ -606,6 +606,104 @@
 .tax-lines b {
   color: #252d3f;
 }
+.profitability-panel {
+  grid-column: span 2;
+}
+.profitability-summary {
+  margin: 18px 0 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.profitability-summary strong {
+  font-size: 1.7rem;
+}
+.profitability-summary span {
+  display: flex;
+  align-items: center;
+  color: #149561;
+  font-size: 0.62rem;
+}
+.margin-chart {
+  height: 115px;
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(8px, 2vw, 18px);
+  border-bottom: 1px solid #e7ebf2;
+}
+.margin-chart i {
+  position: relative;
+  flex: 1;
+  max-width: 46px;
+  border-radius: 6px 6px 0 0;
+  background: #dce3fb;
+}
+.margin-chart i.active {
+  background: linear-gradient(180deg, #00baff, #1233cc);
+}
+.margin-chart i span {
+  position: absolute;
+  top: -17px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #657089;
+  font-size: 0.52rem;
+  font-style: normal;
+}
+.margin-months {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 7px;
+  color: #929aaa;
+  font-size: 0.52rem;
+}
+.budget-panel {
+  text-align: center;
+}
+.budget-panel .panel-header {
+  text-align: left;
+}
+.budget-ring {
+  width: 118px;
+  height: 118px;
+  margin: 18px auto 14px;
+  padding: 12px;
+  border-radius: 50%;
+  background: conic-gradient(#1233cc 0 68%, #e5e9f4 68%);
+}
+.budget-ring > div {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-content: center;
+  border-radius: 50%;
+  background: #fff;
+}
+.budget-ring strong,
+.budget-ring small {
+  display: block;
+}
+.budget-ring strong {
+  font-size: 1.3rem;
+}
+.budget-ring small,
+.budget-status {
+  color: #8790a2;
+  font-size: 0.56rem;
+}
+.budget-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.budget-values span,
+.budget-values b {
+  display: block;
+  font-size: 0.58rem;
+}
+.budget-values span { color: #8790a2; }
+.budget-values b { margin-top: 3px; color: #283146; }
 .activity-panel {
   grid-column: span 2;
 }
