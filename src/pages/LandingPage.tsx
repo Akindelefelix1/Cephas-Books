@@ -6,12 +6,10 @@ import {
   ChevronRight,
   Globe2,
   Landmark,
-  Menu,
   Package,
   Play,
   ShieldCheck,
   Sparkles,
-  X,
   Zap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -53,12 +51,16 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
           </button>
         </nav>
         <button
-          className="mobile-menu"
+          className={`mobile-menu ${menu ? 'is-open' : ''}`}
           onClick={() => setMenu(!menu)}
           aria-label={menu ? 'Close navigation menu' : 'Open navigation menu'}
           aria-expanded={menu}
         >
-          {menu ? <X /> : <Menu />}
+          <span className="hamburger-icon" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
         </button>
       </header>
       <main>
