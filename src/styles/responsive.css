@@ -188,17 +188,66 @@
   }
 }
 @media (max-width: 600px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    max-width: 100%;
+  }
+  .marketing-nav {
+    height: 64px;
+    padding-inline: 16px;
+  }
+  .marketing-nav nav {
+    top: 58px;
+    left: 10px;
+    right: 10px;
+    max-height: calc(100dvh - 70px);
+    overflow-y: auto;
+    z-index: 50;
+  }
+  .marketing-nav nav button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
   .landing-hero {
-    padding-top: 65px;
+    min-height: auto;
+    padding: 52px 16px 48px;
   }
   .landing-hero h1 {
-    font-size: 3.1rem;
+    min-height: 0;
+    font-size: clamp(2.45rem, 12vw, 3.1rem);
+    line-height: 1.02;
+    letter-spacing: -0.055em;
+  }
+  .landing-hero__copy > p {
+    font-size: 0.98rem;
+  }
+  .hero-pill {
+    max-width: 100%;
+    font-size: 0.68rem;
+    text-align: left;
+  }
+  .landing-actions {
+    width: 100%;
+  }
+  .landing-actions .button {
+    width: 100%;
+    justify-content: center;
   }
   .visual-story {
-    padding-block: 75px;
+    padding: 64px 16px;
   }
   .visual-story__heading h2 {
-    font-size: 2.55rem;
+    font-size: clamp(2rem, 10vw, 2.55rem);
   }
   .photo-card,
   .photo-card img,
@@ -213,10 +262,13 @@
     width: 100%;
   }
   .detail-hero {
-    padding-top: 65px;
+    min-height: auto;
+    padding: 52px 16px 72px;
   }
   .detail-hero__copy h1 {
-    font-size: 3.15rem;
+    margin-block: 14px 18px;
+    font-size: clamp(2.4rem, 12vw, 3.15rem);
+    letter-spacing: -0.055em;
   }
   .detail-hero__visual {
     min-height: 300px;
@@ -230,9 +282,12 @@
     left: -8px;
   }
   .detail-mini-chart {
-    right: -8px;
-    bottom: -24px;
-    width: 205px;
+    right: 8px;
+    bottom: -30px;
+    width: min(205px, calc(100% - 32px));
+  }
+  .detail-mini-chart--gauge {
+    width: 170px;
   }
   .landing-actions,
   .hero-trust {
@@ -240,8 +295,21 @@
     align-items: center;
   }
   .product-preview {
-    height: 350px;
-    margin-top: 50px;
+    width: calc(100% + 8px);
+    height: 305px;
+    margin: 40px -4px -145px;
+    perspective: none;
+  }
+  .preview-window {
+    transform: none;
+  }
+  .preview-bar > div {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .preview-side {
     width: 42px;
@@ -250,7 +318,11 @@
     padding: 18px 12px;
   }
   .preview-stats {
+    grid-template-columns: 1fr 1fr;
     gap: 6px;
+  }
+  .preview-stats > div:last-child {
+    display: none;
   }
   .preview-stats > div {
     padding: 10px;
@@ -265,27 +337,67 @@
     flex-wrap: wrap;
     gap: 25px;
   }
+  .logo-strip {
+    padding: 185px 16px 50px;
+  }
+  .logo-strip div span {
+    font-size: 0.78rem;
+  }
+  .landing-section,
+  .pricing-section,
+  .detail-features {
+    padding-inline: 16px;
+  }
+  .landing-section h2,
+  .pricing-section h2,
+  .detail-features h2 {
+    font-size: clamp(2rem, 10vw, 2.7rem);
+  }
   .feature-bento {
     grid-template-columns: 1fr;
+  }
+  .feature-bento > article {
+    min-height: 0;
+    padding: 24px;
   }
   .feature-bento .bento-large {
     grid-row: auto;
   }
   .platform-band {
-    padding: 35px 25px;
+    margin-inline: 12px;
+    padding: 34px 20px;
+    border-radius: 22px;
+  }
+  .platform-band h2 {
+    font-size: clamp(2rem, 10vw, 2.7rem);
   }
   .capability-grid {
     grid-template-columns: 1fr;
   }
   .marketing-footer {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+    padding: 60px 20px 28px;
   }
   .marketing-footer > div:first-child {
     grid-column: 1/-1;
   }
+  .cta-band {
+    margin-inline: 12px;
+    padding: 30px 22px;
+    border-radius: 20px;
+  }
+  .cta-band h2 {
+    font-size: 1.8rem;
+  }
+  .cta-band .button {
+    width: 100%;
+    justify-content: center;
+  }
   .page-header,
   .dashboard-heading {
     flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
   }
   .page-header__actions,
   .dashboard-heading > div:last-child {
@@ -294,11 +406,12 @@
   .page-header__actions .button,
   .dashboard-heading > div:last-child > * {
     flex: 1;
+    min-width: 0;
   }
   .kpi-grid,
   .stats-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
   .stat-card,
   .kpi-card {
@@ -311,6 +424,15 @@
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+  .panel,
+  .register-panel {
+    min-width: 0;
+  }
+  .panel-header {
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
   .chart-panel,
   .activity-panel {
     grid-column: span 1;
@@ -322,7 +444,7 @@
     height: 195px;
   }
   .activity-list > div {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
   .activity-list .badge {
     display: none;
@@ -333,6 +455,8 @@
   }
   .table-toolbar > div {
     overflow: auto;
+    max-width: 100%;
+    scrollbar-width: thin;
   }
   .table-search {
     width: 100%;
@@ -341,7 +465,7 @@
     grid-template-columns: 1fr;
   }
   .coa-summary {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
   .report-feature {
     grid-template-columns: 1fr;
@@ -356,11 +480,19 @@
     display: none;
   }
   .statement {
-    padding: 25px 16px;
-    min-width: 600px;
+    min-width: 0;
+    padding: 22px 14px;
   }
-  .page-content:has(.statement) {
-    overflow-x: auto;
+  .statement > header,
+  .statement-cols,
+  .statement-group > div {
+    gap: 10px;
+  }
+  .statement-cols {
+    grid-template-columns: 1fr;
+  }
+  .statement-group > div {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
   .settings-main {
     padding: 18px;
@@ -371,12 +503,23 @@
   .form-grid .full {
     grid-column: auto;
   }
-  .invoice-item-head,
-  .invoice-item-row {
-    min-width: 650px;
-  }
   .invoice-items {
-    overflow: auto;
+    overflow: visible;
+  }
+  .invoice-item-head {
+    display: none;
+  }
+  .invoice-item-row {
+    min-width: 0;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    border: 1px solid #e5e9f1;
+    border-radius: 12px;
+  }
+  .invoice-item-row > *:first-child {
+    grid-column: 1 / -1;
   }
   .invoice-bottom {
     grid-template-columns: 1fr;
@@ -387,17 +530,61 @@
   .modal__body {
     padding-inline: 15px;
   }
+  .modal-backdrop {
+    padding: 10px;
+    align-items: flex-end;
+  }
+  .modal {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    border-radius: 18px 18px 10px 10px;
+  }
+  .modal__header,
+  .modal__footer {
+    padding-inline: 16px;
+  }
+  .modal__footer {
+    flex-wrap: wrap;
+  }
+  .modal__footer .button {
+    flex: 1;
+  }
   .onboarding-actions {
     gap: 10px;
+    flex-direction: column-reverse;
   }
   .onboarding-actions .button {
-    font-size: 0.7rem;
+    width: 100%;
+    font-size: 0.78rem;
   }
   .auth-page > main {
-    padding: 30px 20px;
+    min-height: 100dvh;
+    padding: 24px 16px;
+    align-items: flex-start;
   }
   .auth-card > .logo {
-    margin-bottom: 40px;
+    margin-bottom: 28px;
+  }
+  .auth-card {
+    width: 100%;
+    padding-block: 8px 24px;
+  }
+  .social-buttons,
+  .form-options {
+    grid-template-columns: 1fr;
+  }
+  .otp-inputs {
+    gap: 6px;
+  }
+  .otp-inputs input {
+    min-width: 0;
+  }
+  .onboarding header {
+    height: 64px;
+    padding-inline: 16px;
+  }
+  .onboarding-layout {
+    padding: 28px 16px;
   }
   .integration-grid {
     grid-template-columns: 1fr;
@@ -409,6 +596,19 @@
   .ai-welcome {
     margin-top: 5vh;
   }
+  .ai-page {
+    height: calc(100dvh - 101px);
+    min-height: 520px;
+  }
+  .ai-chat {
+    min-width: 0;
+  }
+  .ai-composer {
+    margin-inline: 10px;
+  }
+  .answer-metrics {
+    gap: 8px;
+  }
   .profile {
     padding: 0;
   }
@@ -418,5 +618,145 @@
   }
   .global-search kbd {
     display: none;
+  }
+  .topbar {
+    height: 60px;
+    padding-inline: 10px;
+  }
+  .topbar__right {
+    gap: 5px;
+  }
+  .page-content {
+    padding: 18px 12px 60px;
+  }
+  .page-header h1,
+  .dashboard-heading h1 {
+    font-size: 1.65rem;
+  }
+  .tabs {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: thin;
+  }
+  .tabs button {
+    flex: 0 0 auto;
+  }
+  .data-table-wrap,
+  .permission-matrix,
+  .journal-lines,
+  .account-tree {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .data-table {
+    min-width: 680px;
+  }
+  .table-pagination {
+    min-width: 0;
+    padding-inline: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .table-pagination > span {
+    width: 100%;
+  }
+  .reconcile-grid,
+  .users-grid,
+  .settings-layout,
+  .notification-layout {
+    gap: 14px;
+  }
+  .match-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .match-row > *:last-child {
+    grid-column: 1 / -1;
+  }
+  .bank-card,
+  .match-detail,
+  .report-feature {
+    min-width: 0;
+  }
+  .report-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .report-controls > * {
+    width: 100%;
+  }
+  .permission-matrix > header,
+  .settings-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .permission-matrix > header .button,
+  .settings-heading .button {
+    width: 100%;
+  }
+  .notification-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .notification-item > time,
+  .notification-item > button {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .command-backdrop {
+    padding: 10px;
+    align-items: flex-start;
+  }
+  .command-palette {
+    width: 100%;
+    margin-top: 8vh;
+    max-height: 80dvh;
+    overflow-y: auto;
+  }
+  .command-input {
+    padding-inline: 14px;
+  }
+  .command-footer {
+    display: none;
+  }
+}
+
+@media (max-width: 390px) {
+  .page-header__actions,
+  .dashboard-heading > div:last-child {
+    flex-direction: column;
+  }
+  .page-header__actions .button,
+  .dashboard-heading > div:last-child > * {
+    width: 100%;
+  }
+  .preview-heading button,
+  .preview-chart {
+    display: none;
+  }
+  .product-preview {
+    height: 235px;
+    margin-bottom: -105px;
+  }
+  .logo-strip {
+    padding-top: 145px;
+  }
+  .detail-icon--photo {
+    width: 58px;
+    height: 58px;
+  }
+  .detail-icon--photo svg {
+    width: 25px;
+    height: 25px;
+  }
+  .photo-card,
+  .photo-card img,
+  .insight-chart {
+    min-height: 290px;
+  }
+  .donut {
+    width: 145px;
+    height: 145px;
   }
 }
