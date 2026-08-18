@@ -27,6 +27,35 @@ textarea {
 button {
   color: inherit;
 }
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid rgb(0 174 233 / 28%);
+  outline-offset: 2px;
+}
+::selection {
+  color: #fff;
+  background: #1739dc;
+}
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  padding: 10px 14px;
+  border-radius: 9px;
+  color: #fff;
+  background: #102044;
+  font-size: 0.72rem;
+  font-weight: 750;
+  transform: translateY(-150%);
+  transition: transform 0.18s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
 a {
   text-decoration: none;
   color: inherit;
@@ -80,6 +109,9 @@ p {
 .button:hover {
   transform: translateY(-1px);
   background: #0d2bb9;
+}
+.button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 .button--secondary,
 .button--ghost,

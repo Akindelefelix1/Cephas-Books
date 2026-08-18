@@ -250,6 +250,186 @@
   font-size: 0.52rem;
   margin: 5px;
 }
+.ai-page--modern {
+  height: calc(100dvh - 124px);
+  min-height: 610px;
+  border-radius: 18px;
+  border-color: #dfe5ef;
+  box-shadow: 0 18px 50px rgb(19 42 86 / 8%);
+}
+.ai-history-heading,
+.ai-history-trigger,
+.ai-history-scrim {
+  display: none;
+}
+.ai-page--modern > aside {
+  background: linear-gradient(180deg, #fbfcff, #f6f8fc);
+}
+.ai-page--modern > aside > button:not(.button) span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-page--modern > main > header {
+  height: 72px;
+  padding-inline: 22px;
+  background: rgb(255 255 255 / 92%);
+  backdrop-filter: blur(14px);
+}
+.ai-context-pill {
+  margin-left: auto;
+  padding: 7px 10px;
+  border: 1px solid #dfe5ef;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #667085;
+  background: #f8fafc;
+  font-size: 0.59rem;
+  font-weight: 700;
+}
+.ai-context-pill svg {
+  width: 13px;
+  color: #17a36b;
+}
+.ai-page--modern .ai-chat {
+  background: radial-gradient(circle at 50% 0, rgb(18 51 204 / 6%), transparent 34%), #fbfcfe;
+}
+.ai-page--modern .ai-welcome {
+  max-width: 820px;
+  margin-top: clamp(42px, 8vh, 90px);
+}
+.ai-page--modern .ai-welcome > span {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(145deg, #1739dc, #00aee9);
+  box-shadow: 0 14px 28px rgb(18 51 204 / 22%);
+}
+.ai-eyebrow {
+  display: block;
+  margin-top: 15px;
+  color: #3150d8;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+.ai-page--modern .ai-welcome h2 {
+  margin-top: 7px;
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+  letter-spacing: -0.035em;
+}
+.ai-page--modern .ai-welcome > p {
+  max-width: 610px;
+  margin-inline: auto;
+  font-size: 0.78rem;
+}
+.ai-page--modern .ai-prompt-grid {
+  gap: 12px;
+  margin-top: 30px;
+}
+.ai-page--modern .ai-prompt-grid button {
+  min-height: 94px;
+  padding: 15px;
+  gap: 12px;
+  align-items: center;
+  border-radius: 14px;
+  border-color: #e0e6f0;
+  box-shadow: 0 5px 18px rgb(21 43 87 / 4%);
+  transition: 0.18s ease;
+}
+.ai-page--modern .ai-prompt-grid button:hover {
+  border-color: #9aabea;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgb(18 51 204 / 10%);
+}
+.ai-prompt-grid button > i {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: #1739dc;
+  background: #edf1ff;
+}
+.ai-prompt-grid button > i svg {
+  width: 18px;
+}
+.ai-prompt-grid button > span {
+  flex: 1;
+  min-width: 0;
+}
+.ai-prompt-grid button small,
+.ai-prompt-grid button strong,
+.ai-prompt-grid button em {
+  display: block;
+}
+.ai-prompt-grid button small {
+  color: #3150d8;
+  font-size: 0.53rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.ai-prompt-grid button strong {
+  margin-top: 3px;
+  color: #172033;
+  font-size: 0.7rem;
+}
+.ai-prompt-grid button em {
+  margin-top: 4px;
+  color: #8992a3;
+  font-size: 0.58rem;
+  font-style: normal;
+}
+.ai-page--modern .chat-answer {
+  padding-top: 32px;
+  padding-bottom: 140px;
+}
+.ai-page--modern .assistant-message > div {
+  padding: 16px;
+  border: 1px solid #e3e8f0;
+  border-radius: 4px 16px 16px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgb(20 42 84 / 6%);
+}
+.answer-actions,
+.ai-follow-ups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+.answer-actions button,
+.ai-follow-ups button {
+  padding: 7px 10px;
+  border: 1px solid #dce3ee;
+  border-radius: 8px;
+  color: #2744c7;
+  background: #fff;
+  font-size: 0.59rem;
+  font-weight: 700;
+}
+.ai-follow-ups > span {
+  width: 100%;
+  color: #8892a4;
+  font-size: 0.57rem;
+  font-weight: 700;
+}
+.ai-page--modern .ai-composer > div {
+  max-width: 790px;
+  height: 60px;
+  margin: auto;
+  border-radius: 16px;
+  box-shadow: 0 14px 38px rgb(16 38 80 / 14%);
+}
+.ai-page--modern .ai-composer .send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .users-grid {
   display: grid;
   grid-template-columns: 1fr 270px;

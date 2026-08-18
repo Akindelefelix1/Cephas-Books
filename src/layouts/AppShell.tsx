@@ -73,6 +73,9 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
     });
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <aside className={`sidebar ${mobileOpen ? 'is-open' : ''}`}>
         <div className="sidebar__brand">
           <Logo />
@@ -149,7 +152,9 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
             </button>
           </div>
         </header>
-        <div className="page-content">{children}</div>
+        <div className="page-content" id="main-content" role="main" tabIndex={-1}>
+          {children}
+        </div>
       </section>
       {searchOpen && (
         <div className="command-backdrop" onMouseDown={() => setSearchOpen(false)}>

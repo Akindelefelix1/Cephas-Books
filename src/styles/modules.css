@@ -99,6 +99,9 @@
 .data-table-wrap {
   width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 .data-table .table-empty {
   padding: 42px 18px;
@@ -108,6 +111,7 @@
 }
 .data-table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   white-space: nowrap;
 }
@@ -168,6 +172,7 @@
   place-items: center;
   padding: 18px;
   z-index: 100;
+  animation: modal-backdrop-in 160ms ease-out;
 }
 .modal {
   width: min(100%, 560px);
@@ -177,6 +182,8 @@
   box-shadow: 0 35px 90px #03102c66;
   display: flex;
   flex-direction: column;
+  animation: modal-in 190ms ease-out;
+  outline: none;
 }
 .modal--wide {
   width: min(100%, 900px);
@@ -206,6 +213,17 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
 }
 .upload-field input {
   display: none;

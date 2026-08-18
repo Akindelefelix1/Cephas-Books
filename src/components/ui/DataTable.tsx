@@ -45,7 +45,7 @@ export function DataTable({ columns, rows }: DataTableProps) {
                     )}
                   </td>
                 ))}
-                <td>
+                <td className="data-table__actions">
                   <button
                     className="row-action"
                     aria-label="Open row details"

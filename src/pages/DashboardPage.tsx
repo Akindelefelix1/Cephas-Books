@@ -22,6 +22,7 @@ export function DashboardPage({
   onNavigate: (id: string) => void;
   onCreate: () => void;
 }) {
+  const today = new Intl.DateTimeFormat('en-NG', { dateStyle: 'full' }).format(new Date());
   const transactions = [
     ['INV-00245', 'Apex Retail Limited', 'Invoice', '₦2,500,000', 'Partially paid'],
     ['PAY-00831', 'Northstar Schools', 'Payment', '₦1,280,000', 'Paid'],
@@ -33,7 +34,7 @@ export function DashboardPage({
     <>
       <div className="dashboard-heading">
         <div>
-          <p>Monday, 17 August 2026</p>
+          <p>{today}</p>
           <h1>Good morning, Tobi.</h1>
           <span>Here’s how Acme Holdings is performing.</span>
         </div>

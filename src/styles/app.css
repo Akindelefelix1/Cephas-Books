@@ -159,10 +159,13 @@
 .workspace {
   margin-left: 248px;
   min-width: 0;
+  padding-top: 69px;
 }
 .topbar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  right: 0;
+  left: 248px;
   height: 69px;
   background: #ffffffed;
   backdrop-filter: blur(12px);
@@ -170,7 +173,7 @@
   display: flex;
   align-items: center;
   padding: 0 26px;
-  z-index: 30;
+  z-index: 34;
 }
 .global-search {
   width: min(48%, 520px);

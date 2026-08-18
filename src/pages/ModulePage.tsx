@@ -115,6 +115,7 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
 }
 
 function GenericForm({ title }: { title: string }) {
+  const today = new Date().toLocaleDateString('en-CA');
   return (
     <div className="form-grid">
       <label>
@@ -127,7 +128,7 @@ function GenericForm({ title }: { title: string }) {
       </label>
       <label>
         Date
-        <input type="date" defaultValue="2026-08-17" />
+        <input type="date" defaultValue={today} />
       </label>
       <label>
         Amount
@@ -157,6 +158,9 @@ function GenericForm({ title }: { title: string }) {
 }
 
 function InvoiceForm() {
+  const today = new Date();
+  const dueDate = new Date(today);
+  dueDate.setDate(today.getDate() + 30);
   const [lineItems, setLineItems] = useState([
     ['Business software licence', '2', '₦500,000', 'VAT 7.5%', '₦1,000,000'],
     ['Implementation service', '1', '₦250,000', 'VAT 7.5%', '₦250,000'],
@@ -177,11 +181,11 @@ function InvoiceForm() {
         </label>
         <label>
           Invoice date
-          <input type="date" defaultValue="2026-08-17" />
+          <input type="date" defaultValue={today.toLocaleDateString('en-CA')} />
         </label>
         <label>
           Due date
-          <input type="date" defaultValue="2026-09-16" />
+          <input type="date" defaultValue={dueDate.toLocaleDateString('en-CA')} />
         </label>
         <label>
           Currency

@@ -299,6 +299,7 @@ function SettingsPlaceholder({ title, description }: { title: string; descriptio
 }
 
 function OrganisationSettings() {
+  const [savedAt, setSavedAt] = useState('Not saved in this session');
   return (
     <>
       <header className="settings-heading">
@@ -385,8 +386,16 @@ function OrganisationSettings() {
         </label>
       </div>
       <div className="settings-save">
-        <span>Last saved 2 minutes ago</span>
-        <button className="button" onClick={() => confirmAction('Organisation settings saved')}>
+        <span>{savedAt}</span>
+        <button
+          className="button"
+          onClick={() => {
+            setSavedAt(
+              `Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+            );
+            confirmAction('Organisation settings saved');
+          }}
+        >
           Save changes
         </button>
       </div>

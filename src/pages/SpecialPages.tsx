@@ -21,6 +21,7 @@ import {
   Upload,
   Users,
   WandSparkles,
+  X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { DataTable } from '@/components/ui/DataTable';
@@ -422,7 +423,7 @@ export function AccountingPage({ type }: { type: string }) {
             </label>
             <label>
               Posting date
-              <input type="date" defaultValue="2026-08-17" />
+              <input type="date" defaultValue={new Date().toLocaleDateString('en-CA')} />
             </label>
             <label>
               Reference
@@ -869,6 +870,247 @@ export function ReportsPage({ initial }: { initial?: string }) {
 }
 
 export function AIAssistantPage() {
+  const [question, setQuestion] = useState('');
+  const [sent, setSent] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeConversation, setActiveConversation] = useState('August performance review');
+  const conversations = [
+    'August performance review',
+    'Overdue customer analysis',
+    'Q4 cash flow forecast',
+    'Marketing spend breakdown',
+  ];
+  const prompts = [
+    [
+      CircleDollarSign,
+      'Performance',
+      'How did we perform this month?',
+      'Compare revenue, costs and margin',
+    ],
+    [Users, 'Receivables', 'Which customers owe us the most?', 'Prioritise overdue collections'],
+    [
+      FileBarChart,
+      'Forecast',
+      'Forecast cash for the next 3 months',
+      'Model inflows, bills and runway',
+    ],
+    [WandSparkles, 'Spend', 'Show our five largest expenses', 'Find unusual or avoidable costs'],
+  ] as const;
+  const ask = (prompt = question) => {
+    if (!prompt.trim()) return;
+    setQuestion(prompt);
+    setSent(true);
+  };
+  const newConversation = () => {
+    setQuestion('');
+    setSent(false);
+    setHistoryOpen(false);
+  };
+  return (
+    <div className="ai-page ai-page--modern">
+      <aside className={historyOpen ? 'is-open' : ''}>
+        <div className="ai-history-heading">
+          <strong>Conversations</strong>
+          <button aria-label="Close conversations" onClick={() => setHistoryOpen(false)}>
+            <X />
+          </button>
+        </div>
+        <button className="button" onClick={newConversation}>
+          <Plus />
+          New conversation
+        </button>
+        <p>RECENT</p>
+        {conversations.map((conversation) => (
+          <button
+            className={activeConversation === conversation ? 'active' : ''}
+            key={conversation}
+            onClick={() => {
+              setActiveConversation(conversation);
+              setQuestion(conversation);
+              setSent(false);
+              setHistoryOpen(false);
+            }}
+          >
+            <MessageSquare />
+            <span>{conversation}</span>
+            <MoreHorizontal />
+          </button>
+        ))}
+        <footer>
+          <ShieldCheck />
+          <span>
+            <strong>Private & permission-aware</strong>
+            <small>Only uses data you can access.</small>
+          </span>
+        </footer>
+      </aside>
+      {historyOpen && (
+        <button
+          className="ai-history-scrim"
+          aria-label="Close conversations"
+          onClick={() => setHistoryOpen(false)}
+        />
+      )}
+      <main>
+        <header>
+          <div>
+            <span className="ai-avatar">
+              <Bot />
+            </span>
+            <div>
+              <h1>Cephas AI</h1>
+              <p>
+                <i />
+                Ready to analyse your finances
+              </p>
+            </div>
+          </div>
+          <span className="ai-context-pill">
+            <ShieldCheck />
+            Acme Holdings data
+          </span>
+          <button className="ai-history-trigger" onClick={() => setHistoryOpen(true)}>
+            <MessageSquare />
+            History
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Conversation options"
+            onClick={() => confirmAction('Conversation options opened')}
+          >
+            <MoreHorizontal />
+          </button>
+        </header>
+        <div className="ai-chat">
+          {!sent && (
+            <div className="ai-welcome">
+              <span>
+                <Sparkles />
+              </span>
+              <small className="ai-eyebrow">YOUR FINANCIAL COPILOT</small>
+              <h2>Turn your numbers into clear decisions.</h2>
+              <p>
+                Analyse performance, explain changes, find risks, and build forecasts from the
+                financial data you are authorised to view.
+              </p>
+              <div className="ai-prompt-grid">
+                {prompts.map(([Icon, label, prompt, detail]) => (
+                  <button key={prompt} onClick={() => ask(prompt)}>
+                    <i>
+                      <Icon />
+                    </i>
+                    <span>
+                      <small>{label}</small>
+                      <strong>{prompt}</strong>
+                      <em>{detail}</em>
+                    </span>
+                    <ArrowRight />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {sent && (
+            <div className="chat-answer">
+              <div className="user-message">{question}</div>
+              <div className="assistant-message">
+                <span className="ai-avatar">
+                  <Bot />
+                </span>
+                <div>
+                  <p>
+                    Based on your posted transactions, <strong>August revenue is ₦48.24m</strong>,
+                    up 12.8% from the comparable period. Net profit is ₦14.62m with a 30.3% margin.
+                  </p>
+                  <div className="answer-metrics">
+                    <span>
+                      <small>Revenue</small>
+                      <b>₦48.24m</b>
+                      <em>↗ 12.8%</em>
+                    </span>
+                    <span>
+                      <small>Expenses</small>
+                      <b>₦29.86m</b>
+                      <em>↗ 5.2%</em>
+                    </span>
+                    <span>
+                      <small>Net profit</small>
+                      <b>₦14.62m</b>
+                      <em>↗ 8.4%</em>
+                    </span>
+                  </div>
+                  <small className="answer-source">
+                    <FileText />
+                    Sources: Profit & Loss, General Ledger · Updated just now
+                  </small>
+                  <div className="answer-actions">
+                    <button onClick={() => confirmAction('Profit & Loss opened')}>
+                      Open source report
+                    </button>
+                    <button onClick={() => downloadText('cephas-ai-insight.txt', question)}>
+                      Download insight
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="ai-follow-ups">
+                <span>Continue exploring</span>
+                {[
+                  'What caused the change?',
+                  'Show branch comparison',
+                  'What should we do next?',
+                ].map((prompt) => (
+                  <button key={prompt} onClick={() => ask(prompt)}>
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <form
+            className="ai-composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              ask();
+            }}
+          >
+            <div>
+              <textarea
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    ask();
+                  }
+                }}
+                placeholder="Ask about cash flow, sales, expenses…"
+              />
+              <button
+                type="button"
+                aria-label="Attach a file"
+                onClick={() => confirmAction('Attachment picker opened')}
+              >
+                <Paperclip />
+              </button>
+              <button
+                className="send"
+                type="submit"
+                disabled={!question.trim()}
+                aria-label="Send message"
+              >
+                <Send />
+              </button>
+            </div>
+            <p>Cephas AI can make mistakes. Verify important financial decisions.</p>
+          </form>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function LegacyAIAssistantPage() {
   const [question, setQuestion] = useState('');
   const [sent, setSent] = useState(false);
   return (

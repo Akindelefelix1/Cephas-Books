@@ -1,5 +1,5 @@
 import { Download, Plus } from 'lucide-react';
-import { downloadText } from '@/utils/actions';
+import { confirmAction, downloadText } from '@/utils/actions';
 
 interface PageHeaderProps {
   title: string;
@@ -24,7 +24,10 @@ export function PageHeader({ title, description, action, onAction }: PageHeaderP
           <Download size={17} /> Export
         </button>
         {action && (
-          <button className="button" onClick={onAction}>
+          <button
+            className="button"
+            onClick={onAction ?? (() => confirmAction(`${action} form opened`))}
+          >
             <Plus size={17} />
             {action}
           </button>
