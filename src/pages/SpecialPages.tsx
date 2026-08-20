@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ArrowRight,
   Bot,
@@ -33,6 +33,7 @@ import { confirmAction, downloadText } from '@/utils/actions';
 const ledgerRows = [
   {
     date: '17 Aug 2026',
+    account: 'GTBank Current',
     reference: 'INV-00245',
     description: 'Apex Retail Limited · Sales invoice',
     debit: '₦2,500,000',
@@ -41,6 +42,7 @@ const ledgerRows = [
   },
   {
     date: '16 Aug 2026',
+    account: 'Access Operations',
     reference: 'PAY-00831',
     description: 'Northstar Schools · Payment received',
     debit: '—',
@@ -49,6 +51,7 @@ const ledgerRows = [
   },
   {
     date: '14 Aug 2026',
+    account: 'GTBank Current',
     reference: 'INV-00243',
     description: 'Cedar & Stone · Sales invoice',
     debit: '₦945,000',
@@ -57,6 +60,7 @@ const ledgerRows = [
   },
   {
     date: '11 Aug 2026',
+    account: 'Petty Cash',
     reference: 'CN-00008',
     description: 'Credit note · Kora Foods',
     debit: '—',
@@ -67,6 +71,22 @@ const ledgerRows = [
 
 export function BankingPage({ reconciliation = false }: { reconciliation?: boolean }) {
   const [upload, setUpload] = useState(false);
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [accountFilter, setAccountFilter] = useState('All accounts');
+  const [selectedBankAccount, setSelectedBankAccount] = useState<string[] | null>(null);
+  const [accountDialog, setAccountDialog] = useState<'details' | 'actions' | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState(0);
+  const [statementRows, setStatementRows] = useState([
+    ['POS/WEB PAYSTACK SETTLEMENT', '16 Aug', '+₦680,000', 'Suggested match'],
+    ['TRANSFER TO MAINLAND LOGISTICS', '15 Aug', '−₦420,000', 'Unmatched'],
+    ['NIP/APEX RETAIL LIMITED', '14 Aug', '+₦2,500,000', 'Matched'],
+    ['SMS ALERT CHARGE', '13 Aug', '−₦4,800', 'Create expense'],
+  ]);
+  const [bankAccounts, setBankAccounts] = useState([
+    ['GTBank Current', '**** 4821', '₦18,450,200', 'Reconciled to 15 Aug'],
+    ['Access Operations', '**** 9034', '₦6,820,000', '12 items to reconcile'],
+    ['Petty Cash', 'Cash account', '₦1,675,000', 'Up to date'],
+  ]);
   if (reconciliation)
     return (
       <>
@@ -96,16 +116,18 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
                 <h2>Bank statement</h2>
                 <p>GTBank Current · August 2026</p>
               </div>
-              <Badge>16 unmatched</Badge>
+              <Badge>
+                {`${statementRows.filter((row) => row[3] !== 'Matched').length} shown unmatched`}
+              </Badge>
             </header>
-            {[
-              ['POS/WEB PAYSTACK SETTLEMENT', '16 Aug', '+₦680,000', 'Suggested match'],
-              ['TRANSFER TO MAINLAND LOGISTICS', '15 Aug', '−₦420,000', 'Unmatched'],
-              ['NIP/APEX RETAIL LIMITED', '14 Aug', '+₦2,500,000', 'Matched'],
-              ['SMS ALERT CHARGE', '13 Aug', '−₦4,800', 'Create expense'],
-            ].map((x) => (
+            {statementRows.map((x, index) => (
               <div className="match-row" key={x[0]}>
-                <input type="checkbox" />
+                <input
+                  type="checkbox"
+                  checked={selectedMatch === index}
+                  onChange={() => setSelectedMatch(index)}
+                  aria-label={`Select ${x[0]}`}
+                />
                 <span>
                   <strong>{x[0]}</strong>
                   <small>{x[1]}</small>
@@ -143,13 +165,26 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
             </div>
             <button
               className="button"
-              onClick={() => confirmAction('Bank transaction matched and reconciled')}
+              onClick={() => {
+                setStatementRows((rows) =>
+                  rows.map((row, index) =>
+                    index === selectedMatch ? [row[0], row[1], row[2], 'Matched'] : row,
+                  ),
+                );
+                confirmAction('Bank transaction matched and reconciled');
+              }}
             >
               Confirm match
             </button>
             <button
               className="button button--secondary"
-              onClick={() => confirmAction('Showing alternative transaction matches')}
+              onClick={() => {
+                const nextIndex = statementRows.findIndex(
+                  (row, index) => index > selectedMatch && row[3] !== 'Matched',
+                );
+                const firstUnmatched = statementRows.findIndex((row) => row[3] !== 'Matched');
+                setSelectedMatch(nextIndex >= 0 ? nextIndex : Math.max(firstUnmatched, 0));
+              }}
             >
               Find another match
             </button>
@@ -170,12 +205,18 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
             <Upload />
             <strong>Drop your bank statement here</strong>
             <p>CSV, OFX, QIF, CAMT.053 or PDF up to 25 MB</p>
-            <button
-              className="button button--secondary"
-              onClick={() => confirmAction('Select a statement using the upload field')}
-            >
+            <label className="button button--secondary">
               Choose file
-            </button>
+              <input
+                type="file"
+                accept=".csv,.ofx,.qif,.xml,.pdf"
+                hidden
+                onChange={(event) =>
+                  event.target.files?.[0] &&
+                  confirmAction(`${event.target.files[0].name} selected for import`)
+                }
+              />
+            </label>
           </div>
         </Modal>
       </>
@@ -186,6 +227,7 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
         title="Banking"
         description="See cash across every account, import feeds, transfer funds, and reconcile."
         action="Add bank account"
+        onAction={() => setAddAccountOpen(true)}
       />
       <StatsGrid
         stats={[
@@ -196,18 +238,17 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
         ]}
       />
       <div className="bank-accounts">
-        {[
-          ['GTBank Current', '**** 4821', '₦18,450,200', 'Reconciled to 15 Aug'],
-          ['Access Operations', '**** 9034', '₦6,820,000', '12 items to reconcile'],
-          ['Petty Cash', 'Cash account', '₦1,675,000', 'Up to date'],
-        ].map((x, i) => (
+        {bankAccounts.map((x, i) => (
           <article className="bank-card" key={x[0]}>
             <header>
               <span className={`bank-logo bank-logo--${i}`}>{x[0].slice(0, 2)}</span>
               <button
                 className="icon-button"
                 aria-label={`Open ${x[0]} account`}
-                onClick={() => confirmAction(`${x[0]} selected`)}
+                onClick={() => {
+                  setSelectedBankAccount(x);
+                  setAccountDialog('actions');
+                }}
               >
                 <MoreHorizontal />
               </button>
@@ -216,23 +257,38 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
               {x[0]} <small>{x[1]}</small>
             </p>
             <strong>{x[2]}</strong>
-            <footer>
+            <button
+              type="button"
+              className="bank-card-footer"
+              aria-label={`View ${x[0]} account details`}
+              onClick={() => {
+                setSelectedBankAccount(x);
+                setAccountDialog('details');
+              }}
+            >
               <i className={i === 1 ? 'warning' : ''} />
               {x[3]}
               <ArrowRight size={15} />
-            </footer>
+            </button>
           </article>
         ))}
       </div>
       <section className="panel register-panel">
         <div className="table-toolbar">
           <h2>Recent bank transactions</h2>
-          <button
-            className="filter-button"
-            onClick={() => confirmAction('Showing transactions from all accounts')}
-          >
-            All accounts <ChevronDown />
-          </button>
+          <label className="filter-button account-filter">
+            <span className="sr-only">Filter transactions by account</span>
+            <select
+              value={accountFilter}
+              onChange={(event) => setAccountFilter(event.target.value)}
+            >
+              <option>All accounts</option>
+              {bankAccounts.map((account) => (
+                <option key={account[0]}>{account[0]}</option>
+              ))}
+            </select>
+            <ChevronDown size={15} />
+          </label>
         </div>
         <DataTable
           columns={[
@@ -243,15 +299,193 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
             { key: 'credit', label: 'Money out', align: 'right' },
             { key: 'balance', label: 'Balance', align: 'right' },
           ]}
-          rows={ledgerRows}
+          rows={ledgerRows.filter(
+            (row) => accountFilter === 'All accounts' || row.account === accountFilter,
+          )}
         />
       </section>
+      <Modal
+        open={addAccountOpen}
+        onClose={() => setAddAccountOpen(false)}
+        title="Add bank account"
+        subtitle="Add an account to track its balance and transactions in Cephas."
+        footer={
+          <>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => setAddAccountOpen(false)}
+            >
+              Cancel
+            </button>
+            <button className="button" type="submit" form="add-bank-account-form">
+              Add account
+            </button>
+          </>
+        }
+      >
+        <form
+          id="add-bank-account-form"
+          className="form-grid"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const accountName = String(form.get('accountName') ?? '').trim();
+            const accountNumber = String(form.get('accountNumber') ?? '').trim();
+            const openingBalance = Number(form.get('openingBalance') ?? 0);
+            const maskedNumber = accountNumber
+              ? `**** ${accountNumber.slice(-4)}`
+              : String(form.get('accountType') ?? 'Bank account');
+            const formattedBalance = new Intl.NumberFormat('en-NG', {
+              style: 'currency',
+              currency: 'NGN',
+              maximumFractionDigits: 0,
+            }).format(Number.isFinite(openingBalance) ? openingBalance : 0);
+
+            setBankAccounts((accounts) => [
+              ...accounts,
+              [accountName, maskedNumber, formattedBalance, 'Ready to reconcile'],
+            ]);
+            setAddAccountOpen(false);
+            confirmAction(`${accountName} added successfully`);
+          }}
+        >
+          <label className="full">
+            Account name
+            <input name="accountName" placeholder="e.g. Zenith Bank Current" required autoFocus />
+          </label>
+          <label>
+            Bank
+            <select name="bank" required defaultValue="">
+              <option value="" disabled>
+                Select bank
+              </option>
+              <option>Access Bank</option>
+              <option>First Bank</option>
+              <option>GTBank</option>
+              <option>UBA</option>
+              <option>Zenith Bank</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label>
+            Account type
+            <select name="accountType" defaultValue="Current account">
+              <option>Current account</option>
+              <option>Savings account</option>
+              <option>Cash account</option>
+            </select>
+          </label>
+          <label>
+            Account number
+            <input
+              name="accountNumber"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={10}
+              placeholder="10-digit account number"
+              required
+            />
+          </label>
+          <label>
+            Opening balance
+            <input name="openingBalance" type="number" min="0" step="0.01" placeholder="0.00" />
+          </label>
+        </form>
+      </Modal>
+      <Modal
+        open={accountDialog !== null && selectedBankAccount !== null}
+        onClose={() => setAccountDialog(null)}
+        title={
+          accountDialog === 'actions'
+            ? `${selectedBankAccount?.[0] ?? ''} actions`
+            : selectedBankAccount?.[0] ?? 'Bank account'
+        }
+        subtitle={
+          accountDialog === 'details'
+            ? 'Account balance and reconciliation information.'
+            : 'Choose what you want to do with this account.'
+        }
+        footer={
+          accountDialog === 'details' ? (
+            <button className="button" type="button" onClick={() => setAccountDialog(null)}>
+              Done
+            </button>
+          ) : undefined
+        }
+      >
+        {selectedBankAccount && accountDialog === 'details' && (
+          <div className="account-detail-list">
+            <span>
+              <small>Account</small>
+              <strong>{selectedBankAccount[0]}</strong>
+            </span>
+            <span>
+              <small>Account number</small>
+              <strong>{selectedBankAccount[1]}</strong>
+            </span>
+            <span>
+              <small>Current balance</small>
+              <strong>{selectedBankAccount[2]}</strong>
+            </span>
+            <span>
+              <small>Status</small>
+              <strong>{selectedBankAccount[3]}</strong>
+            </span>
+          </div>
+        )}
+        {selectedBankAccount && accountDialog === 'actions' && (
+          <div className="account-action-list">
+            <button className="button button--secondary" onClick={() => setAccountDialog('details')}>
+              View account details
+            </button>
+            <button
+              className="button button--secondary"
+              onClick={() => {
+                const accountName = selectedBankAccount[0];
+                setBankAccounts((accounts) =>
+                  accounts.map((account) =>
+                    account[0] === accountName
+                      ? [account[0], account[1], account[2], 'Up to date']
+                      : account,
+                  ),
+                );
+                setSelectedBankAccount((account) =>
+                  account ? [account[0], account[1], account[2], 'Up to date'] : account,
+                );
+                setAccountDialog(null);
+                confirmAction(`${accountName} marked as reconciled`);
+              }}
+            >
+              Mark as reconciled
+            </button>
+            <button
+              className="button button--secondary"
+              onClick={() => {
+                downloadText(
+                  `${selectedBankAccount[0].toLowerCase().replace(/[^a-z0-9]+/g, '-')}-statement.txt`,
+                  `${selectedBankAccount[0]}\nBalance: ${selectedBankAccount[2]}\nStatus: ${selectedBankAccount[3]}`,
+                );
+                setAccountDialog(null);
+              }}
+            >
+              Export account summary
+            </button>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }
 
 export function AccountingPage({ type }: { type: string }) {
   const [modal, setModal] = useState(false);
+  const [accountQuery, setAccountQuery] = useState('');
+  const [ledgerPeriod, setLedgerPeriod] = useState('1 Aug – 17 Aug 2026');
+  const [ledgerBranch, setLedgerBranch] = useState('All branches');
+  const [ledgerDepartment, setLedgerDepartment] = useState('All departments');
+  const [selectedLedgerAccount, setSelectedLedgerAccount] = useState<string[] | null>(null);
+  const [journalLines, setJournalLines] = useState([1, 2]);
   if (type === 'chart-of-accounts')
     return (
       <>
@@ -280,14 +514,20 @@ export function AccountingPage({ type }: { type: string }) {
           <div className="table-toolbar">
             <div className="table-search">
               <Search />
-              <input placeholder="Search accounts by name or code…" />
+              <input
+                value={accountQuery}
+                onChange={(event) => setAccountQuery(event.target.value)}
+                placeholder="Search accounts by name or code…"
+              />
             </div>
-            <button
-              className="filter-button"
-              onClick={() => confirmAction('Showing active accounts')}
-            >
-              Active accounts <ChevronDown />
-            </button>
+            <label className="filter-button account-filter">
+              <span className="sr-only">Account status</span>
+              <select defaultValue="Active accounts">
+                <option>Active accounts</option>
+                <option>All accounts</option>
+              </select>
+              <ChevronDown size={14} />
+            </label>
           </div>
           {[
             ['1000', 'Assets', 'Header', '₦184,620,000'],
@@ -298,7 +538,14 @@ export function AccountingPage({ type }: { type: string }) {
             ['1300', 'Inventory Asset', 'Inventory', '₦18,620,000'],
             ['2000', 'Liabilities', 'Header', '₦46,810,000'],
             ['2100', 'Accounts Payable', 'Payable', '₦5,680,000'],
-          ].map((x, i) => (
+          ]
+            .map((account, index) => ({ account, index }))
+            .filter(({ account }) =>
+              account.slice(0, 3).some((value) =>
+                value.toLowerCase().includes(accountQuery.trim().toLowerCase()),
+              ),
+            )
+            .map(({ account: x, index: i }) => (
             <div
               className={`account-line depth-${i === 0 || i === 6 ? 0 : i === 1 || i === 4 || i === 5 || i === 7 ? 1 : 2}`}
               key={x[0]}
@@ -313,12 +560,12 @@ export function AccountingPage({ type }: { type: string }) {
               <button
                 className="row-action"
                 aria-label={`Open ${x[1]}`}
-                onClick={() => confirmAction(`${x[1]} account selected`)}
+                onClick={() => setSelectedLedgerAccount(x)}
               >
                 <MoreHorizontal />
               </button>
             </div>
-          ))}
+            ))}
         </section>
         <Modal
           open={modal}
@@ -360,6 +607,25 @@ export function AccountingPage({ type }: { type: string }) {
               <input placeholder="₦0.00" />
             </label>
           </div>
+        </Modal>
+        <Modal
+          open={selectedLedgerAccount !== null}
+          onClose={() => setSelectedLedgerAccount(null)}
+          title={selectedLedgerAccount?.[1] ?? 'Account details'}
+          footer={
+            <button className="button" onClick={() => setSelectedLedgerAccount(null)}>
+              Done
+            </button>
+          }
+        >
+          {selectedLedgerAccount && (
+            <div className="account-detail-list">
+              <span><small>Code</small><strong>{selectedLedgerAccount[0]}</strong></span>
+              <span><small>Name</small><strong>{selectedLedgerAccount[1]}</strong></span>
+              <span><small>Type</small><strong>{selectedLedgerAccount[2]}</strong></span>
+              <span><small>Balance</small><strong>{selectedLedgerAccount[3]}</strong></span>
+            </div>
+          )}
         </Modal>
       </>
     );
@@ -406,7 +672,10 @@ export function AccountingPage({ type }: { type: string }) {
             <>
               <button
                 className="button button--secondary"
-                onClick={() => confirmAction('Journal saved as draft')}
+                onClick={() => {
+                  setModal(false);
+                  confirmAction('Journal saved as draft');
+                }}
               >
                 Save draft
               </button>
@@ -448,7 +717,7 @@ export function AccountingPage({ type }: { type: string }) {
               <span>Debit</span>
               <span>Credit</span>
             </header>
-            {[1, 2].map((x) => (
+            {journalLines.map((x) => (
               <div key={x}>
                 <select>
                   <option>
@@ -460,7 +729,11 @@ export function AccountingPage({ type }: { type: string }) {
                 <input defaultValue={x === 2 ? '100,000.00' : ''} />
               </div>
             ))}
-            <button onClick={() => confirmAction('A new journal line was added')}>
+            <button
+              onClick={() =>
+                setJournalLines((lines) => [...lines, Math.max(...lines, 0) + 1])
+              }
+            >
               + Add line
             </button>
             <footer>
@@ -488,17 +761,33 @@ export function AccountingPage({ type }: { type: string }) {
         }
       />
       <section className="report-controls">
-        <button onClick={() => confirmAction('Date range selector opened')}>
-          1 Aug – 17 Aug 2026 <ChevronDown />
-        </button>
-        <button onClick={() => confirmAction('Branch filter opened')}>
-          All branches <ChevronDown />
-        </button>
-        <button onClick={() => confirmAction('Department filter opened')}>
-          All departments <ChevronDown />
-        </button>
-        <button onClick={() => confirmAction('Additional filters opened')}>
-          More filters <Settings2 />
+        <select value={ledgerPeriod} onChange={(event) => setLedgerPeriod(event.target.value)}>
+          <option>1 Aug – 17 Aug 2026</option>
+          <option>July 2026</option>
+          <option>Year to date</option>
+        </select>
+        <select value={ledgerBranch} onChange={(event) => setLedgerBranch(event.target.value)}>
+          <option>All branches</option>
+          <option>Lagos Head Office</option>
+          <option>Abuja Branch</option>
+        </select>
+        <select
+          value={ledgerDepartment}
+          onChange={(event) => setLedgerDepartment(event.target.value)}
+        >
+          <option>All departments</option>
+          <option>Finance</option>
+          <option>Operations</option>
+          <option>Sales</option>
+        </select>
+        <button
+          onClick={() => {
+            setLedgerPeriod('1 Aug – 17 Aug 2026');
+            setLedgerBranch('All branches');
+            setLedgerDepartment('All departments');
+          }}
+        >
+          Reset filters <Settings2 />
         </button>
         <span />
         <button
@@ -707,6 +996,10 @@ export function FinancialStatement({
 export function ReportsPage({ initial }: { initial?: string }) {
   const [report, setReport] = useState(initial ?? 'centre');
   const [reportCategory, setReportCategory] = useState('All reports');
+  const [statementPeriod, setStatementPeriod] = useState('1 Jan – 17 Aug 2026');
+  const [statementScope, setStatementScope] = useState('Consolidated');
+  const [customReportOpen, setCustomReportOpen] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const statements = ['profit-loss', 'balance-sheet', 'cash-flow'];
   if (statements.includes(report))
     return (
@@ -722,12 +1015,23 @@ export function ReportsPage({ initial }: { initial?: string }) {
           description="Generated from posted accounting transactions in the general ledger."
         />
         <section className="report-controls">
-          <button onClick={() => confirmAction('Report date range opened')}>
-            1 Jan – 17 Aug 2026 <ChevronDown />
-          </button>
-          <button onClick={() => confirmAction('Consolidation scope opened')}>
-            Consolidated <ChevronDown />
-          </button>
+          <select
+            value={statementPeriod}
+            onChange={(event) => setStatementPeriod(event.target.value)}
+          >
+            <option>1 Jan – 17 Aug 2026</option>
+            <option>August 2026</option>
+            <option>July 2026</option>
+            <option>Year to date</option>
+          </select>
+          <select
+            value={statementScope}
+            onChange={(event) => setStatementScope(event.target.value)}
+          >
+            <option>Consolidated</option>
+            <option>Lagos Head Office</option>
+            <option>Abuja Branch</option>
+          </select>
           <span />
           <button onClick={() => setReport('centre')}>Back to reports</button>
           <button onClick={() => downloadText(`${report}.pdf.txt`, `${report} report`)}>
@@ -794,6 +1098,7 @@ export function ReportsPage({ initial }: { initial?: string }) {
         title="Reports centre"
         description="Professional financial, operational, tax, inventory, and custom reporting."
         action="Build custom report"
+        onAction={() => setCustomReportOpen(true)}
       />
       <div className="report-feature">
         <div>
@@ -806,7 +1111,7 @@ export function ReportsPage({ initial }: { initial?: string }) {
             Higher service revenue and better inventory purchasing contributed ₦2.8m additional
             gross profit.
           </p>
-          <button onClick={() => confirmAction('AI report analysis opened')}>
+          <button onClick={() => setSelectedReport('July gross margin analysis')}>
             View analysis <ArrowRight />
           </button>
         </div>
@@ -848,7 +1153,10 @@ export function ReportsPage({ initial }: { initial?: string }) {
               <div>
                 {(reports as unknown as Array<[typeof FileText, string, string, string]>).map(
                   ([Icon, name, desc, id]) => (
-                    <button key={name} onClick={() => id && setReport(id)}>
+                    <button
+                      key={name}
+                      onClick={() => (id ? setReport(id) : setSelectedReport(name))}
+                    >
                       <i>
                         <Icon />
                       </i>
@@ -865,6 +1173,86 @@ export function ReportsPage({ initial }: { initial?: string }) {
           ))}
         </div>
       </div>
+      <Modal
+        open={customReportOpen}
+        onClose={() => setCustomReportOpen(false)}
+        title="Build custom report"
+        subtitle="Choose the report name, source, and reporting period."
+        footer={
+          <>
+            <button className="button button--secondary" onClick={() => setCustomReportOpen(false)}>
+              Cancel
+            </button>
+            <button className="button" type="submit" form="custom-report-form">
+              Build report
+            </button>
+          </>
+        }
+      >
+        <form
+          id="custom-report-form"
+          className="form-grid"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            setSelectedReport(String(form.get('name') ?? 'Custom report'));
+            setCustomReportOpen(false);
+          }}
+        >
+          <label className="full">
+            Report name
+            <input name="name" required autoFocus />
+          </label>
+          <label>
+            Data source
+            <select name="source">
+              <option>General ledger</option>
+              <option>Sales and income</option>
+              <option>Purchases and expenses</option>
+              <option>Inventory</option>
+            </select>
+          </label>
+          <label>
+            Period
+            <select name="period">
+              <option>This month</option>
+              <option>This quarter</option>
+              <option>Year to date</option>
+            </select>
+          </label>
+        </form>
+      </Modal>
+      <Modal
+        open={selectedReport !== null}
+        onClose={() => setSelectedReport(null)}
+        title={selectedReport ?? 'Report'}
+        subtitle="Report preview generated from the currently selected company data."
+        footer={
+          <>
+            <button className="button button--secondary" onClick={() => setSelectedReport(null)}>
+              Close
+            </button>
+            <button
+              className="button"
+              onClick={() =>
+                downloadText(
+                  `${(selectedReport ?? 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`,
+                  'Account,Amount',
+                )
+              }
+            >
+              Export report
+            </button>
+          </>
+        }
+      >
+        <div className="account-detail-list">
+          <span><small>Report</small><strong>{selectedReport}</strong></span>
+          <span><small>Period</small><strong>{statementPeriod}</strong></span>
+          <span><small>Scope</small><strong>{statementScope}</strong></span>
+          <span><small>Status</small><strong>Ready</strong></span>
+        </div>
+      </Modal>
     </>
   );
 }
@@ -874,6 +1262,7 @@ export function AIAssistantPage() {
   const [sent, setSent] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [activeConversation, setActiveConversation] = useState('August performance review');
+  const attachmentRef = useRef<HTMLInputElement>(null);
   const conversations = [
     'August performance review',
     'Overdue customer analysis',
@@ -976,7 +1365,7 @@ export function AIAssistantPage() {
           <button
             className="icon-button"
             aria-label="Conversation options"
-            onClick={() => confirmAction('Conversation options opened')}
+            onClick={() => setHistoryOpen(true)}
           >
             <MoreHorizontal />
           </button>
@@ -1044,7 +1433,7 @@ export function AIAssistantPage() {
                     Sources: Profit & Loss, General Ledger · Updated just now
                   </small>
                   <div className="answer-actions">
-                    <button onClick={() => confirmAction('Profit & Loss opened')}>
+                    <button onClick={() => ask('Explain the Profit & Loss report')}>
                       Open source report
                     </button>
                     <button onClick={() => downloadText('cephas-ai-insight.txt', question)}>
@@ -1089,10 +1478,18 @@ export function AIAssistantPage() {
               <button
                 type="button"
                 aria-label="Attach a file"
-                onClick={() => confirmAction('Attachment picker opened')}
+                onClick={() => attachmentRef.current?.click()}
               >
                 <Paperclip />
               </button>
+              <input
+                ref={attachmentRef}
+                type="file"
+                hidden
+                onChange={(event) =>
+                  event.target.files?.[0] && confirmAction(`${event.target.files[0].name} attached`)
+                }
+              />
               <button
                 className="send"
                 type="submit"
@@ -1113,6 +1510,7 @@ export function AIAssistantPage() {
 export function LegacyAIAssistantPage() {
   const [question, setQuestion] = useState('');
   const [sent, setSent] = useState(false);
+  const attachmentRef = useRef<HTMLInputElement>(null);
   return (
     <div className="ai-page">
       <aside>
@@ -1171,7 +1569,10 @@ export function LegacyAIAssistantPage() {
           <button
             className="icon-button"
             aria-label="Conversation options"
-            onClick={() => confirmAction('Conversation options opened')}
+            onClick={() => {
+              setQuestion('');
+              setSent(false);
+            }}
           >
             <MoreHorizontal />
           </button>
@@ -1252,10 +1653,18 @@ export function LegacyAIAssistantPage() {
               />
               <button
                 aria-label="Attach a file"
-                onClick={() => confirmAction('Attachment picker opened')}
+                onClick={() => attachmentRef.current?.click()}
               >
                 <Paperclip />
               </button>
+              <input
+                ref={attachmentRef}
+                type="file"
+                hidden
+                onChange={(event) =>
+                  event.target.files?.[0] && confirmAction(`${event.target.files[0].name} attached`)
+                }
+              />
               <button className="send" onClick={() => setSent(true)}>
                 <Send />
               </button>
@@ -1416,9 +1825,16 @@ const simplePageData: Record<
 
 export function SimpleFeaturePage({ type }: { type: string }) {
   const data = simplePageData[type] ?? simplePageData.budgets;
+  const [createOpen, setCreateOpen] = useState(false);
+  const [rows, setRows] = useState(data.rows);
   return (
     <>
-      <PageHeader title={data.title} description={data.description} action={data.action} />
+      <PageHeader
+        title={data.title}
+        description={data.description}
+        action={data.action}
+        onAction={data.action ? () => setCreateOpen(true) : undefined}
+      />
       <StatsGrid stats={data.stats} />
       <section className="panel register-panel">
         <DataTable
@@ -1429,9 +1845,69 @@ export function SimpleFeaturePage({ type }: { type: string }) {
             { key: 'd', label: 'Reference' },
             { key: 'status', label: 'Status' },
           ]}
-          rows={data.rows.map((r) => ({ a: r[0], b: r[1], c: r[2], d: r[3], status: r[4] }))}
+          rows={rows.map((r) => ({ a: r[0], b: r[1], c: r[2], d: r[3], status: r[4] }))}
         />
       </section>
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title={data.action ?? `Add to ${data.title}`}
+        footer={
+          <>
+            <button className="button button--secondary" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </button>
+            <button className="button" type="submit" form="simple-feature-form">
+              Save
+            </button>
+          </>
+        }
+      >
+        <form
+          id="simple-feature-form"
+          className="form-grid"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            setRows((currentRows) => [
+              [
+                String(form.get('name') ?? ''),
+                String(form.get('detail') ?? ''),
+                String(form.get('amount') ?? '—'),
+                String(form.get('reference') ?? '—'),
+                String(form.get('status') ?? 'Draft'),
+              ],
+              ...currentRows,
+            ]);
+            setCreateOpen(false);
+          }}
+        >
+          <label className="full">
+            Name / period
+            <input name="name" required autoFocus />
+          </label>
+          <label>
+            Scope / detail
+            <input name="detail" required />
+          </label>
+          <label>
+            Amount / change
+            <input name="amount" placeholder="₦0.00" />
+          </label>
+          <label>
+            Reference
+            <input name="reference" />
+          </label>
+          <label>
+            Status
+            <select name="status">
+              <option>Draft</option>
+              <option>Active</option>
+              <option>Ready</option>
+            </select>
+          </label>
+        </form>
+      </Modal>
     </>
   );
 }

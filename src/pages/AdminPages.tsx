@@ -31,6 +31,27 @@ import { confirmAction } from '@/utils/actions';
 
 export function UsersPage() {
   const [modal, setModal] = useState(false);
+  const [roleModal, setRoleModal] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('Accountant');
+  const [permissionEditing, setPermissionEditing] = useState(false);
+  const [permissions, setPermissions] = useState(() =>
+    Array.from({ length: 8 }, (_, row) =>
+      Array.from({ length: 6 }, (_, column) =>
+        (row < 5 && column < 3) || (row >= 4 && column !== 3),
+      ),
+    ),
+  );
+  const [roles, setRoles] = useState([
+    ['Owner', '1', 'Full access'],
+    ['Administrator', '2', 'System administration'],
+    ['Accountant', '6', 'Accounting & reports'],
+    ['Finance Manager', '3', 'Finance & approvals'],
+    ['Sales', '8', 'Customers & invoices'],
+    ['Procurement', '4', 'Suppliers & purchases'],
+    ['Inventory Manager', '4', 'Inventory operations'],
+    ['Auditor', '2', 'Read-only finance'],
+    ['Employee', '6', 'Expenses & workflows'],
+  ]);
   const rows = [
     ['Tobi Adeyemi', 'tobi@acme.ng', 'Finance Manager', 'Lagos HQ', 'Active'],
     ['Ada Okafor', 'ada@acme.ng', 'Accountant', 'All branches', 'Active'],
@@ -76,25 +97,15 @@ export function UsersPage() {
         <aside className="panel role-list">
           <header>
             <h2>Roles</h2>
-            <button aria-label="Add role" onClick={() => confirmAction('Role creator opened')}>
+            <button aria-label="Add role" onClick={() => setRoleModal(true)}>
               <Plus />
             </button>
           </header>
-          {[
-            ['Owner', '1', 'Full access'],
-            ['Administrator', '2', 'System administration'],
-            ['Accountant', '6', 'Accounting & reports'],
-            ['Finance Manager', '3', 'Finance & approvals'],
-            ['Sales', '8', 'Customers & invoices'],
-            ['Procurement', '4', 'Suppliers & purchases'],
-            ['Inventory Manager', '4', 'Inventory operations'],
-            ['Auditor', '2', 'Read-only finance'],
-            ['Employee', '6', 'Expenses & workflows'],
-          ].map((x, i) => (
+          {roles.map((x) => (
             <button
-              className={i === 2 ? 'active' : ''}
+              className={selectedRole === x[0] ? 'active' : ''}
               key={x[0]}
-              onClick={() => confirmAction(`${x[0]} role selected`)}
+              onClick={() => setSelectedRole(x[0])}
             >
               <span>
                 <strong>{x[0]}</strong>
@@ -109,14 +120,17 @@ export function UsersPage() {
       <section className="panel permission-matrix">
         <header>
           <div>
-            <h2>Accountant permissions</h2>
+            <h2>{selectedRole} permissions</h2>
             <p>Permissions apply across assigned branches.</p>
           </div>
           <button
             className="button button--secondary"
-            onClick={() => confirmAction('Permission editing enabled')}
+            onClick={() => {
+              if (permissionEditing) confirmAction(`${selectedRole} permissions saved`);
+              setPermissionEditing((editing) => !editing);
+            }}
           >
-            Edit permissions
+            {permissionEditing ? 'Save permissions' : 'Edit permissions'}
           </button>
         </header>
         <div className="permission-head">
@@ -137,10 +151,27 @@ export function UsersPage() {
         ].map((x, i) => (
           <div className="permission-row" key={x}>
             <strong>{x}</strong>
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <i className={(i < 5 && n < 4) || (i >= 4 && n !== 4) ? 'checked' : ''} key={n}>
-                {((i < 5 && n < 4) || (i >= 4 && n !== 4)) && <Check />}
-              </i>
+            {[1, 2, 3, 4, 5, 6].map((n, permissionIndex) => (
+              <button
+                type="button"
+                className={permissions[i][permissionIndex] ? 'checked' : ''}
+                key={n}
+                disabled={!permissionEditing}
+                aria-label={`${permissions[i][permissionIndex] ? 'Disable' : 'Enable'} ${x} ${['view', 'create', 'edit', 'delete', 'approve', 'export'][permissionIndex]} permission`}
+                onClick={() =>
+                  setPermissions((current) =>
+                    current.map((row, rowIndex) =>
+                      rowIndex === i
+                        ? row.map((enabled, columnIndex) =>
+                            columnIndex === permissionIndex ? !enabled : enabled,
+                          )
+                        : row,
+                    ),
+                  )
+                }
+              >
+                {permissions[i][permissionIndex] && <Check />}
+              </button>
             ))}
           </div>
         ))}
@@ -178,6 +209,44 @@ export function UsersPage() {
             </select>
           </label>
         </div>
+      </Modal>
+      <Modal
+        open={roleModal}
+        onClose={() => setRoleModal(false)}
+        title="Create role"
+        footer={
+          <>
+            <button className="button button--secondary" onClick={() => setRoleModal(false)}>
+              Cancel
+            </button>
+            <button className="button" type="submit" form="role-form">
+              Create role
+            </button>
+          </>
+        }
+      >
+        <form
+          id="role-form"
+          className="form-grid"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const name = String(form.get('name') ?? '').trim();
+            const description = String(form.get('description') ?? '').trim();
+            setRoles((items) => [...items, [name, '0', description]]);
+            setSelectedRole(name);
+            setRoleModal(false);
+          }}
+        >
+          <label className="full">
+            Role name
+            <input name="name" required autoFocus />
+          </label>
+          <label className="full">
+            Description
+            <input name="description" required />
+          </label>
+        </form>
       </Modal>
     </>
   );
@@ -311,11 +380,17 @@ function OrganisationSettings() {
         <div>
           <strong>Company logo</strong>
           <p>PNG or SVG, at least 256 × 256px.</p>
-          <button
-            onClick={() => confirmAction('Choose a new company logo from your profile settings')}
-          >
+          <label className="button button--secondary">
             Replace logo
-          </button>
+            <input
+              type="file"
+              accept="image/png,image/svg+xml"
+              hidden
+              onChange={(event) =>
+                event.target.files?.[0] && confirmAction(`${event.target.files[0].name} selected`)
+              }
+            />
+          </label>
         </div>
       </div>
       <div className="form-grid">
@@ -583,22 +658,29 @@ function BranchSettings() {
   );
 }
 function CurrencySettings() {
+  const [currencies, setCurrencies] = useState([
+    ['NGN', 'Nigerian Naira', '₦', '1.0000', 'Base currency'],
+    ['USD', 'US Dollar', '$', '1,592.4500', 'Active'],
+    ['GBP', 'British Pound', '£', '2,055.8400', 'Active'],
+    ['EUR', 'Euro', '€', '1,753.2100', 'Active'],
+  ]);
+  const [currencyDialog, setCurrencyDialog] = useState(false);
+  const [editingCurrency, setEditingCurrency] = useState<string[] | null>(null);
+  const openCurrencyDialog = (currency: string[] | null = null) => {
+    setEditingCurrency(currency);
+    setCurrencyDialog(true);
+  };
   return (
     <>
       <header className="settings-heading">
         <h2>Currency management</h2>
         <p>Record foreign transactions and recognise realised or unrealised gains and losses.</p>
-        <button className="button" onClick={() => confirmAction('Currency form opened')}>
+        <button className="button" onClick={() => openCurrencyDialog()}>
           <Plus />
           Add currency
         </button>
       </header>
-      {[
-        ['NGN', 'Nigerian Naira', '₦', '1.0000', 'Base currency'],
-        ['USD', 'US Dollar', '$', '1,592.4500', 'Active'],
-        ['GBP', 'British Pound', '£', '2,055.8400', 'Active'],
-        ['EUR', 'Euro', '€', '1,753.2100', 'Active'],
-      ].map((x) => (
+      {currencies.map((x) => (
         <div className="currency-row" key={x[0]}>
           <b>{x[0]}</b>
           <span>
@@ -613,12 +695,66 @@ function CurrencySettings() {
           <button
             className="row-action"
             aria-label={`Edit ${x[0]}`}
-            onClick={() => confirmAction(`${x[0]} currency selected`)}
+            onClick={() => openCurrencyDialog(x)}
           >
             <MoreHorizontal />
           </button>
         </div>
       ))}
+      <Modal
+        open={currencyDialog}
+        onClose={() => setCurrencyDialog(false)}
+        title={editingCurrency ? `Edit ${editingCurrency[0]}` : 'Add currency'}
+        footer={
+          <>
+            <button className="button button--secondary" onClick={() => setCurrencyDialog(false)}>
+              Cancel
+            </button>
+            <button className="button" type="submit" form="currency-form">
+              Save currency
+            </button>
+          </>
+        }
+      >
+        <form
+          id="currency-form"
+          className="form-grid"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const currency = [
+              String(form.get('code') ?? '').toUpperCase(),
+              String(form.get('name') ?? ''),
+              String(form.get('symbol') ?? ''),
+              String(form.get('rate') ?? ''),
+              editingCurrency?.[4] ?? 'Active',
+            ];
+            setCurrencies((items) =>
+              editingCurrency
+                ? items.map((item) => (item[0] === editingCurrency[0] ? currency : item))
+                : [...items, currency],
+            );
+            setCurrencyDialog(false);
+          }}
+        >
+          <label>
+            Currency code
+            <input name="code" defaultValue={editingCurrency?.[0]} maxLength={3} required />
+          </label>
+          <label>
+            Currency name
+            <input name="name" defaultValue={editingCurrency?.[1]} required />
+          </label>
+          <label>
+            Symbol
+            <input name="symbol" defaultValue={editingCurrency?.[2]} required />
+          </label>
+          <label>
+            Exchange rate
+            <input name="rate" defaultValue={editingCurrency?.[3]} inputMode="decimal" required />
+          </label>
+        </form>
+      </Modal>
     </>
   );
 }
@@ -674,6 +810,7 @@ function SecuritySettings() {
             className={enabled[title] ? 'on' : ''}
             role="switch"
             aria-checked={enabled[title]}
+            aria-label={title}
             onClick={() => setEnabled((items) => ({ ...items, [title]: !items[title] }))}
           >
             <i />
@@ -901,12 +1038,17 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
           <h2>Tobi Adeyemi</h2>
           <p>Finance Manager</p>
           <span>Acme Holdings</span>
-          <button
-            className="button button--secondary"
-            onClick={() => confirmAction('Photo chooser opened')}
-          >
+          <label className="button button--secondary">
             <UserRound size={16} /> Change photo
-          </button>
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) =>
+                event.target.files?.[0] && confirmAction(`${event.target.files[0].name} selected`)
+              }
+            />
+          </label>
           <dl>
             <div>
               <dt>Member since</dt>

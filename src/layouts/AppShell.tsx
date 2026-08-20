@@ -166,11 +166,18 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
             </div>
             <p className="command-label">Recent results</p>
             {[
-              { type: 'Invoice', title: 'INV-00245', meta: 'Apex Retail Limited · ₦2,500,000' },
-              { type: 'Customer', title: 'Northstar Schools', meta: '₦1,280,000 outstanding' },
-              { type: 'Account', title: '1020 · GTBank Current', meta: '₦18,450,200 balance' },
+              { type: 'Invoice', title: 'INV-00245', meta: 'Apex Retail Limited · ₦2,500,000', id: 'invoices' },
+              { type: 'Customer', title: 'Northstar Schools', meta: '₦1,280,000 outstanding', id: 'customers' },
+              { type: 'Account', title: '1020 · GTBank Current', meta: '₦18,450,200 balance', id: 'chart-of-accounts' },
             ].map((x) => (
-              <button className="search-result" key={x.title} onClick={() => setSearchOpen(false)}>
+              <button
+                className="search-result"
+                key={x.title}
+                onClick={() => {
+                  setSearchOpen(false);
+                  navigate(x.id);
+                }}
+              >
                 <span>{x.type.slice(0, 2)}</span>
                 <div>
                   <strong>{x.title}</strong>

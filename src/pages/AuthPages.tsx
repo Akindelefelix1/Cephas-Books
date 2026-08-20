@@ -21,6 +21,7 @@ export function AuthPage({
   onView: (v: View) => void;
 }) {
   const [showPassword, setShowPassword] = useState(false);
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const content = {
     login: {
       title: 'Welcome back',
@@ -102,19 +103,27 @@ export function AuthPage({
           {mode === 'mfa' ? (
             <>
               <label>
-                Authentication code
-                <div className="otp-inputs">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <input
-                      key={i}
-                      maxLength={1}
-                      inputMode="numeric"
-                      defaultValue={i < 3 ? String(i) : ''}
-                    />
-                  ))}
-                </div>
+                {useRecoveryCode ? 'Recovery code' : 'Authentication code'}
+                {useRecoveryCode ? (
+                  <input autoFocus placeholder="Enter your recovery code" />
+                ) : (
+                  <div className="otp-inputs">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <input
+                        key={i}
+                        maxLength={1}
+                        inputMode="numeric"
+                        defaultValue={i < 3 ? String(i) : ''}
+                      />
+                    ))}
+                  </div>
+                )}
               </label>
-              <p className="auth-help">Open your authenticator app to view your code.</p>
+              <p className="auth-help">
+                {useRecoveryCode
+                  ? 'Use one of the recovery codes saved when MFA was configured.'
+                  : 'Open your authenticator app to view your code.'}
+              </p>
             </>
           ) : (
             <div className="form-stack">
@@ -186,9 +195,9 @@ export function AuthPage({
           {mode === 'mfa' && (
             <button
               className="link-center"
-              onClick={() => confirmAction('Recovery-code entry enabled')}
+              onClick={() => setUseRecoveryCode((enabled) => !enabled)}
             >
-              Use a recovery code instead
+              {useRecoveryCode ? 'Use authenticator code instead' : 'Use a recovery code instead'}
             </button>
           )}
         </div>

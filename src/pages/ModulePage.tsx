@@ -5,28 +5,38 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import type { ModuleDefinition } from '@/types/app';
-import { confirmAction } from '@/utils/actions';
 
 export function ModulePage({ definition }: { definition: ModuleDefinition }) {
   const [modal, setModal] = useState(false);
+  const [filterModal, setFilterModal] = useState(false);
+  const [rows, setRows] = useState(definition.rows);
   const [tab, setTab] = useState(definition.tabs?.[0] ?? 'All');
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const filteredRows = useMemo(() => {
     const firstTab = definition.tabs?.[0];
     const normalizedQuery = query.trim().toLowerCase();
-    return definition.rows.filter((row) => {
+    return rows.filter((row) => {
       const matchesTab = !definition.tabs || tab === firstTab || String(row.status) === tab;
       const matchesQuery =
         !normalizedQuery ||
         Object.values(row).some((value) => String(value).toLowerCase().includes(normalizedQuery));
-      return matchesTab && matchesQuery;
+      const normalizedFilter = activeFilter?.toLowerCase();
+      const matchesFilter =
+        !normalizedFilter ||
+        normalizedFilter.startsWith('all ') ||
+        (normalizedFilter === 'outstanding'
+          ? Number(String(row.amount ?? '').replace(/[^0-9.-]/g, '')) > 0
+          : Object.values(row).some(
+              (value) => String(value).toLowerCase() === normalizedFilter,
+            ));
+      return matchesTab && matchesQuery && matchesFilter;
     });
-  }, [definition, query, tab]);
+  }, [activeFilter, definition.tabs, query, rows, tab]);
   const tabCount = (name: string) =>
     name === definition.tabs?.[0]
-      ? definition.rows.length
-      : definition.rows.filter((row) => String(row.status) === name).length;
+      ? rows.length
+      : rows.filter((row) => String(row.status) === name).length;
   return (
     <>
       <PageHeader
@@ -48,19 +58,26 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
           </div>
         )}
         <div className="table-toolbar">
-          <div
-            className="table-search"
-            onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
-          >
+          <div className="table-search">
             <Search size={17} />
-            <input placeholder={`Search ${definition.title.toLowerCase()}…`} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={`Search ${definition.title.toLowerCase()}…`}
+            />
           </div>
           <div>
             {definition.filters?.slice(0, 2).map((filter) => (
               <button
-                className={`filter-button ${activeFilter === filter ? 'active' : ''}`}
+                className={`filter-button ${
+                  activeFilter === filter || (!activeFilter && filter.toLowerCase().startsWith('all '))
+                    ? 'active'
+                    : ''
+                }`}
                 key={filter}
-                onClick={() => setActiveFilter((value) => (value === filter ? null : filter))}
+                onClick={() =>
+                  setActiveFilter(filter.toLowerCase().startsWith('all ') ? null : filter)
+                }
               >
                 {filter}
                 <ChevronDown size={14} />
@@ -68,7 +85,7 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
             ))}
             <button
               className="filter-button"
-              onClick={() => confirmAction('All available filters are shown above')}
+              onClick={() => setFilterModal(true)}
             >
               <Filter size={15} /> Filters
             </button>
@@ -88,6 +105,42 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
         <DataTable columns={definition.columns} rows={filteredRows} />
       </section>
       <Modal
+        open={filterModal}
+        onClose={() => setFilterModal(false)}
+        title={`Filter ${definition.title.toLowerCase()}`}
+        subtitle="Choose which records to display."
+        footer={
+          <button
+            className="button button--secondary"
+            onClick={() => {
+              setActiveFilter(null);
+              setFilterModal(false);
+            }}
+          >
+            Clear filters
+          </button>
+        }
+      >
+        <div className="account-action-list">
+          {definition.filters?.map((filter) => {
+            const isAll = filter.toLowerCase().startsWith('all ');
+            const selected = isAll ? !activeFilter : activeFilter === filter;
+            return (
+              <button
+                className={`button button--secondary ${selected ? 'active' : ''}`}
+                key={filter}
+                onClick={() => {
+                  setActiveFilter(isAll ? null : filter);
+                  setFilterModal(false);
+                }}
+              >
+                {filter}
+              </button>
+            );
+          })}
+        </div>
+      </Modal>
+      <Modal
         open={modal}
         onClose={() => setModal(false)}
         title={definition.action}
@@ -98,7 +151,12 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
             <button className="button button--secondary" onClick={() => setModal(false)}>
               Cancel
             </button>
-            <button className="button" onClick={() => setModal(false)}>
+            <button
+              className="button"
+              type={definition.title === 'Invoices' ? 'button' : 'submit'}
+              form={definition.title === 'Invoices' ? undefined : 'generic-record-form'}
+              onClick={definition.title === 'Invoices' ? () => setModal(false) : undefined}
+            >
               Save {definition.title === 'Invoices' ? 'and send' : ''}
             </button>
           </>
@@ -107,36 +165,70 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
         {definition.title === 'Invoices' ? (
           <InvoiceForm />
         ) : (
-          <GenericForm title={definition.title} />
+          <GenericForm
+            title={definition.title}
+            onSubmit={(form) => {
+              const name = String(form.get('name') ?? '').trim();
+              const date = String(form.get('date') ?? '');
+              const amount = String(form.get('amount') ?? '').trim() || '₦0';
+              const status = String(form.get('status') ?? 'Draft');
+              const prefix = definition.title.slice(0, 3).toUpperCase();
+              const reference = `${prefix}-${String(Date.now()).slice(-5)}`;
+              const row = Object.fromEntries(
+                definition.columns.map((column) => {
+                  if (column.key === 'reference') return [column.key, reference];
+                  if (column.key === 'date') return [column.key, date];
+                  if (column.key === 'amount') return [column.key, amount];
+                  if (column.key === 'status') return [column.key, status];
+                  return [column.key, name];
+                }),
+              );
+              setRows((currentRows) => [row, ...currentRows]);
+              setModal(false);
+            }}
+          />
         )}
       </Modal>
     </>
   );
 }
 
-function GenericForm({ title }: { title: string }) {
+function GenericForm({
+  title,
+  onSubmit,
+}: {
+  title: string;
+  onSubmit: (form: FormData) => void;
+}) {
   const today = new Date().toLocaleDateString('en-CA');
   return (
-    <div className="form-grid">
+    <form
+      id="generic-record-form"
+      className="form-grid"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(new FormData(event.currentTarget));
+      }}
+    >
       <label>
         {title.includes('customer')
           ? 'Customer / company name'
           : title.includes('supplier')
             ? 'Supplier / company name'
             : 'Reference / name'}
-        <input placeholder="Enter details" />
+        <input name="name" placeholder="Enter details" required />
       </label>
       <label>
         Date
-        <input type="date" defaultValue={today} />
+        <input name="date" type="date" defaultValue={today} required />
       </label>
       <label>
         Amount
-        <input placeholder="₦ 0.00" inputMode="decimal" />
+        <input name="amount" placeholder="₦ 0.00" inputMode="decimal" />
       </label>
       <label>
         Status
-        <select>
+        <select name="status">
           <option>Draft</option>
           <option>Pending approval</option>
           <option>Approved</option>
@@ -144,7 +236,7 @@ function GenericForm({ title }: { title: string }) {
       </label>
       <label className="full">
         Description
-        <textarea placeholder="Add notes or context…" />
+        <textarea name="description" placeholder="Add notes or context…" />
       </label>
       <label className="full upload-field">
         <input type="file" />
@@ -153,7 +245,7 @@ function GenericForm({ title }: { title: string }) {
         </span>
         <small>PDF, JPG, PNG, DOCX, XLSX · max 10 MB</small>
       </label>
-    </div>
+    </form>
   );
 }
 

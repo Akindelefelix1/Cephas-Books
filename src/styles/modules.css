@@ -455,7 +455,8 @@
 .bank-card > strong {
   font-size: 1.35rem;
 }
-.bank-card footer {
+.bank-card footer,
+.bank-card-footer {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -465,17 +466,52 @@
   color: #7d8698;
   font-size: 0.6rem;
 }
-.bank-card footer i {
+.bank-card-footer {
+  width: calc(100% + 36px);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.bank-card-footer:hover {
+  background: #f8f9fc;
+}
+.bank-card footer i,
+.bank-card-footer i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #1aa166;
 }
-.bank-card footer i.warning {
+.bank-card footer i.warning,
+.bank-card-footer i.warning {
   background: #e49a19;
 }
-.bank-card footer svg {
+.bank-card footer svg,
+.bank-card-footer svg {
   margin-left: auto;
+}
+.account-detail-list {
+  display: grid;
+  gap: 12px;
+}
+.account-detail-list span {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8ebf0;
+}
+.account-detail-list small {
+  color: #7d8698;
+}
+.account-action-list {
+  display: grid;
+  gap: 10px;
+}
+.account-action-list .button {
+  width: 100%;
+  justify-content: flex-start;
 }
 .reconcile-grid {
   display: grid;
@@ -696,7 +732,8 @@
   margin-bottom: 14px;
   overflow: auto;
 }
-.report-controls button {
+.report-controls button,
+.report-controls select {
   height: 36px;
   border: 1px solid #dce1e9;
   border-radius: 8px;
@@ -707,6 +744,11 @@
   gap: 6px;
   font-size: 0.65rem;
   white-space: nowrap;
+}
+.report-controls select {
+  min-width: max-content;
+  color: #101828;
+  cursor: pointer;
 }
 .report-controls span {
   flex: 1;

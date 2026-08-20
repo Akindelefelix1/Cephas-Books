@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { confirmAction } from '@/utils/actions';
 
@@ -22,6 +23,8 @@ export function DashboardPage({
   onNavigate: (id: string) => void;
   onCreate: () => void;
 }) {
+  const [period, setPeriod] = useState('This month');
+  const [chartRange, setChartRange] = useState('Last 6 months');
   const today = new Intl.DateTimeFormat('en-NG', { dateStyle: 'full' }).format(new Date());
   const transactions = [
     ['INV-00245', 'Apex Retail Limited', 'Invoice', '₦2,500,000', 'Partially paid'],
@@ -39,14 +42,24 @@ export function DashboardPage({
           <span>Here’s how Acme Holdings is performing.</span>
         </div>
         <div>
-          <button
-            className="period-button"
-            onClick={() => confirmAction('Reporting period set to this month')}
-          >
+          <label className="period-button">
             <CalendarDays size={17} />
-            This month
+            <span className="sr-only">Reporting period</span>
+            <select
+              value={period}
+              onChange={(event) => {
+                const nextPeriod = event.target.value;
+                setPeriod(nextPeriod);
+                confirmAction(`Reporting period set to ${nextPeriod.toLowerCase()}`);
+              }}
+            >
+              <option>This month</option>
+              <option>Last month</option>
+              <option>This quarter</option>
+              <option>This year</option>
+            </select>
             <ChevronDown size={15} />
-          </button>
+          </label>
           <button className="button" onClick={onCreate}>
             + Quick create
           </button>
@@ -101,13 +114,15 @@ export function DashboardPage({
               <h2>Revenue & expenses</h2>
               <p>Income and spending over time</p>
             </div>
-            <button
-              className="select-button"
-              onClick={() => confirmAction('Chart range set to the last 6 months')}
-            >
-              Last 6 months
+            <label className="select-button account-filter">
+              <span className="sr-only">Chart range</span>
+              <select value={chartRange} onChange={(event) => setChartRange(event.target.value)}>
+                <option>Last 3 months</option>
+                <option>Last 6 months</option>
+                <option>Last 12 months</option>
+              </select>
               <ChevronDown size={14} />
-            </button>
+            </label>
           </header>
           <div className="chart-legend">
             <span>

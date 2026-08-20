@@ -277,7 +277,7 @@
 .period-button,
 .select-button,
 .filter-button {
-  height: 39px;
+  min-height: 42px;
   padding: 0 12px;
   border: 1px solid #dce1e9;
   background: #fff;
@@ -288,8 +288,47 @@
   font-size: 0.7rem;
   font-weight: 650;
 }
+.period-button {
+  cursor: pointer;
+}
+.period-button select {
+  min-width: 7.5rem;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: #101828;
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+}
+.account-filter {
+  cursor: pointer;
+}
+.account-filter select {
+  min-width: 7.5rem;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: #101828;
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+}
+.account-filter:focus-within {
+  border-color: #2446df;
+  box-shadow: 0 0 0 3px rgb(36 70 223 / 12%);
+}
+.period-button:focus-within {
+  border-color: #2446df;
+  box-shadow: 0 0 0 3px rgb(36 70 223 / 12%);
+}
 .select-button {
   height: 33px;
+  min-height: 33px;
 }
 .panel {
   background: #fff;
