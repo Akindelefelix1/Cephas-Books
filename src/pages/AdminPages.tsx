@@ -36,8 +36,9 @@ export function UsersPage() {
   const [permissionEditing, setPermissionEditing] = useState(false);
   const [permissions, setPermissions] = useState(() =>
     Array.from({ length: 8 }, (_, row) =>
-      Array.from({ length: 6 }, (_, column) =>
-        (row < 5 && column < 3) || (row >= 4 && column !== 3),
+      Array.from(
+        { length: 6 },
+        (_, column) => (row < 5 && column < 3) || (row >= 4 && column !== 3),
       ),
     ),
   );

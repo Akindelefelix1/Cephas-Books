@@ -399,7 +399,7 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
         title={
           accountDialog === 'actions'
             ? `${selectedBankAccount?.[0] ?? ''} actions`
-            : selectedBankAccount?.[0] ?? 'Bank account'
+            : (selectedBankAccount?.[0] ?? 'Bank account')
         }
         subtitle={
           accountDialog === 'details'
@@ -436,7 +436,10 @@ export function BankingPage({ reconciliation = false }: { reconciliation?: boole
         )}
         {selectedBankAccount && accountDialog === 'actions' && (
           <div className="account-action-list">
-            <button className="button button--secondary" onClick={() => setAccountDialog('details')}>
+            <button
+              className="button button--secondary"
+              onClick={() => setAccountDialog('details')}
+            >
               View account details
             </button>
             <button
@@ -541,30 +544,30 @@ export function AccountingPage({ type }: { type: string }) {
           ]
             .map((account, index) => ({ account, index }))
             .filter(({ account }) =>
-              account.slice(0, 3).some((value) =>
-                value.toLowerCase().includes(accountQuery.trim().toLowerCase()),
-              ),
+              account
+                .slice(0, 3)
+                .some((value) => value.toLowerCase().includes(accountQuery.trim().toLowerCase())),
             )
             .map(({ account: x, index: i }) => (
-            <div
-              className={`account-line depth-${i === 0 || i === 6 ? 0 : i === 1 || i === 4 || i === 5 || i === 7 ? 1 : 2}`}
-              key={x[0]}
-            >
-              <span>
-                {i === 0 || i === 6 ? <ChevronDown /> : <i />}
-                <b>{x[0]}</b>
-                <strong>{x[1]}</strong>
-                <small>{x[2]}</small>
-              </span>
-              <b>{x[3]}</b>
-              <button
-                className="row-action"
-                aria-label={`Open ${x[1]}`}
-                onClick={() => setSelectedLedgerAccount(x)}
+              <div
+                className={`account-line depth-${i === 0 || i === 6 ? 0 : i === 1 || i === 4 || i === 5 || i === 7 ? 1 : 2}`}
+                key={x[0]}
               >
-                <MoreHorizontal />
-              </button>
-            </div>
+                <span>
+                  {i === 0 || i === 6 ? <ChevronDown /> : <i />}
+                  <b>{x[0]}</b>
+                  <strong>{x[1]}</strong>
+                  <small>{x[2]}</small>
+                </span>
+                <b>{x[3]}</b>
+                <button
+                  className="row-action"
+                  aria-label={`Open ${x[1]}`}
+                  onClick={() => setSelectedLedgerAccount(x)}
+                >
+                  <MoreHorizontal />
+                </button>
+              </div>
             ))}
         </section>
         <Modal
@@ -620,10 +623,22 @@ export function AccountingPage({ type }: { type: string }) {
         >
           {selectedLedgerAccount && (
             <div className="account-detail-list">
-              <span><small>Code</small><strong>{selectedLedgerAccount[0]}</strong></span>
-              <span><small>Name</small><strong>{selectedLedgerAccount[1]}</strong></span>
-              <span><small>Type</small><strong>{selectedLedgerAccount[2]}</strong></span>
-              <span><small>Balance</small><strong>{selectedLedgerAccount[3]}</strong></span>
+              <span>
+                <small>Code</small>
+                <strong>{selectedLedgerAccount[0]}</strong>
+              </span>
+              <span>
+                <small>Name</small>
+                <strong>{selectedLedgerAccount[1]}</strong>
+              </span>
+              <span>
+                <small>Type</small>
+                <strong>{selectedLedgerAccount[2]}</strong>
+              </span>
+              <span>
+                <small>Balance</small>
+                <strong>{selectedLedgerAccount[3]}</strong>
+              </span>
             </div>
           )}
         </Modal>
@@ -730,9 +745,7 @@ export function AccountingPage({ type }: { type: string }) {
               </div>
             ))}
             <button
-              onClick={() =>
-                setJournalLines((lines) => [...lines, Math.max(...lines, 0) + 1])
-              }
+              onClick={() => setJournalLines((lines) => [...lines, Math.max(...lines, 0) + 1])}
             >
               + Add line
             </button>
@@ -971,13 +984,7 @@ export function FinancialStatement({
             <div className={i === rows.length - 1 ? 'total' : ''} key={r[0]}>
               <span>{r[0]}</span>
               <b>{r[1] ? (r[1] === '—' ? '—' : `₦${r[1]}`) : '—'}</b>
-              <b>
-                {r[2]
-                  ? type === 'trial' && r[2] !== '—'
-                    ? `₦${r[2]}`
-                    : r[2]
-                  : '—'}
-              </b>
+              <b>{r[2] ? (type === 'trial' && r[2] !== '—' ? `₦${r[2]}` : r[2]) : '—'}</b>
             </div>
           ))}
         </div>
@@ -1006,6 +1013,8 @@ export function ReportsPage({ initial }: { initial?: string }) {
   const [statementScope, setStatementScope] = useState('Consolidated');
   const [customReportOpen, setCustomReportOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [reportQuery, setReportQuery] = useState('');
+  const [customReports, setCustomReports] = useState<string[]>([]);
   const statements = ['profit-loss', 'balance-sheet', 'cash-flow'];
   if (statements.includes(report))
     return (
@@ -1098,6 +1107,43 @@ export function ReportsPage({ initial }: { initial?: string }) {
       ],
     ],
   ];
+  type ReportItem = [typeof FileText, string, string, string];
+  const reportGroups = groups as unknown as Array<[string, ReportItem[]]>;
+  const curatedReports: Record<string, string[]> = {
+    Favourites: ['Profit & Loss', 'Cash Flow Statement', 'Aged Receivables'],
+    'Recently viewed': ['Balance Sheet', 'VAT Report'],
+    'Scheduled reports': ['Cash Flow Statement', 'Stock Valuation'],
+  };
+  const categoryGroups: Array<[string, ReportItem[]]> =
+    reportCategory === 'Custom reports'
+      ? [['Custom reports', customReports.map((name) => [FileBarChart, name, 'Custom report', ''])]]
+      : reportCategory === 'All reports'
+        ? reportGroups
+        : reportGroups.map(([title, reports]) => [
+            title,
+            reports.filter(([, name]) => curatedReports[reportCategory]?.includes(name)),
+          ]);
+  const normalizedReportQuery = reportQuery.trim().toLowerCase();
+  const visibleGroups = categoryGroups
+    .map(
+      ([title, reports]) =>
+        [
+          title,
+          reports.filter(
+            ([, name, description]) =>
+              !normalizedReportQuery ||
+              `${name} ${description}`.toLowerCase().includes(normalizedReportQuery),
+          ),
+        ] as [string, ReportItem[]],
+    )
+    .filter(([, reports]) => reports.length);
+  const categoryCounts = [
+    reportGroups.reduce((total, [, reports]) => total + reports.length, 0),
+    curatedReports.Favourites.length,
+    curatedReports['Recently viewed'].length,
+    customReports.length,
+    curatedReports['Scheduled reports'].length,
+  ];
   return (
     <>
       <PageHeader
@@ -1133,7 +1179,11 @@ export function ReportsPage({ initial }: { initial?: string }) {
         <aside>
           <div className="table-search">
             <Search />
-            <input placeholder="Find a report…" />
+            <input
+              value={reportQuery}
+              onChange={(event) => setReportQuery(event.target.value)}
+              placeholder="Find a report…"
+            />
           </div>
           {[
             'All reports',
@@ -1148,35 +1198,37 @@ export function ReportsPage({ initial }: { initial?: string }) {
               onClick={() => setReportCategory(x)}
             >
               {x}
-              <span>{[24, 5, 8, 3, 4][i]}</span>
+              <span>{categoryCounts[i]}</span>
             </button>
           ))}
         </aside>
         <div>
-          {groups.map(([title, reports]) => (
+          {visibleGroups.map(([title, reports]) => (
             <section className="report-group" key={String(title)}>
               <h2>{String(title)}</h2>
               <div>
-                {(reports as unknown as Array<[typeof FileText, string, string, string]>).map(
-                  ([Icon, name, desc, id]) => (
-                    <button
-                      key={name}
-                      onClick={() => (id ? setReport(id) : setSelectedReport(name))}
-                    >
-                      <i>
-                        <Icon />
-                      </i>
-                      <span>
-                        <strong>{name}</strong>
-                        <small>{desc}</small>
-                      </span>
-                      <ArrowRight />
-                    </button>
-                  ),
-                )}
+                {reports.map(([Icon, name, desc, id]) => (
+                  <button key={name} onClick={() => (id ? setReport(id) : setSelectedReport(name))}>
+                    <i>
+                      <Icon />
+                    </i>
+                    <span>
+                      <strong>{name}</strong>
+                      <small>{desc}</small>
+                    </span>
+                    <ArrowRight />
+                  </button>
+                ))}
               </div>
             </section>
           ))}
+          {!visibleGroups.length && (
+            <div className="report-empty">
+              <FileBarChart />
+              <strong>No reports found</strong>
+              <p>Try another search or choose a different report category.</p>
+            </div>
+          )}
         </div>
       </div>
       <Modal
@@ -1201,7 +1253,11 @@ export function ReportsPage({ initial }: { initial?: string }) {
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
-            setSelectedReport(String(form.get('name') ?? 'Custom report'));
+            const reportName = String(form.get('name') ?? 'Custom report').trim();
+            setCustomReports((reports) =>
+              reports.includes(reportName) ? reports : [...reports, reportName],
+            );
+            setSelectedReport(reportName);
             setCustomReportOpen(false);
           }}
         >
@@ -1253,10 +1309,22 @@ export function ReportsPage({ initial }: { initial?: string }) {
         }
       >
         <div className="account-detail-list">
-          <span><small>Report</small><strong>{selectedReport}</strong></span>
-          <span><small>Period</small><strong>{statementPeriod}</strong></span>
-          <span><small>Scope</small><strong>{statementScope}</strong></span>
-          <span><small>Status</small><strong>Ready</strong></span>
+          <span>
+            <small>Report</small>
+            <strong>{selectedReport}</strong>
+          </span>
+          <span>
+            <small>Period</small>
+            <strong>{statementPeriod}</strong>
+          </span>
+          <span>
+            <small>Scope</small>
+            <strong>{statementScope}</strong>
+          </span>
+          <span>
+            <small>Status</small>
+            <strong>Ready</strong>
+          </span>
         </div>
       </Modal>
     </>
@@ -1657,10 +1725,7 @@ export function LegacyAIAssistantPage() {
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder="Ask Cephas AI about your business…"
               />
-              <button
-                aria-label="Attach a file"
-                onClick={() => attachmentRef.current?.click()}
-              >
+              <button aria-label="Attach a file" onClick={() => attachmentRef.current?.click()}>
                 <Paperclip />
               </button>
               <input

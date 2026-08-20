@@ -28,14 +28,18 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
         !normalizedQuery ||
         Object.values(row).some((value) => String(value).toLowerCase().includes(normalizedQuery));
       const normalizedFilter = activeFilter?.toLowerCase();
+      const currentMonth = new Intl.DateTimeFormat('en-GB', {
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date());
       const matchesFilter =
         !normalizedFilter ||
         normalizedFilter.startsWith('all ') ||
-        (normalizedFilter === 'outstanding'
-          ? Number(String(row.amount ?? '').replace(/[^0-9.-]/g, '')) > 0
-          : Object.values(row).some(
-              (value) => String(value).toLowerCase() === normalizedFilter,
-            ));
+        (normalizedFilter === 'this month'
+          ? Object.values(row).some((value) => String(value).includes(currentMonth))
+          : normalizedFilter === 'outstanding'
+            ? Number(String(row.amount ?? '').replace(/[^0-9.-]/g, '')) > 0
+            : Object.values(row).some((value) => String(value).toLowerCase() === normalizedFilter));
       return matchesTab && matchesQuery && matchesFilter;
     });
   }, [activeFilter, definition.tabs, query, rows, tab]);
@@ -76,7 +80,8 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
             {definition.filters?.slice(0, 2).map((filter) => (
               <button
                 className={`filter-button ${
-                  activeFilter === filter || (!activeFilter && filter.toLowerCase().startsWith('all '))
+                  activeFilter === filter ||
+                  (!activeFilter && filter.toLowerCase().startsWith('all '))
                     ? 'active'
                     : ''
                 }`}
@@ -174,13 +179,7 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
   );
 }
 
-function GenericForm({
-  title,
-  onSubmit,
-}: {
-  title: string;
-  onSubmit: (form: FormData) => void;
-}) {
+function GenericForm({ title, onSubmit }: { title: string; onSubmit: (form: FormData) => void }) {
   const today = new Date().toLocaleDateString('en-CA');
   return (
     <form

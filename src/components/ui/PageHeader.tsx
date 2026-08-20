@@ -24,10 +24,7 @@ export function PageHeader({ title, description, action, onAction }: PageHeaderP
           <Download size={17} /> Export
         </button>
         {action && onAction && (
-          <button
-            className="button"
-            onClick={onAction}
-          >
+          <button className="button" onClick={onAction}>
             <Plus size={17} />
             {action}
           </button>

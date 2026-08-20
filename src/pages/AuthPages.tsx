@@ -148,8 +148,8 @@ export function AuthPage({
                 {mode !== 'mfa'
                   ? 'The code expires in 10 minutes.'
                   : useRecoveryCode
-                  ? 'Use one of the recovery codes saved when MFA was configured.'
-                  : 'Open your authenticator app to view your code.'}
+                    ? 'Use one of the recovery codes saved when MFA was configured.'
+                    : 'Open your authenticator app to view your code.'}
               </p>
             </>
           ) : flowStep === 'new-password' ? (
@@ -203,9 +203,7 @@ export function AuthPage({
                   Password
                   <div className="input-icon">
                     <LockKeyhole size={17} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                    />
+                    <input type={showPassword ? 'text' : 'password'} />
                     <button
                       type="button"
                       className="password-toggle"

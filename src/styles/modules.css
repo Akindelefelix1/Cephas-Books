@@ -1007,3 +1007,26 @@
   width: 14px;
   color: #a0a7b5;
 }
+.report-empty {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
+  padding: 30px;
+  border: 1px dashed #d8deea;
+  border-radius: 12px;
+  color: #7c8699;
+  text-align: center;
+}
+.report-empty svg {
+  width: 30px;
+  color: #3150d8;
+}
+.report-empty strong {
+  color: #253047;
+}
+.report-empty p {
+  margin: 0;
+  font-size: 0.68rem;
+}
