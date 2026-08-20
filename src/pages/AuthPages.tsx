@@ -22,6 +22,8 @@ export function AuthPage({
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
+  const [flowStep, setFlowStep] = useState<'form' | 'otp' | 'new-password'>('form');
+  const [email, setEmail] = useState('');
   const content = {
     login: {
       title: 'Welcome back',
@@ -44,14 +46,35 @@ export function AuthPage({
       button: 'Verify and continue',
     },
   }[mode];
-  const submit = () =>
-    mode === 'login'
-      ? onView('app')
-      : mode === 'register'
-        ? onView('onboarding')
-        : mode === 'forgot'
-          ? onView('login')
-          : onView('app');
+  const flowContent =
+    flowStep === 'otp'
+      ? {
+          title: 'Verify your email',
+          subtitle: `Enter the six-digit code sent to ${email || 'your work email'}.`,
+          button: 'Verify code',
+        }
+      : flowStep === 'new-password'
+        ? {
+            title: 'Create a new password',
+            subtitle: 'Choose a strong password you have not used before.',
+            button: 'Update password',
+          }
+        : content;
+  const submit = () => {
+    if (mode === 'register') {
+      if (flowStep === 'form') setFlowStep('otp');
+      else onView('onboarding');
+      return;
+    }
+    if (mode === 'forgot') {
+      if (flowStep === 'form') setFlowStep('otp');
+      else if (flowStep === 'otp') setFlowStep('new-password');
+      else onView('login');
+      return;
+    }
+    if (mode === 'login') onView('app');
+    else onView('app');
+  };
   return (
     <div className="auth-page">
       <aside>
@@ -80,10 +103,10 @@ export function AuthPage({
         <div className="auth-card">
           <Logo />
           <div className="auth-heading">
-            <h1>{content.title}</h1>
-            <p>{content.subtitle}</p>
+            <h1>{flowContent.title}</h1>
+            <p>{flowContent.subtitle}</p>
           </div>
-          {mode === 'register' && (
+          {mode === 'register' && flowStep === 'form' && (
             <div className="social-buttons">
               <button
                 onClick={() => confirmAction('Google sign-in requires an authentication provider')}
@@ -99,12 +122,14 @@ export function AuthPage({
               </button>
             </div>
           )}
-          {mode === 'register' && <div className="divider">or use work email</div>}
-          {mode === 'mfa' ? (
+          {mode === 'register' && flowStep === 'form' && (
+            <div className="divider">or use work email</div>
+          )}
+          {mode === 'mfa' || flowStep === 'otp' ? (
             <>
               <label>
-                {useRecoveryCode ? 'Recovery code' : 'Authentication code'}
-                {useRecoveryCode ? (
+                {mode === 'mfa' && useRecoveryCode ? 'Recovery code' : 'Verification code'}
+                {mode === 'mfa' && useRecoveryCode ? (
                   <input autoFocus placeholder="Enter your recovery code" />
                 ) : (
                   <div className="otp-inputs">
@@ -113,18 +138,46 @@ export function AuthPage({
                         key={i}
                         maxLength={1}
                         inputMode="numeric"
-                        defaultValue={i < 3 ? String(i) : ''}
+                        defaultValue={mode === 'mfa' && i < 3 ? String(i) : ''}
                       />
                     ))}
                   </div>
                 )}
               </label>
               <p className="auth-help">
-                {useRecoveryCode
+                {mode !== 'mfa'
+                  ? 'The code expires in 10 minutes.'
+                  : useRecoveryCode
                   ? 'Use one of the recovery codes saved when MFA was configured.'
                   : 'Open your authenticator app to view your code.'}
               </p>
             </>
+          ) : flowStep === 'new-password' ? (
+            <div className="form-stack">
+              <label>
+                New password
+                <div className="input-icon">
+                  <LockKeyhole size={17} />
+                  <input type={showPassword ? 'text' : 'password'} autoFocus />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+              </label>
+              <label>
+                Confirm new password
+                <div className="input-icon">
+                  <LockKeyhole size={17} />
+                  <input type={showPassword ? 'text' : 'password'} />
+                </div>
+              </label>
+            </div>
           ) : (
             <div className="form-stack">
               {mode === 'register' && (
@@ -137,7 +190,12 @@ export function AuthPage({
                 Work email
                 <div className="input-icon">
                   <Mail size={17} />
-                  <input type="email" placeholder="you@company.com" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@company.com"
+                  />
                 </div>
               </label>
               {mode !== 'forgot' && (
@@ -147,7 +205,6 @@ export function AuthPage({
                     <LockKeyhole size={17} />
                     <input
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="At least 8 characters"
                     />
                     <button
                       type="button"
@@ -172,14 +229,14 @@ export function AuthPage({
               <button onClick={() => onView('forgot')}>Forgot password?</button>
             </div>
           )}
-          {mode === 'register' && (
+          {mode === 'register' && flowStep === 'form' && (
             <label className="terms">
               <input type="checkbox" defaultChecked />
               <span>I agree to the Terms of Service and Privacy Policy.</span>
             </label>
           )}
           <button className="button auth-submit" onClick={submit}>
-            {content.button}
+            {flowContent.button}
             <ArrowRight size={17} />
           </button>
           {mode === 'login' && (
@@ -191,6 +248,19 @@ export function AuthPage({
             <p className="auth-switch">
               Already have an account? <button onClick={() => onView('login')}>Sign in</button>
             </p>
+          )}
+          {flowStep === 'otp' && mode !== 'mfa' && (
+            <div className="auth-flow-links">
+              <button className="link-center" onClick={() => setFlowStep('form')}>
+                Change email
+              </button>
+              <button
+                className="link-center"
+                onClick={() => confirmAction(`A new verification code was sent to ${email}`)}
+              >
+                Resend verification code
+              </button>
+            </div>
           )}
           {mode === 'mfa' && (
             <button

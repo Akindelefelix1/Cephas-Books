@@ -970,8 +970,14 @@ export function FinancialStatement({
           {(rows as string[][]).map((r, i) => (
             <div className={i === rows.length - 1 ? 'total' : ''} key={r[0]}>
               <span>{r[0]}</span>
-              <b>{r[1] && `₦${r[1]}`}</b>
-              <b>{r[2] ? (type === 'trial' ? `₦${r[2]}` : r[2]) : '—'}</b>
+              <b>{r[1] ? (r[1] === '—' ? '—' : `₦${r[1]}`) : '—'}</b>
+              <b>
+                {r[2]
+                  ? type === 'trial' && r[2] !== '—'
+                    ? `₦${r[2]}`
+                    : r[2]
+                  : '—'}
+              </b>
             </div>
           ))}
         </div>

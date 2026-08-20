@@ -1,4 +1,4 @@
-import { ChevronDown, Filter, Search, SlidersHorizontal } from 'lucide-react';
+import { Filter, Search, SlidersHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { DataTable } from '@/components/ui/DataTable';
 import { Modal } from '@/components/ui/Modal';
@@ -8,7 +8,6 @@ import type { ModuleDefinition } from '@/types/app';
 
 export function ModulePage({ definition }: { definition: ModuleDefinition }) {
   const [modal, setModal] = useState(false);
-  const [filterModal, setFilterModal] = useState(false);
   const [rows, setRows] = useState(definition.rows);
   const [tab, setTab] = useState(definition.tabs?.[0] ?? 'All');
   const [query, setQuery] = useState('');
@@ -87,17 +86,24 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
                 }
               >
                 {filter}
-                <ChevronDown size={14} />
               </button>
             ))}
-            <button
-              className={`filter-button ${activeFilter ? 'active' : ''}`}
-              onClick={() => setFilterModal(true)}
-              aria-label={`Filter ${definition.title.toLowerCase()}`}
-              aria-haspopup="dialog"
-            >
-              <Filter size={15} /> {activeFilter ?? availableFilters[0] ?? 'All records'}
-            </button>
+            <label className={`filter-button account-filter ${activeFilter ? 'active' : ''}`}>
+              <Filter size={15} />
+              <span className="sr-only">Filter {definition.title.toLowerCase()}</span>
+              <select
+                value={activeFilter ?? availableFilters[0] ?? 'All records'}
+                onChange={(event) => {
+                  const filter = event.target.value;
+                  setActiveFilter(filter.toLowerCase().startsWith('all ') ? null : filter);
+                }}
+                aria-label={`Filter ${definition.title.toLowerCase()}`}
+              >
+                {availableFilters.map((filter) => (
+                  <option key={filter}>{filter}</option>
+                ))}
+              </select>
+            </label>
             <button
               className="icon-button"
               aria-label="Reset table view"
@@ -115,42 +121,6 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
         </div>
         <DataTable columns={definition.columns} rows={filteredRows} />
       </section>
-      <Modal
-        open={filterModal}
-        onClose={() => setFilterModal(false)}
-        title={`Filter ${definition.title.toLowerCase()}`}
-        subtitle="Choose which records to display."
-        footer={
-          <button
-            className="button button--secondary"
-            onClick={() => {
-              setActiveFilter(null);
-              setFilterModal(false);
-            }}
-          >
-            Clear filters
-          </button>
-        }
-      >
-        <div className="account-action-list">
-          {availableFilters.map((filter) => {
-            const isAll = filter.toLowerCase().startsWith('all ');
-            const selected = isAll ? !activeFilter : activeFilter === filter;
-            return (
-              <button
-                className={`button button--secondary ${selected ? 'active' : ''}`}
-                key={filter}
-                onClick={() => {
-                  setActiveFilter(isAll ? null : filter);
-                  setFilterModal(false);
-                }}
-              >
-                {filter}
-              </button>
-            );
-          })}
-        </div>
-      </Modal>
       <Modal
         open={modal}
         onClose={() => setModal(false)}

@@ -807,14 +807,31 @@
   }
   .statement > header,
   .statement-cols,
-  .statement-group > div {
-    gap: 10px;
+  .statement-group > div,
+  .statement > footer {
+    gap: 8px;
   }
-  .statement-cols {
-    grid-template-columns: 1fr;
+  .statement-cols,
+  .statement-group > div,
+  .statement > footer {
+    grid-template-columns: minmax(0, 1fr) minmax(78px, 0.62fr) minmax(72px, 0.58fr);
   }
   .statement-group > div {
-    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 38px;
+  }
+  .statement-cols span,
+  .statement-group > div b,
+  .statement > footer b {
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .statement-group > div > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .statement > footer small {
+    justify-self: start;
   }
   .settings-main {
     padding: 18px;

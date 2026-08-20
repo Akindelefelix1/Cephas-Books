@@ -29,6 +29,14 @@
   color: #c33232;
   background: #ffebeb;
 }
+.badge--info {
+  color: #1746b5;
+  background: #e9efff;
+}
+.badge--purple {
+  color: #7137a8;
+  background: #f3eaff;
+}
 .register-panel {
   overflow: hidden;
 }

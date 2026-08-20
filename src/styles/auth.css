@@ -224,6 +224,15 @@ textarea:focus {
   font-weight: 700;
   cursor: pointer;
 }
+.auth-flow-links {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.auth-flow-links .link-center {
+  margin: 0;
+}
 .auth-submit {
   width: 100%;
   margin-top: 5px;
