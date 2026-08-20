@@ -96,6 +96,20 @@
 .filter-button svg {
   width: 14px;
 }
+.filter-count {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #1233cc;
+  color: #fff;
+  font-size: 0.58rem;
+}
+.table-toolbar .icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
 .data-table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -512,6 +526,11 @@
 .account-action-list .button {
   width: 100%;
   justify-content: flex-start;
+}
+.account-action-list .button.active {
+  border-color: #1233cc;
+  background: #eef2ff;
+  color: #1233cc;
 }
 .reconcile-grid {
   display: grid;

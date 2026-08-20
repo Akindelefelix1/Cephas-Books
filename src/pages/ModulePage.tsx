@@ -13,6 +13,13 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
   const [tab, setTab] = useState(definition.tabs?.[0] ?? 'All');
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const availableFilters = useMemo(() => {
+    if (definition.filters?.length) return definition.filters;
+    const statuses = Array.from(
+      new Set(rows.map((row) => String(row.status ?? '')).filter(Boolean)),
+    );
+    return ['All records', ...statuses];
+  }, [definition.filters, rows]);
   const filteredRows = useMemo(() => {
     const firstTab = definition.tabs?.[0];
     const normalizedQuery = query.trim().toLowerCase();
@@ -86,12 +93,16 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
             <button
               className="filter-button"
               onClick={() => setFilterModal(true)}
+              aria-label={`Filter ${definition.title.toLowerCase()}`}
             >
               <Filter size={15} /> Filters
+              {activeFilter && <span className="filter-count">1</span>}
             </button>
             <button
               className="icon-button"
               aria-label="Reset table view"
+              title="Reset table view"
+              disabled={!query && !activeFilter && tab === (definition.tabs?.[0] ?? 'All')}
               onClick={() => {
                 setQuery('');
                 setActiveFilter(null);
@@ -122,7 +133,7 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
         }
       >
         <div className="account-action-list">
-          {definition.filters?.map((filter) => {
+          {availableFilters.map((filter) => {
             const isAll = filter.toLowerCase().startsWith('all ');
             const selected = isAll ? !activeFilter : activeFilter === filter;
             return (
