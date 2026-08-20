@@ -91,12 +91,12 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
               </button>
             ))}
             <button
-              className="filter-button"
+              className={`filter-button ${activeFilter ? 'active' : ''}`}
               onClick={() => setFilterModal(true)}
               aria-label={`Filter ${definition.title.toLowerCase()}`}
+              aria-haspopup="dialog"
             >
-              <Filter size={15} /> Filters
-              {activeFilter && <span className="filter-count">1</span>}
+              <Filter size={15} /> {activeFilter ?? availableFilters[0] ?? 'All records'}
             </button>
             <button
               className="icon-button"

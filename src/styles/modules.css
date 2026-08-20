@@ -96,16 +96,6 @@
 .filter-button svg {
   width: 14px;
 }
-.filter-count {
-  min-width: 18px;
-  height: 18px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 999px;
-  background: #1233cc;
-  color: #fff;
-  font-size: 0.58rem;
-}
 .table-toolbar .icon-button:disabled {
   cursor: not-allowed;
   opacity: 0.42;
