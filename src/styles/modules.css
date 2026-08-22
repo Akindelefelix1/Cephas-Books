@@ -430,6 +430,31 @@
   gap: 13px;
   margin-bottom: 18px;
 }
+.quotation-form { display: grid; gap: 18px; }
+.invoice-send-option { display: flex; align-items: flex-start; gap: 9px; padding: 12px; border: 1px solid #e2e6ed; border-radius: 9px; background: #f8f9fc; }
+.invoice-send-option input { margin-top: 2px; }
+.invoice-send-option span { display: grid; gap: 3px; }
+.invoice-send-option strong { font-size: .7rem; }
+.invoice-send-option small { color: #7d8698; font-size: .6rem; }
+.quotation-items { border: 1px solid #e2e6ed; border-radius: 10px; padding: 14px; }
+.quotation-items-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.quotation-items-heading h3 { margin: 0; font-size: .8rem; }
+.quotation-items-heading span { color: #7d8698; font-size: .6rem; }
+.quotation-item { display: grid; grid-template-columns: minmax(0, 2fr) .7fr 1fr 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid #edf0f4; }
+.quotation-add-item { margin-top: 10px; }
+@media (max-width: 600px) { .quotation-item { grid-template-columns: 1fr 1fr; } .quotation-item label:first-child { grid-column: 1 / -1; } .quotation-items-heading { display: block; } .quotation-items-heading span { display: block; margin-top: 4px; } }
+.dashboard-feature-section { margin-bottom: 18px; }
+.dashboard-feature-section > .panel-header { margin-bottom: 10px; }
+.dashboard-feature-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.dashboard-feature-grid > button { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 14px; border: 1px solid #e2e6ed; border-radius: 11px; background: #fff; color: inherit; text-align: left; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.dashboard-feature-grid > button:hover { border-color: #b9c4ed; box-shadow: 0 5px 18px rgba(22,35,76,.07); transform: translateY(-1px); }
+.dashboard-feature-grid > button > i { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; border-radius: 9px; background: #edf1ff; color: #1233cc; }
+.dashboard-feature-grid span, .dashboard-feature-grid small { display: block; min-width: 0; }
+.dashboard-feature-grid strong { font-size: .72rem; }
+.dashboard-feature-grid small { margin-top: 3px; color: #7d8698; font-size: .58rem; }
+.dashboard-feature-grid .feature-arrow { flex: 0 0 auto; margin-left: auto; color: #929aac; transform: rotate(-90deg); }
+@media (max-width: 900px) { .dashboard-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .dashboard-feature-grid { grid-template-columns: 1fr; } }
 .bank-card {
   padding: 18px;
   background: #fff;

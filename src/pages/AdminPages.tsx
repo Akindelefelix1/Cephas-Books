@@ -52,6 +52,7 @@ export function UsersPage() {
     ['Inventory Manager', '4', 'Inventory operations'],
     ['Auditor', '2', 'Read-only finance'],
     ['Employee', '6', 'Expenses & workflows'],
+    ['Submitter', '5', 'Create and view own submissions'],
   ]);
   const rows = [
     ['Tobi Adeyemi', 'tobi@acme.ng', 'Finance Manager', 'Lagos HQ', 'Active'],

@@ -6,6 +6,8 @@ import {
   CircleDollarSign,
   Clock3,
   CreditCard,
+  FileUp,
+  Landmark,
   MoreHorizontal,
   ReceiptText,
   Sparkles,
@@ -25,6 +27,12 @@ export function DashboardPage({
 }) {
   const [period, setPeriod] = useState('This month');
   const [chartRange, setChartRange] = useState('Last 6 months');
+  const bankingFeatures = [
+    ['Bank accounts', 'Balances and account details', 'banking', Landmark],
+    ['Transactions', 'Review money in and out', 'transactions', CreditCard],
+    ['Reconciliation', 'Match and resolve entries', 'reconciliation', Sparkles],
+    ['Capture receipt', 'Attach proof of payment', 'expenses', FileUp],
+  ] as const;
   const today = new Intl.DateTimeFormat('en-NG', { dateStyle: 'full' }).format(new Date());
   const transactions = [
     ['INV-00245', 'Apex Retail Limited', 'Invoice', '₦2,500,000', 'Partially paid'],
@@ -107,6 +115,23 @@ export function DashboardPage({
           </article>
         ))}
       </div>
+      <section className="dashboard-feature-section" aria-labelledby="banking-tools-title">
+        <header className="panel-header">
+          <div>
+            <h2 id="banking-tools-title">Banking tools</h2>
+            <p>Features available to your role</p>
+          </div>
+        </header>
+        <div className="dashboard-feature-grid">
+          {bankingFeatures.map(([title, description, id, Icon]) => (
+            <button key={title} onClick={() => onNavigate(id)}>
+              <i><Icon size={19} /></i>
+              <span><strong>{title}</strong><small>{description}</small></span>
+              <ChevronDown className="feature-arrow" size={16} />
+            </button>
+          ))}
+        </div>
+      </section>
       <div className="dashboard-grid">
         <article className="panel chart-panel">
           <header className="panel-header">

@@ -139,17 +139,47 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
             </button>
             <button
               className="button"
-              type={definition.title === 'Invoices' ? 'button' : 'submit'}
-              form={definition.title === 'Invoices' ? undefined : 'generic-record-form'}
-              onClick={definition.title === 'Invoices' ? () => setModal(false) : undefined}
+              type={definition.title === 'Invoices' || definition.title === 'Quotations' ? 'button' : 'submit'}
+              form={definition.title === 'Invoices' ? undefined : definition.title === 'Quotations' ? 'quotation-form' : 'generic-record-form'}
+              onClick={definition.title === 'Invoices' || definition.title === 'Quotations' ? () => setModal(false) : undefined}
             >
-              Save {definition.title === 'Invoices' ? 'and send' : ''}
+              {definition.title === 'Quotations' ? 'Save & send to customer' : `Save ${definition.title === 'Invoices' ? 'and send' : ''}`}
             </button>
+            {definition.title === 'Quotations' && (
+              <button className="button button--secondary" type="button" onClick={() => setModal(false)}>
+                Save as draft
+              </button>
+            )}
           </>
         }
       >
         {definition.title === 'Invoices' ? (
           <InvoiceForm />
+        ) : definition.title === 'Quotations' ? (
+          <QuotationForm />
+        ) : definition.title === 'Customers' ? (
+          <CustomerForm
+            onSubmit={(form) => {
+              const displayName = String(form.get('displayName') ?? '').trim();
+              const companyName = String(form.get('companyName') ?? '').trim();
+              const name = String(form.get('name') ?? '').trim();
+              setRows((currentRows) => [
+                {
+                  party: displayName || companyName || name,
+                  reference: `CUS-${String(Date.now()).slice(-5)}`,
+                  date: new Date().toLocaleDateString('en-GB', {
+                    day: '2-digit', month: 'short', year: 'numeric',
+                  }),
+                  amount: '₦0',
+                  status: 'Active',
+                },
+                ...currentRows,
+              ]);
+              setModal(false);
+            }}
+          />
+        ) : definition.title === 'Payments received' ? (
+          <PaymentForm />
         ) : (
           <GenericForm
             title={definition.title}
@@ -176,6 +206,93 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
         )}
       </Modal>
     </>
+  );
+}
+
+function QuotationForm() {
+  const today = new Date().toLocaleDateString('en-CA');
+  const [items, setItems] = useState([['Business software licence', '1', '₦0', '₦0']]);
+  return (
+    <form id="quotation-form" className="quotation-form" onSubmit={(event) => event.preventDefault()}>
+      <div className="form-grid">
+        <label>Customer name<input required placeholder="Select or enter customer" /></label>
+        <label>Date<input type="date" defaultValue={today} required /></label>
+        <label>Status<select defaultValue="Draft"><option>Draft</option><option>Sent</option><option>Accepted</option><option>Rejected</option><option>Expired</option></select></label>
+        <label>Terms & conditions<input placeholder="e.g. Valid for 30 days" /></label>
+      </div>
+      <section className="quotation-items">
+        <div className="quotation-items-heading"><h3>Items</h3><span>Item name, quantity, rate and amount</span></div>
+        {items.map((item, index) => (
+          <div className="quotation-item" key={index}>
+            <label>Item name / details<input defaultValue={item[0]} required /></label>
+            <label>Qty<input type="number" min="1" defaultValue={item[1]} required /></label>
+            <label>Rate<input inputMode="decimal" defaultValue={item[2]} required /></label>
+            <label>Amount<input inputMode="decimal" defaultValue={item[3]} required /></label>
+          </div>
+        ))}
+        <button className="button button--secondary quotation-add-item" type="button" onClick={() => setItems((current) => [...current, ['', '1', '₦0', '₦0']])}>+ Add new item</button>
+      </section>
+      <label className="full">Notes / terms<textarea placeholder="Additional details for the customer" /></label>
+    </form>
+  );
+}
+
+function CustomerForm({ onSubmit }: { onSubmit: (form: FormData) => void }) {
+  return (
+    <form
+      id="generic-record-form"
+      className="form-grid"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(new FormData(event.currentTarget));
+      }}
+    >
+      <label>
+        Name
+        <input name="name" placeholder="Contact name" required autoFocus />
+      </label>
+      <label>
+        Email
+        <input name="email" type="email" placeholder="name@company.com" required />
+      </label>
+      <label>
+        Company name
+        <input name="companyName" placeholder="Registered company name" required />
+      </label>
+      <label>
+        Display name <small>(optional)</small>
+        <input name="displayName" placeholder="Name shown on transactions" />
+      </label>
+      <label>
+        Phone <small>(optional)</small>
+        <input name="phone" type="tel" placeholder="+234 800 000 0000" />
+      </label>
+      <label>
+        Tax ID <small>(optional)</small>
+        <input name="taxId" placeholder="Tax identification number" />
+      </label>
+      <label className="full">
+        Billing address <small>(optional)</small>
+        <textarea name="address" placeholder="Street, city, state and country" />
+      </label>
+      <label className="full">
+        Notes <small>(optional)</small>
+        <textarea name="notes" placeholder="Credit terms or other customer context…" />
+      </label>
+    </form>
+  );
+}
+
+function PaymentForm() {
+  return (
+    <form id="generic-record-form" className="form-grid" onSubmit={(event) => event.preventDefault()}>
+      <label className="full">Invoice number<input name="invoice" placeholder="e.g. INV-00245" required /></label>
+      <label>Customer<input name="customer" placeholder="Customer name" required /></label>
+      <label>Amount<input name="amount" type="number" min="0.01" step="0.01" placeholder="₦ 0.00" required /></label>
+      <label>Date<input name="date" type="date" defaultValue={new Date().toLocaleDateString('en-CA')} required /></label>
+      <label>Method<select name="method"><option>Bank transfer</option><option>Card</option><option>POS</option><option>Cash</option><option>Mobile payment</option></select></label>
+      <label className="full">Reference / notes<textarea name="notes" placeholder="Payment reference or notes" /></label>
+    </form>
   );
 }
 
@@ -218,12 +335,19 @@ function GenericForm({ title, onSubmit }: { title: string; onSubmit: (form: Form
         Description
         <textarea name="description" placeholder="Add notes or context…" />
       </label>
-      <label className="full upload-field">
-        <input type="file" />
-        <span>
-          Drop receipt or attachment here, or <b>browse files</b>
-        </span>
-        <small>PDF, JPG, PNG, DOCX, XLSX · max 10 MB</small>
+      <label>
+        Attachment type
+        <select name="attachmentType" defaultValue="Receipt">
+          <option>Receipt</option>
+          <option>Invoice</option>
+          <option>Bank statement</option>
+          <option>Contract</option>
+          <option>Other document</option>
+        </select>
+      </label>
+      <label>
+        Receipt / attachment <small>(optional)</small>
+        <input type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" />
       </label>
     </form>
   );
@@ -242,7 +366,8 @@ function InvoiceForm() {
       <div className="form-grid">
         <label>
           Customer
-          <select defaultValue="Apex Retail Limited">
+          <select defaultValue="" required>
+            <option value="" disabled>Select customer</option>
             <option>Apex Retail Limited</option>
             <option>Northstar Schools</option>
           </select>
@@ -272,6 +397,12 @@ function InvoiceForm() {
             <option>Net 30</option>
             <option>Due on receipt</option>
             <option>Net 15</option>
+          </select>
+        </label>
+        <label>
+          Invoice status
+          <select defaultValue="Draft" aria-label="Invoice status">
+            <option>Draft</option><option>Sent</option><option>Partially paid</option><option>Paid</option><option>Overdue</option>
           </select>
         </label>
       </div>
@@ -316,6 +447,10 @@ function InvoiceForm() {
           </strong>
         </div>
       </div>
+      <label className="invoice-send-option">
+        <input type="checkbox" defaultChecked />
+        <span><strong>Send invoice and customer statement</strong><small>Email both documents to the customer after saving.</small></span>
+      </label>
     </div>
   );
 }
