@@ -72,7 +72,7 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
             </div>
             <TypewriterHeading />
             <p>
-              Accounting, cash flow, inventory, tax, payroll, and business intelligence—connected in
+              Accounting, cash flow, inventory, tax, payroll, and AI business intelligence—connected in
               one secure financial operating system.
             </p>
             <div className="landing-actions">
