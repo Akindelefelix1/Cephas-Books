@@ -296,6 +296,9 @@
 }
 .ai-page--modern .ai-chat {
   background: radial-gradient(circle at 50% 0, rgb(18 51 204 / 6%), transparent 34%), #fbfcfe;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .ai-page--modern .ai-welcome {
   max-width: 820px;
@@ -425,6 +428,13 @@
   margin: auto;
   border-radius: 16px;
   box-shadow: 0 14px 38px rgb(16 38 80 / 14%);
+}
+.ai-page--modern .ai-composer {
+  position: sticky;
+  z-index: 3;
+  flex: 0 0 auto;
+  bottom: 0;
+  margin-top: auto;
 }
 .ai-page--modern .ai-composer .send:disabled {
   opacity: 0.45;
