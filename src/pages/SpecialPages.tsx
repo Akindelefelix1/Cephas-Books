@@ -1892,6 +1892,70 @@ const simplePageData: Record<
       ['System', 'Posted payment journal', 'JRN-00678', 'Automated', '17 Aug · 08:54'],
     ],
   },
+  'excel-sync': {
+    title: 'Excel data sync',
+    description: 'Keep approved Excel workbooks connected to Cephas Books with safe, traceable syncs.',
+    action: 'Connect workbook',
+    stats: [
+      { label: 'Connected workbooks', value: '4', change: '+1 this month', tone: 'positive' },
+      { label: 'Rows synced', value: '18,420', change: 'This month' },
+      { label: 'Last sync', value: '12 min ago', change: 'All healthy', tone: 'positive' },
+      { label: 'Needs review', value: '2', change: 'Resolve conflicts', tone: 'warning' },
+    ],
+    rows: [
+      ['FY2026 Management Pack.xlsx', 'Budgets · Two-way', '8,420 rows', '12 min ago', 'Healthy'],
+      ['Branch Forecast.xlsx', 'Projects · Import', '4,182 rows', 'Yesterday', 'Healthy'],
+      ['Payroll Expenses.xlsx', 'Staff expenses · Import', '5,818 rows', '18 Aug 2026', 'Needs review'],
+    ],
+  },
+  workflows: {
+    title: 'Workflow automation',
+    description: 'Automate approvals, reminders and routine accounting actions across your organisation.',
+    action: 'Create workflow',
+    stats: [
+      { label: 'Active workflows', value: '12', change: '+3 this quarter', tone: 'positive' },
+      { label: 'Runs this month', value: '1,284', change: '98.6% successful' },
+      { label: 'Hours saved', value: '46h', change: 'Estimated' },
+      { label: 'Exceptions', value: '8', change: 'Needs attention', tone: 'warning' },
+    ],
+    rows: [
+      ['Invoice approval', 'Invoices over ₦500,000', '184 runs', 'Manager → Finance', 'Active'],
+      ['Overdue reminder', 'Customer invoices · 7 days', '62 runs', 'Email + notification', 'Active'],
+      ['Project budget alert', 'Spend reaches 80%', '14 runs', 'Project owner', 'Active'],
+    ],
+  },
+  'custom-reports': {
+    title: 'Custom report builder',
+    description: 'Build reusable financial and management reports from your authorised data.',
+    action: 'Create report',
+    stats: [
+      { label: 'Saved reports', value: '18', change: '+4 this month' },
+      { label: 'Scheduled', value: '6', change: 'Delivered automatically', tone: 'positive' },
+      { label: 'Shared with team', value: '11' },
+      { label: 'Data sources', value: '24', change: 'Ledger + operations' },
+    ],
+    rows: [
+      ['Branch profitability', 'Revenue · costs · margin', 'Monthly', 'CFO + branch leads', 'Scheduled'],
+      ['Project cost variance', 'Budgets · expenses · tasks', 'Weekly', 'Project office', 'Shared'],
+      ['Cash runway forecast', 'Banking · receivables · payables', 'On demand', 'Finance team', 'Draft'],
+    ],
+  },
+  'project-ai': {
+    title: 'Project management AI',
+    description: 'Start projects faster with AI-assisted briefs, task lists, budgets and cost tracking.',
+    action: 'Start with AI',
+    stats: [
+      { label: 'AI project briefs', value: '28', change: 'Created this month', tone: 'positive' },
+      { label: 'Tasks suggested', value: '416', change: 'Across 12 projects' },
+      { label: 'Delegated tasks', value: '84', change: 'BETA' },
+      { label: 'At-risk projects', value: '3', change: 'Review recommendations', tone: 'warning' },
+    ],
+    rows: [
+      ['Lekki Retail Rollout', 'AI brief + task plan', '31 tasks', 'Owner: Tobi Adeyemi', 'In progress'],
+      ['Northstar ERP', 'Cost forecast suggestion', '₦12.4m actual', 'Owner: Ada Okafor', 'Review'],
+      ['Abuja Solar Install', 'Delegated supplier follow-up', '4 tasks', 'AI delegate · BETA', 'Active'],
+    ],
+  },
 };
 
 export function SimpleFeaturePage({ type }: { type: string }) {

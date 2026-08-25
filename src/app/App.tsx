@@ -61,7 +61,7 @@ export function App() {
     if (active === 'profile') return <ProfilePage onLogout={() => setView('landing')} />;
     if (['settings', 'security', 'integrations', 'branches', 'currencies'].includes(active))
       return <SettingsPage type={active} />;
-    if (['budgets', 'tax', 'payroll', 'approvals', 'documents', 'audit-logs'].includes(active))
+    if (['budgets', 'tax', 'payroll', 'approvals', 'documents', 'audit-logs', 'excel-sync', 'workflows', 'custom-reports', 'project-ai'].includes(active))
       return <SimpleFeaturePage type={active === 'audit-logs' ? 'audit' : active} />;
     return <ModulePage key={active} definition={getFallbackModule(active)} />;
   })();

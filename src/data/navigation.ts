@@ -73,6 +73,7 @@ export const primaryNavigation: NavItem[] = [
       { id: 'stock-movements', label: 'Stock movements' },
       { id: 'stock-adjustments', label: 'Adjustments' },
       { id: 'projects', label: 'Projects' },
+      { id: 'project-ai', label: 'Project management AI' },
     ],
   },
 ];
@@ -84,8 +85,10 @@ export const secondaryNavigation: NavItem[] = [
     icon: Activity,
     children: [
       { id: 'reports', label: 'Reports' },
+      { id: 'custom-reports', label: 'Custom report builder' },
       { id: 'analytics', label: 'Analytics' },
       { id: 'ai-assistant', label: 'Cephas AI' },
+      { id: 'excel-sync', label: 'Excel data sync' },
     ],
   },
   {
@@ -96,6 +99,7 @@ export const secondaryNavigation: NavItem[] = [
       { id: 'documents', label: 'Documents' },
       { id: 'approvals', label: 'Approvals' },
       { id: 'notifications', label: 'Notifications' },
+      { id: 'workflows', label: 'Workflow automation' },
     ],
   },
   {
