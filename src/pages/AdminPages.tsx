@@ -254,7 +254,15 @@ export function UsersPage() {
   );
 }
 
-export function SettingsPage({ type = 'settings' }: { type?: string }) {
+export function SettingsPage({
+  type = 'settings',
+  onboardingComplete = true,
+  onResumeOnboarding,
+}: {
+  type?: string;
+  onboardingComplete?: boolean;
+  onResumeOnboarding?: () => void;
+}) {
   const sections = [
     ['Organisation', Building2, 'Business details, fiscal year and preferences'],
     ['Branches & departments', MapPin, 'Locations, warehouses, departments and cost centres'],
@@ -311,7 +319,10 @@ export function SettingsPage({ type = 'settings' }: { type?: string }) {
         </aside>
         <section className="settings-main panel">
           {selected === 0 ? (
-            <OrganisationSettings />
+            <OrganisationSettings
+              onboardingComplete={onboardingComplete}
+              onResumeOnboarding={onResumeOnboarding}
+            />
           ) : selected === 1 ? (
             <BranchSettings />
           ) : selected === 2 ? (
@@ -369,10 +380,30 @@ function SettingsPlaceholder({ title, description }: { title: string; descriptio
   );
 }
 
-function OrganisationSettings() {
+function OrganisationSettings({
+  onboardingComplete,
+  onResumeOnboarding,
+}: {
+  onboardingComplete: boolean;
+  onResumeOnboarding?: () => void;
+}) {
   const [savedAt, setSavedAt] = useState('Not saved in this session');
   return (
     <>
+      {!onboardingComplete && (
+        <div className="onboarding-resume">
+          <div>
+            <strong>Finish setting up your organisation</strong>
+            <p>
+              Your saved onboarding details are waiting. Complete the remaining steps to configure
+              financial defaults, taxes, structure, and team access.
+            </p>
+          </div>
+          <button className="button" onClick={onResumeOnboarding}>
+            Resume setup
+          </button>
+        </div>
+      )}
       <header className="settings-heading">
         <h2>Organisation profile</h2>
         <p>Legal and contact information used on financial documents.</p>

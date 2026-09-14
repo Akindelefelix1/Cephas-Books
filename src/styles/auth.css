@@ -373,3 +373,44 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
 }
+
+.onboarding-actions__secondary {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.onboarding-layout > aside > div.complete > i {
+  color: #fff;
+  background: var(--color-primary, #173bd1);
+  border-color: var(--color-primary, #173bd1);
+}
+
+.onboarding-note {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid #dce3f1;
+  border-radius: 12px;
+  background: #f7f9fe;
+  color: #173bd1;
+}
+
+.onboarding-note span,
+.onboarding-note strong,
+.onboarding-note small {
+  display: block;
+}
+
+.onboarding-note small {
+  margin-top: 0.25rem;
+  color: #69758f;
+}
+
+@media (max-width: 700px) {
+  .onboarding-actions,
+  .onboarding-actions__secondary {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+}

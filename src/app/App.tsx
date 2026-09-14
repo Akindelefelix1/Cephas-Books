@@ -33,6 +33,9 @@ export function App() {
   const [view, setView] = useState<View>('landing');
   const [active, setActive] = useState('dashboard');
   const [quick, setQuick] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(
+    () => localStorage.getItem('cephas:onboarding-complete') === 'true',
+  );
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [view]);
@@ -45,7 +48,21 @@ export function App() {
     return <MarketingDetailPage page={view as MarketingView} onView={setView} />;
   if (view === 'login' || view === 'register' || view === 'forgot' || view === 'mfa')
     return <AuthPage mode={view} onView={setView} />;
-  if (view === 'onboarding') return <OnboardingPage onComplete={() => setView('app')} />;
+  if (view === 'onboarding')
+    return (
+      <OnboardingPage
+        onComplete={() => {
+          localStorage.setItem('cephas:onboarding-complete', 'true');
+          setOnboardingComplete(true);
+          setActive('dashboard');
+          setView('app');
+        }}
+        onSaveExit={() => {
+          setActive('dashboard');
+          setView('app');
+        }}
+      />
+    );
   const content = (() => {
     if (active === 'dashboard')
       return <DashboardPage onNavigate={navigate} onCreate={() => setQuick(true)} />;
@@ -60,8 +77,27 @@ export function App() {
     if (active === 'notifications') return <NotificationsPage />;
     if (active === 'profile') return <ProfilePage onLogout={() => setView('landing')} />;
     if (['settings', 'security', 'integrations', 'branches', 'currencies'].includes(active))
-      return <SettingsPage type={active} />;
-    if (['budgets', 'tax', 'payroll', 'approvals', 'documents', 'audit-logs', 'excel-sync', 'workflows', 'custom-reports', 'project-ai'].includes(active))
+      return (
+        <SettingsPage
+          type={active}
+          onboardingComplete={onboardingComplete}
+          onResumeOnboarding={() => setView('onboarding')}
+        />
+      );
+    if (
+      [
+        'budgets',
+        'tax',
+        'payroll',
+        'approvals',
+        'documents',
+        'audit-logs',
+        'excel-sync',
+        'workflows',
+        'custom-reports',
+        'project-ai',
+      ].includes(active)
+    )
       return <SimpleFeaturePage type={active === 'audit-logs' ? 'audit' : active} />;
     return <ModulePage key={active} definition={getFallbackModule(active)} />;
   })();

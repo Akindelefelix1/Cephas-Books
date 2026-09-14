@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -37,11 +37,11 @@ export function AuthPage({
     },
     forgot: {
       title: 'Reset your password',
-      subtitle: 'Enter your work email and we’ll send a secure reset link.',
+      subtitle: 'Enter your work email and weâ€™ll send a secure reset link.',
       button: 'Send reset link',
     },
     mfa: {
-      title: 'Verify it’s you',
+      title: 'Verify itâ€™s you',
       subtitle: 'Enter the six-digit code from your authenticator app.',
       button: 'Verify and continue',
     },
@@ -84,7 +84,7 @@ export function AuthPage({
         </button>
         <div>
           <div className="auth-quote">
-            “Cephas gives our finance team a single source of truth across four branches.”
+            â€œCephas gives our finance team a single source of truth across four branches.â€
           </div>
           <div className="quote-author">
             <span>AO</span>
@@ -96,7 +96,7 @@ export function AuthPage({
         </div>
         <p>
           <ShieldCheck size={16} />
-          Bank-grade security · NDPR aligned
+          Bank-grade security Â· NDPR aligned
         </p>
       </aside>
       <main>
@@ -118,7 +118,7 @@ export function AuthPage({
                   confirmAction('Microsoft sign-in requires an authentication provider')
                 }
               >
-                ▦&nbsp; Microsoft
+                â–¦&nbsp; Microsoft
               </button>
             </div>
           )}
@@ -297,7 +297,84 @@ function GoogleLogo() {
   );
 }
 
-export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
+const setupSteps = [
+  ['Business profile', 'Tell us about your company'],
+  ['Financial settings', 'Currency, year & accounting'],
+  ['Organisation structure', 'Branches and departments'],
+  ['Tax setup', 'Configure local tax rules'],
+  ['Invite your team', 'Bring your people in'],
+] as const;
+
+const setupHeadings = [
+  [
+    'Tell us about your business',
+    'Weâ€™ll use this to personalise your chart of accounts and reports.',
+  ],
+  [
+    'Set your financial foundations',
+    'Choose the defaults used for reporting, posting, and period controls.',
+  ],
+  ['Shape your organisation', 'Add the structure you use to track performance and responsibility.'],
+  [
+    'Configure your tax profile',
+    'Set sensible local defaults now and refine individual rates later.',
+  ],
+  ['Bring your team in', 'Invite colleagues and give them an appropriate starting role.'],
+] as const;
+
+type SetupData = Record<string, string>;
+
+export function OnboardingPage({
+  onComplete,
+  onSaveExit,
+}: {
+  onComplete: () => void;
+  onSaveExit: () => void;
+}) {
+  const [step, setStep] = useState(() => {
+    const saved = Number(localStorage.getItem('cephas:onboarding-step') ?? 0);
+    return Number.isInteger(saved) && saved >= 0 && saved < setupSteps.length ? saved : 0;
+  });
+  const [data, setData] = useState<SetupData>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cephas:onboarding-data') ?? '{}') as SetupData;
+    } catch {
+      return {};
+    }
+  });
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const saveForm = () => {
+    if (!formRef.current) return;
+    const next = { ...data };
+    new FormData(formRef.current).forEach((value, key) => (next[key] = String(value)));
+    setData(next);
+    localStorage.setItem('cephas:onboarding-data', JSON.stringify(next));
+    localStorage.setItem('cephas:onboarding-step', String(step));
+    localStorage.setItem('cephas:onboarding-complete', 'false');
+  };
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    saveForm();
+    if (step === setupSteps.length - 1) {
+      localStorage.setItem('cephas:onboarding-step', String(setupSteps.length));
+      onComplete();
+    } else {
+      const next = step + 1;
+      setStep(next);
+      localStorage.setItem('cephas:onboarding-step', String(next));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  const back = () => {
+    saveForm();
+    setStep((current) => {
+      const previous = Math.max(0, current - 1);
+      localStorage.setItem('cephas:onboarding-step', String(previous));
+      return previous;
+    });
+  };
+
   return (
     <div className="onboarding">
       <header>
@@ -309,103 +386,320 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
       <div className="onboarding-layout">
         <aside>
           <p>SET UP YOUR WORKSPACE</p>
-          {[
-            'Business profile',
-            'Financial settings',
-            'Organisation structure',
-            'Tax setup',
-            'Invite your team',
-          ].map((x, i) => (
-            <div className={i === 0 ? 'active' : ''} key={x}>
-              <i>{i === 0 ? <Check size={14} /> : i + 1}</i>
+          {setupSteps.map(([title, description], index) => (
+            <div className={index === step ? 'active' : index < step ? 'complete' : ''} key={title}>
+              <i>{index < step ? <Check size={14} /> : index + 1}</i>
               <span>
-                <strong>{x}</strong>
-                <small>
-                  {
-                    [
-                      'Tell us about your company',
-                      'Currency, year & accounting',
-                      'Branches and departments',
-                      'Configure local tax rules',
-                      'Bring your people in',
-                    ][i]
-                  }
-                </small>
+                <strong>{title}</strong>
+                <small>{description}</small>
               </span>
             </div>
           ))}
         </aside>
         <main>
           <div className="step-progress">
-            <span>Step 1 of 5</span>
+            <span>
+              Step {step + 1} of {setupSteps.length}
+            </span>
             <i>
-              <b />
+              <b style={{ width: `${((step + 1) / setupSteps.length) * 100}%` }} />
             </i>
           </div>
-          <h1>Tell us about your business</h1>
-          <p>We’ll use this to personalise your chart of accounts and reports.</p>
-          <div className="form-grid">
-            <label>
-              Business name
-              <input defaultValue="Acme Holdings Limited" />
-            </label>
-            <label>
-              Legal name
-              <input placeholder="Registered company name" />
-            </label>
-            <label>
-              Registration number
-              <input placeholder="RC 1234567" />
-            </label>
-            <label>
-              Tax identification number
-              <input placeholder="TIN" />
-            </label>
-            <label>
-              Industry
-              <select defaultValue="Professional services">
-                <option>Professional services</option>
-                <option>Retail</option>
-                <option>Manufacturing</option>
-                <option>Education</option>
-                <option>Non-profit</option>
-              </select>
-            </label>
-            <label>
-              Business type
-              <select>
-                <option>Limited liability company</option>
-                <option>Sole proprietorship</option>
-                <option>Partnership</option>
-                <option>Cooperative</option>
-              </select>
-            </label>
-            <label className="full">
-              Business address
-              <textarea placeholder="Street, city, state, country" />
-            </label>
-            <label>
-              Phone
-              <input placeholder="+234" />
-            </label>
-            <label>
-              Website
-              <input placeholder="https://" />
-            </label>
-          </div>
-          <div className="onboarding-actions">
-            <button
-              className="button button--ghost"
-              onClick={() => confirmAction('Onboarding progress saved')}
-            >
-              Save and exit
-            </button>
-            <button className="button" onClick={onComplete}>
-              Continue to financial settings <ArrowRight size={17} />
-            </button>
-          </div>
+          <h1>{setupHeadings[step][0]}</h1>
+          <p>{setupHeadings[step][1]}</p>
+          <form ref={formRef} onSubmit={submit}>
+            <div className="form-grid">
+              <SetupFields step={step} data={data} />
+            </div>
+            <div className="onboarding-actions">
+              <div className="onboarding-actions__secondary">
+                {step > 0 && (
+                  <button type="button" className="button button--ghost" onClick={back}>
+                    <ArrowLeft size={17} /> Back
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={() => {
+                    saveForm();
+                    confirmAction('Progress saved. Resume setup from Organisation Settings.');
+                    onSaveExit();
+                  }}
+                >
+                  Save and exit
+                </button>
+              </div>
+              <button className="button" type="submit">
+                {step === setupSteps.length - 1
+                  ? 'Finish setup'
+                  : `Continue to ${setupSteps[step + 1][0].toLowerCase()}`}{' '}
+                <ArrowRight size={17} />
+              </button>
+            </div>
+          </form>
         </main>
       </div>
     </div>
+  );
+}
+
+function SetupFields({ step, data }: { step: number; data: SetupData }) {
+  if (step === 0)
+    return (
+      <>
+        <label>
+          Business name
+          <input
+            name="businessName"
+            defaultValue={data.businessName ?? 'Acme Holdings Limited'}
+            required
+          />
+        </label>
+        <label>
+          Legal name
+          <input
+            name="legalName"
+            defaultValue={data.legalName}
+            placeholder="Registered company name"
+          />
+        </label>
+        <label>
+          Registration number
+          <input
+            name="registrationNumber"
+            defaultValue={data.registrationNumber}
+            placeholder="RC 1234567"
+          />
+        </label>
+        <label>
+          Tax identification number
+          <input name="taxId" defaultValue={data.taxId} placeholder="TIN" />
+        </label>
+        <label>
+          Industry
+          <select name="industry" defaultValue={data.industry ?? 'Professional services'}>
+            <option>Professional services</option>
+            <option>Retail</option>
+            <option>Manufacturing</option>
+            <option>Education</option>
+            <option>Non-profit</option>
+          </select>
+        </label>
+        <label>
+          Business type
+          <select
+            name="businessType"
+            defaultValue={data.businessType ?? 'Limited liability company'}
+          >
+            <option>Limited liability company</option>
+            <option>Sole proprietorship</option>
+            <option>Partnership</option>
+            <option>Cooperative</option>
+          </select>
+        </label>
+        <label className="full">
+          Business address
+          <textarea
+            name="businessAddress"
+            defaultValue={data.businessAddress}
+            placeholder="Street, city, state, country"
+          />
+        </label>
+        <label>
+          Phone
+          <input name="phone" defaultValue={data.phone} placeholder="+234" />
+        </label>
+        <label>
+          Website
+          <input name="website" defaultValue={data.website} placeholder="https://" />
+        </label>
+      </>
+    );
+  if (step === 1)
+    return (
+      <>
+        <label>
+          Base currency
+          <select name="baseCurrency" defaultValue={data.baseCurrency ?? 'NGN'}>
+            <option value="NGN">NGN â€” Nigerian Naira</option>
+            <option value="USD">USD â€” US Dollar</option>
+            <option value="GBP">GBP â€” British Pound</option>
+            <option value="GHS">GHS â€” Ghanaian Cedi</option>
+          </select>
+        </label>
+        <label>
+          Fiscal year starts
+          <select name="fiscalYearStart" defaultValue={data.fiscalYearStart ?? 'January'}>
+            <option>January</option>
+            <option>April</option>
+            <option>July</option>
+            <option>October</option>
+          </select>
+        </label>
+        <label>
+          Accounting method
+          <select name="accountingMethod" defaultValue={data.accountingMethod ?? 'Accrual basis'}>
+            <option>Accrual basis</option>
+            <option>Cash basis</option>
+          </select>
+        </label>
+        <label>
+          Invoice payment terms
+          <select name="paymentTerms" defaultValue={data.paymentTerms ?? 'Net 30'}>
+            <option>Due on receipt</option>
+            <option>Net 15</option>
+            <option>Net 30</option>
+            <option>Net 60</option>
+          </select>
+        </label>
+        <label>
+          Inventory valuation
+          <select
+            name="inventoryValuation"
+            defaultValue={data.inventoryValuation ?? 'Weighted average'}
+          >
+            <option>Weighted average</option>
+            <option>FIFO</option>
+          </select>
+        </label>
+        <label>
+          Reporting timezone
+          <select name="timezone" defaultValue={data.timezone ?? 'Africa/Lagos'}>
+            <option>Africa/Lagos</option>
+            <option>Africa/Accra</option>
+            <option>UTC</option>
+          </select>
+        </label>
+      </>
+    );
+  if (step === 2)
+    return (
+      <>
+        <label>
+          Head office / primary branch
+          <input
+            name="primaryBranch"
+            defaultValue={data.primaryBranch}
+            placeholder="e.g. Lagos Head Office"
+            required
+          />
+        </label>
+        <label>
+          Number of branches
+          <select name="branchCount" defaultValue={data.branchCount ?? '1'}>
+            <option>1</option>
+            <option>2â€“5</option>
+            <option>6â€“20</option>
+            <option>More than 20</option>
+          </select>
+        </label>
+        <label className="full">
+          Departments
+          <textarea
+            name="departments"
+            defaultValue={data.departments}
+            placeholder="Finance, Sales, Operations â€” separate with commas"
+          />
+        </label>
+        <label>
+          Default cost centre
+          <input
+            name="defaultCostCentre"
+            defaultValue={data.defaultCostCentre}
+            placeholder="e.g. Head Office"
+          />
+        </label>
+        <label>
+          Track projects separately?
+          <select name="projectTracking" defaultValue={data.projectTracking ?? 'Yes'}>
+            <option>Yes</option>
+            <option>No</option>
+          </select>
+        </label>
+      </>
+    );
+  if (step === 3)
+    return (
+      <>
+        <label>
+          Tax country
+          <select name="taxCountry" defaultValue={data.taxCountry ?? 'Nigeria'}>
+            <option>Nigeria</option>
+            <option>Ghana</option>
+            <option>Kenya</option>
+            <option>South Africa</option>
+          </select>
+        </label>
+        <label>
+          VAT registered?
+          <select name="vatRegistered" defaultValue={data.vatRegistered ?? 'Yes'}>
+            <option>Yes</option>
+            <option>No</option>
+          </select>
+        </label>
+        <label>
+          Default sales VAT rate
+          <select name="salesVatRate" defaultValue={data.salesVatRate ?? '7.5%'}>
+            <option>7.5%</option>
+            <option>0%</option>
+            <option>Exempt</option>
+          </select>
+        </label>
+        <label>
+          Tax filing frequency
+          <select name="taxFrequency" defaultValue={data.taxFrequency ?? 'Monthly'}>
+            <option>Monthly</option>
+            <option>Quarterly</option>
+            <option>Annually</option>
+          </select>
+        </label>
+        <label className="full">
+          Tax notes
+          <textarea
+            name="taxNotes"
+            defaultValue={data.taxNotes}
+            placeholder="Exemptions, withholding arrangements, or adviser notes"
+          />
+        </label>
+      </>
+    );
+  return (
+    <>
+      <label>
+        Colleague email
+        <input
+          name="inviteEmail"
+          type="email"
+          defaultValue={data.inviteEmail}
+          placeholder="colleague@company.com"
+        />
+      </label>
+      <label>
+        Starting role
+        <select name="inviteRole" defaultValue={data.inviteRole ?? 'Accountant'}>
+          <option>Administrator</option>
+          <option>Accountant</option>
+          <option>Approver</option>
+          <option>Member</option>
+          <option>Auditor</option>
+        </select>
+      </label>
+      <label className="full">
+        Personal message
+        <textarea
+          name="inviteMessage"
+          defaultValue={data.inviteMessage}
+          placeholder="Add an optional note to the invitation"
+        />
+      </label>
+      <div className="onboarding-note full">
+        <Check size={18} />
+        <span>
+          <strong>Invitations are optional.</strong>
+          <small>You can add users later from Users & roles.</small>
+        </span>
+      </div>
+    </>
   );
 }
