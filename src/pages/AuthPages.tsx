@@ -112,7 +112,15 @@ export function AuthPage({
         setVerificationCode('');
         setFlowStep('otp');
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Account creation failed.');
+        if (caught instanceof ApiError && caught.status === 503) {
+          setVerificationCode('');
+          setFlowStep('otp');
+          setError(
+            'Your account was created, but the email could not be delivered. Check the address and try resending the code.',
+          );
+        } else {
+          setError(caught instanceof Error ? caught.message : 'Account creation failed.');
+        }
       } finally {
         setSubmitting(false);
       }
