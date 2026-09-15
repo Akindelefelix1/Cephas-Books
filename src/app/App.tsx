@@ -17,15 +17,12 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { ModulePage } from '@/pages/ModulePage';
 import { modules } from '@/data/modules';
 import { getFallbackModule } from '@/data/fallbackModules';
-import {
-  AccountingPage,
-  AIAssistantPage,
-  ReportsPage,
-  SimpleFeaturePage,
-} from '@/pages/SpecialPages';
+import { AIAssistantPage, ReportsPage, SimpleFeaturePage } from '@/pages/SpecialPages';
 import { BankingPage } from '@/pages/BankingPage';
 import { SalesIncomePage } from '@/pages/SalesIncomePage';
 import { PurchasesSpendingPage } from '@/pages/PurchasesSpendingPage';
+import { AccountingFinancePage } from '@/pages/AccountingFinancePage';
+import type { AccountingView } from '@/services/accounting';
 import type { PurchaseView } from '@/services/purchases';
 import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
 import { Modal } from '@/components/ui/Modal';
@@ -141,11 +138,24 @@ export function App() {
       return (
         <PurchasesSpendingPage key={active} view={active as PurchaseView} role={identity.role} />
       );
+    if (
+      [
+        'chart-of-accounts',
+        'journals',
+        'general-ledger',
+        'trial-balance',
+        'assets',
+        'budgets',
+        'tax',
+        'payroll',
+      ].includes(active)
+    )
+      return (
+        <AccountingFinancePage key={active} view={active as AccountingView} role={identity.role} />
+      );
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
     if (active === 'banking' || active === 'transactions' || active === 'reconciliation')
       return <BankingPage key={active} view={active} role={identity.role} />;
-    if (['chart-of-accounts', 'journals', 'general-ledger', 'trial-balance'].includes(active))
-      return <AccountingPage type={active} />;
     if (active === 'reports') return <ReportsPage />;
     if (active === 'ai-assistant') return <AIAssistantPage />;
     if (active === 'users') return <UsersPage />;
