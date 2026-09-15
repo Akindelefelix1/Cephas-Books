@@ -50,6 +50,11 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [view]);
   useEffect(() => {
+    const handleExpiredSession = () => setView('login');
+    window.addEventListener('cephas:auth-expired', handleExpiredSession);
+    return () => window.removeEventListener('cephas:auth-expired', handleExpiredSession);
+  }, []);
+  useEffect(() => {
     if (!hasAuthTokens() || (view !== 'app' && view !== 'onboarding')) return;
     Promise.all([onboardingApi.get(), authApi.me()])
       .then(([progress, profile]) => {

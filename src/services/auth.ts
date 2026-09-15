@@ -91,6 +91,7 @@ export const authApi = {
 };
 
 const TOKEN_KEY = 'cephas:auth';
+let refreshPromise: Promise<AuthTokens> | null = null;
 
 export function saveAuthTokens(tokens: AuthTokens, remember: boolean): void {
   const target = remember ? localStorage : sessionStorage;
@@ -102,6 +103,15 @@ export function saveAuthTokens(tokens: AuthTokens, remember: boolean): void {
 export function clearAuthTokens(): void {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+}
+
+function refreshSession(refreshToken: string): Promise<AuthTokens> {
+  if (!refreshPromise) {
+    refreshPromise = authApi.refresh(refreshToken).finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 export function getAuthTokens(): AuthTokens | null {
@@ -139,11 +149,12 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
   if (response.status === 401) {
     try {
       const remember = localStorage.getItem(TOKEN_KEY) !== null;
-      tokens = await authApi.refresh(tokens.refreshToken);
+      tokens = await refreshSession(tokens.refreshToken);
       saveAuthTokens(tokens, remember);
       response = await send(tokens.accessToken);
     } catch {
       clearAuthTokens();
+      window.dispatchEvent(new Event('cephas:auth-expired'));
       throw new ApiError('Your session has expired. Please sign in again.', 401);
     }
   }
