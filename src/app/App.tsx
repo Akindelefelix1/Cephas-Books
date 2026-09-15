@@ -24,6 +24,7 @@ import {
   SimpleFeaturePage,
 } from '@/pages/SpecialPages';
 import { BankingPage } from '@/pages/BankingPage';
+import { SalesIncomePage } from '@/pages/SalesIncomePage';
 import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
@@ -107,6 +108,21 @@ export function App() {
           onboardingComplete={onboardingComplete}
           onResumeOnboarding={() => setView('onboarding')}
           companyName={identity.companyName}
+        />
+      );
+    if (
+      ['customers', 'quotations', 'invoices', 'payments', 'credit-notes', 'receivables'].includes(
+        active,
+      )
+    )
+      return (
+        <SalesIncomePage
+          key={active}
+          view={
+            active as
+              'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables'
+          }
+          role={identity.role}
         />
       );
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
