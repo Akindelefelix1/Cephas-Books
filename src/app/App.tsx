@@ -28,7 +28,7 @@ import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
 import type { MarketingView } from '@/types/app';
-import { ApiError, clearAuthTokens, hasAuthTokens } from '@/services/auth';
+import { ApiError, authApi, clearAuthTokens, hasAuthTokens } from '@/services/auth';
 import { onboardingApi } from '@/services/onboarding';
 
 export function App() {
@@ -38,22 +38,37 @@ export function App() {
   const [onboardingComplete, setOnboardingComplete] = useState(
     () => localStorage.getItem('cephas:onboarding-complete') === 'true',
   );
+  const [identity, setIdentity] = useState({
+    firstName: '',
+    lastName: '',
+    companyName: '',
+    role: '',
+    baseCurrency: 'NGN',
+    countryCode: 'NG',
+  });
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [view]);
   useEffect(() => {
-    if (!hasAuthTokens()) return;
-    onboardingApi
-      .get()
-      .then((progress) => {
+    if (!hasAuthTokens() || (view !== 'app' && view !== 'onboarding')) return;
+    Promise.all([onboardingApi.get(), authApi.me()])
+      .then(([progress, profile]) => {
         const complete = Boolean(progress.onboardingCompletedAt);
         setOnboardingComplete(complete);
         localStorage.setItem('cephas:onboarding-complete', String(complete));
+        setIdentity({
+          firstName: profile.firstName ?? '',
+          lastName: profile.lastName ?? '',
+          companyName: profile.organization.name,
+          role: profile.role,
+          baseCurrency: profile.organization.baseCurrency,
+          countryCode: profile.organization.countryCode,
+        });
       })
       .catch((caught) => {
         if (caught instanceof ApiError && caught.status === 401) setView('login');
       });
-  }, []);
+  }, [view]);
   const navigate = (id: string) => {
     setActive(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -86,6 +101,8 @@ export function App() {
           onCreate={() => setQuick(true)}
           onboardingComplete={onboardingComplete}
           onResumeOnboarding={() => setView('onboarding')}
+          firstName={identity.firstName}
+          companyName={identity.companyName}
         />
       );
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
@@ -132,7 +149,12 @@ export function App() {
     return <ModulePage key={active} definition={getFallbackModule(active)} />;
   })();
   return (
-    <AppShell active={active} onNavigate={navigate} onQuickCreate={() => setQuick(true)}>
+    <AppShell
+      active={active}
+      onNavigate={navigate}
+      onQuickCreate={() => setQuick(true)}
+      identity={identity}
+    >
       {content}
       <QuickCreate
         open={quick}

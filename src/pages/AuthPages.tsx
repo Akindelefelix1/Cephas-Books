@@ -28,8 +28,7 @@ export function AuthPage({
   const [flowStep, setFlowStep] = useState<'form' | 'otp' | 'new-password'>('form');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [remember, setRemember] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -100,11 +99,13 @@ export function AuthPage({
         setError('Please accept the Terms of Service and Privacy Policy.');
         return;
       }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
       setSubmitting(true);
       try {
         await authApi.register({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
           organizationName: organizationName.trim(),
           email: email.trim(),
           password,
@@ -296,41 +297,17 @@ export function AuthPage({
             ) : (
               <div className="form-stack">
                 {mode === 'register' && (
-                  <>
-                    <div className="auth-name-fields">
-                      <label>
-                        First name
-                        <input
-                          value={firstName}
-                          onChange={(event) => setFirstName(event.target.value)}
-                          autoComplete="given-name"
-                          maxLength={80}
-                          required
-                        />
-                      </label>
-                      <label>
-                        Last name
-                        <input
-                          value={lastName}
-                          onChange={(event) => setLastName(event.target.value)}
-                          autoComplete="family-name"
-                          maxLength={80}
-                          required
-                        />
-                      </label>
-                    </div>
-                    <label>
-                      Company name
-                      <input
-                        value={organizationName}
-                        onChange={(event) => setOrganizationName(event.target.value)}
-                        autoComplete="organization"
-                        placeholder="Enter your company name"
-                        maxLength={120}
-                        required
-                      />
-                    </label>
-                  </>
+                  <label>
+                    Company name
+                    <input
+                      value={organizationName}
+                      onChange={(event) => setOrganizationName(event.target.value)}
+                      autoComplete="organization"
+                      placeholder="Enter your company name"
+                      maxLength={120}
+                      required
+                    />
+                  </label>
                 )}
                 <label>
                   Work email
@@ -380,6 +357,23 @@ export function AuthPage({
                       >
                         {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                       </button>
+                    </div>
+                  </label>
+                )}
+                {mode === 'register' && (
+                  <label>
+                    Confirm password
+                    <div className="input-icon">
+                      <LockKeyhole size={17} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        autoComplete="new-password"
+                        minLength={12}
+                        maxLength={128}
+                        required
+                      />
                     </div>
                   </label>
                 )}
@@ -604,6 +598,13 @@ export function OnboardingPage({
         const remoteData = removeLegacyDemoValues(
           Object.assign({}, ...Object.values(progress.onboardingData)) as SetupData,
         );
+        if (
+          !remoteData.businessName &&
+          progress.organizationName &&
+          progress.organizationName !== 'Acme Holdings Limited'
+        ) {
+          remoteData.businessName = progress.organizationName;
+        }
         setData((current) => ({ ...remoteData, ...current }));
         setStep((current) =>
           Math.max(current, Math.min(progress.onboardingStep, setupSteps.length - 1)),

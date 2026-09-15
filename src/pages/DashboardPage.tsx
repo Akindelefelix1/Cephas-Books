@@ -23,11 +23,15 @@ export function DashboardPage({
   onCreate,
   onboardingComplete,
   onResumeOnboarding,
+  firstName,
+  companyName,
 }: {
   onNavigate: (id: string) => void;
   onCreate: () => void;
   onboardingComplete: boolean;
   onResumeOnboarding: () => void;
+  firstName: string;
+  companyName: string;
 }) {
   const [period, setPeriod] = useState('This month');
   const [chartRange, setChartRange] = useState('Last 6 months');
@@ -38,6 +42,10 @@ export function DashboardPage({
     ['Capture receipt', 'Attach proof of payment', 'expenses', FileUp],
   ] as const;
   const today = new Intl.DateTimeFormat('en-NG', { dateStyle: 'full' }).format(new Date());
+  const hour = new Date().getHours();
+  const dayPeriod = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+  const displayCompany = companyName || 'your company';
+  const displayName = firstName || displayCompany;
   const transactions = [
     ['INV-00245', 'Apex Retail Limited', 'Invoice', '₦2,500,000', 'Partially paid'],
     ['PAY-00831', 'Northstar Schools', 'Payment', '₦1,280,000', 'Paid'],
@@ -61,8 +69,10 @@ export function DashboardPage({
       <div className="dashboard-heading">
         <div>
           <p>{today}</p>
-          <h1>Good morning, Tobi.</h1>
-          <span>Here’s how Acme Holdings is performing.</span>
+          <h1>
+            Good {dayPeriod}, {displayName}.
+          </h1>
+          <span>Here’s how {displayCompany} is performing.</span>
         </div>
         <div>
           <label className="period-button">

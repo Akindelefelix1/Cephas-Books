@@ -9,8 +9,6 @@ export interface AuthTokens {
 }
 
 export interface RegisterInput {
-  firstName: string;
-  lastName: string;
   organizationName: string;
   email: string;
   password: string;
@@ -25,6 +23,18 @@ export interface VerificationPending {
   email: string;
   verificationRequired: true;
   expiresIn: number;
+}
+
+export interface CurrentUserProfile {
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  role: string;
+  organization: {
+    name: string;
+    baseCurrency: string;
+    countryCode: string;
+  };
 }
 
 interface ApiErrorBody {
@@ -77,6 +87,7 @@ export const authApi = {
   resendVerification: (email: string) =>
     post<{ message: string; expiresIn: number }>('/auth/resend-verification', { email }),
   refresh: (refreshToken: string) => post<AuthTokens>('/auth/refresh', { refreshToken }),
+  me: () => authorizedRequest<CurrentUserProfile>('/auth/me'),
 };
 
 const TOKEN_KEY = 'cephas:auth';

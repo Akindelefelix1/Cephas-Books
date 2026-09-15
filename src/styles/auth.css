@@ -129,11 +129,6 @@
   display: grid;
   gap: 18px;
 }
-.auth-name-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
 .auth-error {
   margin-top: 14px;
   padding: 10px 12px;
@@ -432,9 +427,6 @@ textarea:focus {
 }
 
 @media (max-width: 700px) {
-  .auth-name-fields {
-    grid-template-columns: 1fr;
-  }
   .onboarding-actions,
   .onboarding-actions__secondary {
     align-items: stretch;

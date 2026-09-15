@@ -4,6 +4,7 @@ export const onboardingSteps = ['business', 'financial', 'structure', 'tax', 'te
 export type OnboardingStep = (typeof onboardingSteps)[number];
 
 export interface OnboardingProgress {
+  organizationName?: string;
   onboardingData: Partial<Record<OnboardingStep, Record<string, string>>>;
   onboardingStep: number;
   onboardingCompletedAt: string | null;

@@ -17,12 +17,23 @@ interface AppShellProps extends PropsWithChildren {
   active: string;
   onNavigate: (id: string) => void;
   onQuickCreate: () => void;
+  identity: {
+    firstName: string;
+    lastName: string;
+    companyName: string;
+    role: string;
+    baseCurrency: string;
+    countryCode: string;
+  };
 }
 
-export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShellProps) {
+export function AppShell({ active, onNavigate, onQuickCreate, identity, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const companyName = identity.companyName || 'Your company';
+  const companyInitials = getInitials(companyName);
+  const userName = [identity.firstName, identity.lastName].filter(Boolean).join(' ');
   const navigate = (id: string) => {
     const parent = allNavigation.find((item) => item.children?.some((child) => child.id === id));
     if (parent) {
@@ -103,10 +114,12 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
           <small>7 of 10 seats used</small>
         </div>
         <button className="organisation" onClick={() => navigate('settings')}>
-          <span className="avatar avatar--square">AC</span>
+          <span className="avatar avatar--square">{companyInitials}</span>
           <span>
-            <strong>Acme Holdings</strong>
-            <small>Lagos · NGN</small>
+            <strong>{companyName}</strong>
+            <small>
+              {identity.countryCode} · {identity.baseCurrency}
+            </small>
           </span>
           <ChevronDown size={16} />
         </button>
@@ -143,10 +156,10 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
               onClick={() => navigate('profile')}
               aria-label="Open profile"
             >
-              <span className="avatar">TA</span>
+              <span className="avatar">{companyInitials}</span>
               <span>
-                <strong>Tobi Adeyemi</strong>
-                <small>Finance manager</small>
+                <strong>{companyName}</strong>
+                <small>{userName || formatRole(identity.role)}</small>
               </span>
               <ChevronDown size={15} />
             </button>
@@ -161,7 +174,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
           <section className="command-palette" onMouseDown={(e) => e.stopPropagation()}>
             <div className="command-input">
               <Search size={20} />
-              <input autoFocus placeholder="Search anything in Acme Holdings…" />
+              <input autoFocus placeholder={`Search anything in ${companyName}…`} />
               <kbd>ESC</kbd>
             </div>
             <p className="command-label">Recent results</p>
@@ -214,4 +227,22 @@ export function AppShell({ active, onNavigate, onQuickCreate, children }: AppShe
       )}
     </div>
   );
+}
+
+function getInitials(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
+
+function formatRole(role: string): string {
+  if (!role) return 'Account owner';
+  return role
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
