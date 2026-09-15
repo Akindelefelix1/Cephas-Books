@@ -325,7 +325,7 @@ export function AuthPage({
                         value={organizationName}
                         onChange={(event) => setOrganizationName(event.target.value)}
                         autoComplete="organization"
-                        placeholder="e.g. Acme Holdings"
+                        placeholder="Enter your company name"
                         maxLength={120}
                         required
                       />
@@ -529,6 +529,13 @@ const setupHeadings = [
 
 type SetupData = Record<string, string>;
 
+function removeLegacyDemoValues(data: SetupData): SetupData {
+  if (data.businessName !== 'Acme Holdings Limited') return data;
+  const cleaned = { ...data };
+  delete cleaned.businessName;
+  return cleaned;
+}
+
 const setupFieldNames = [
   [
     'businessName',
@@ -576,7 +583,9 @@ export function OnboardingPage({
   });
   const [data, setData] = useState<SetupData>(() => {
     try {
-      return JSON.parse(localStorage.getItem('cephas:onboarding-data') ?? '{}') as SetupData;
+      return removeLegacyDemoValues(
+        JSON.parse(localStorage.getItem('cephas:onboarding-data') ?? '{}') as SetupData,
+      );
     } catch {
       return {};
     }
@@ -592,7 +601,9 @@ export function OnboardingPage({
       .get()
       .then((progress) => {
         if (!active) return;
-        const remoteData = Object.assign({}, ...Object.values(progress.onboardingData));
+        const remoteData = removeLegacyDemoValues(
+          Object.assign({}, ...Object.values(progress.onboardingData)) as SetupData,
+        );
         setData((current) => ({ ...remoteData, ...current }));
         setStep((current) =>
           Math.max(current, Math.min(progress.onboardingStep, setupSteps.length - 1)),
@@ -766,7 +777,8 @@ function SetupFields({ step, data }: { step: number; data: SetupData }) {
           <input
             name="businessName"
             defaultValue={data.businessName}
-            placeholder="e.g. Acme Holdings Limited"
+            placeholder="Enter your business name"
+            autoComplete="organization"
             required
           />
         </label>

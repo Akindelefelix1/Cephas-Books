@@ -465,26 +465,70 @@
   justify-content: space-between;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
-  padding: 1.15rem 1.25rem;
-  border: 1px solid #cdd8ff;
-  border-radius: 14px;
-  background: #f4f7ff;
+  padding: 1.35rem 1.5rem 1.35rem 5rem;
+  border: 1px solid #88a5ff;
+  border-left: 5px solid #173bd1;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 88% -40%, rgb(0 186 255 / 24%), transparent 42%),
+    linear-gradient(110deg, #eef3ff 0%, #f5fbff 65%, #e9f5ff 100%);
+  box-shadow: 0 12px 30px rgb(23 59 209 / 12%);
+  position: relative;
+  overflow: hidden;
+}
+
+.onboarding-resume::before {
+  content: '→';
+  position: absolute;
+  left: 1.25rem;
+  width: 2.6rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #173bd1, #00aeea);
+  box-shadow: 0 7px 16px rgb(23 59 209 / 28%);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.onboarding-resume strong {
+  color: #0b1b4d;
+  font-size: 1rem;
 }
 
 .onboarding-resume p {
-  margin: 0.3rem 0 0;
-  color: #66728a;
+  margin: 0.4rem 0 0;
+  color: #52617d;
   line-height: 1.5;
 }
 
 .onboarding-resume .button {
   flex: 0 0 auto;
+  min-width: 150px;
+  border: 0;
+  background: linear-gradient(135deg, #173bd1, #0758ec);
+  box-shadow: 0 8px 20px rgb(23 59 209 / 28%);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.onboarding-resume .button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 11px 24px rgb(23 59 209 / 35%);
 }
 
 @media (max-width: 700px) {
   .onboarding-resume {
     align-items: stretch;
     flex-direction: column;
+    padding: 4.5rem 1.25rem 1.25rem;
+  }
+
+  .onboarding-resume::before {
+    top: 1.15rem;
   }
 }
 .role-list h2 {
