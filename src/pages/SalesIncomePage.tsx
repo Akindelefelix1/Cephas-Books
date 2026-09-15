@@ -40,7 +40,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         salesApi.invoices(),
       ]);
       setSummary(s);
-      setCustomers(c.data);
+      setCustomers(c.data.filter((customer) => customer.isActive));
       setInvoices(i);
       if (view === 'customers')
         setRows(
@@ -158,16 +158,10 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
           {(view === 'invoices' || view === 'quotations') && (
             <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All statuses</option>
-              {[
-                'DRAFT',
-                'SENT',
-                'ACCEPTED',
-                'PARTIALLY_PAID',
-                'PAID',
-                'OVERDUE',
-                'DECLINED',
-                'VOID',
-              ].map((x) => (
+              {(view === 'quotations'
+                ? ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED', 'CONVERTED', 'VOID']
+                : ['DRAFT', 'SENT', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID']
+              ).map((x) => (
                 <option key={x}>{x}</option>
               ))}
             </select>
@@ -222,7 +216,10 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                 ))}
                 {!rows.length && (
                   <tr>
-                    <td className="table-empty" colSpan={columns(view).length + 1}>
+                    <td
+                      className="table-empty"
+                      colSpan={columns(view).length + (canEdit ? 1 : 0)}
+                    >
                       No records found.
                     </td>
                   </tr>
@@ -331,28 +328,38 @@ function actions(
     return (
       <>
         <button onClick={edit}>Edit</button>
-        <button onClick={() => run(() => salesApi.archiveCustomer(r.id), 'Customer archived')}>
-          Archive
-        </button>
+        {(r as Customer).isActive && (
+          <button onClick={() => run(() => salesApi.archiveCustomer(r.id), 'Customer archived')}>
+            Archive
+          </button>
+        )}
       </>
     );
   if (v === 'quotations') {
     const x = r as Quotation;
     return (
       <>
-        <button
-          onClick={() => run(() => salesApi.quotationStatus(x.id, 'SENT'), 'Quotation marked sent')}
-        >
-          Send
-        </button>
-        <button onClick={() => run(() => salesApi.convertQuotation(x.id), 'Invoice created')}>
-          Convert
-        </button>
-        <button
-          onClick={() => run(() => salesApi.quotationStatus(x.id, 'VOID'), 'Quotation voided')}
-        >
-          Void
-        </button>
+        {x.status === 'DRAFT' && (
+          <button
+            onClick={() =>
+              run(() => salesApi.quotationStatus(x.id, 'SENT'), 'Quotation marked sent')
+            }
+          >
+            Send
+          </button>
+        )}
+        {!['CONVERTED', 'VOID', 'DECLINED', 'EXPIRED'].includes(x.status) && (
+          <button onClick={() => run(() => salesApi.convertQuotation(x.id), 'Invoice created')}>
+            Convert
+          </button>
+        )}
+        {!['CONVERTED', 'VOID'].includes(x.status) && (
+          <button
+            onClick={() => run(() => salesApi.quotationStatus(x.id, 'VOID'), 'Quotation voided')}
+          >
+            Void
+          </button>
+        )}
       </>
     );
   }
@@ -362,7 +369,7 @@ function actions(
         Reverse
       </button>
     );
-  if (v === 'credit-notes')
+  if (v === 'credit-notes' && !(r as CreditNote).isVoid)
     return (
       <button onClick={() => run(() => salesApi.voidCredit(r.id), 'Credit note voided')}>
         Void

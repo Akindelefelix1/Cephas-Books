@@ -25,6 +25,8 @@ import {
 } from '@/pages/SpecialPages';
 import { BankingPage } from '@/pages/BankingPage';
 import { SalesIncomePage } from '@/pages/SalesIncomePage';
+import { PurchasesSpendingPage } from '@/pages/PurchasesSpendingPage';
+import type { PurchaseView } from '@/services/purchases';
 import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
@@ -124,6 +126,20 @@ export function App() {
           }
           role={identity.role}
         />
+      );
+    if (
+      [
+        'suppliers',
+        'purchase-requests',
+        'purchase-orders',
+        'bills',
+        'supplier-payments',
+        'payables',
+        'expenses',
+      ].includes(active)
+    )
+      return (
+        <PurchasesSpendingPage key={active} view={active as PurchaseView} role={identity.role} />
       );
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
     if (active === 'banking' || active === 'transactions' || active === 'reconciliation')
@@ -240,8 +256,16 @@ function QuickCreate({
         <QuickActionForm action={String(selected[0])} onSubmit={complete} />
       ) : (
         <div className="quick-create-grid">
-          {choices.map(([title, desc, Icon]) => (
-            <button key={String(title)} onClick={() => setSelectedId(String(title))}>
+          {choices.map(([title, desc, Icon, target]) => (
+            <button
+              key={String(title)}
+              onClick={() => {
+                if (target === 'bills' || target === 'expenses') {
+                  sessionStorage.setItem('cephas:quick-create', String(target));
+                  onComplete(String(target));
+                } else setSelectedId(String(title));
+              }}
+            >
               <i>
                 <Icon />
               </i>
