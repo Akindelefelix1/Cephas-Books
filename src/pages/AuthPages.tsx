@@ -10,6 +10,9 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
+import { ApiError, authApi, saveAuthTokens } from '@/services/auth';
+import { onboardingApi, onboardingSteps } from '@/services/onboarding';
+import { useEffect } from 'react';
 import { confirmAction } from '@/utils/actions';
 import type { View } from '@/types/app';
 
@@ -24,6 +27,15 @@ export function AuthPage({
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [flowStep, setFlowStep] = useState<'form' | 'otp' | 'new-password'>('form');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
+  const [remember, setRemember] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const content = {
     login: {
       title: 'Welcome back',
@@ -60,10 +72,50 @@ export function AuthPage({
             button: 'Update password',
           }
         : content;
-  const submit = () => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+
+    if (flowStep === 'otp' && (mode === 'register' || mode === 'login')) {
+      if (!/^\d{6}$/.test(verificationCode)) {
+        setError('Enter the complete six-digit verification code.');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const tokens = await authApi.verifyEmail(email.trim(), verificationCode);
+        saveAuthTokens(tokens, mode === 'register' || remember);
+        const progress = await onboardingApi.get();
+        onView(progress.onboardingCompletedAt ? 'app' : 'onboarding');
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Email verification failed.');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (mode === 'register') {
-      if (flowStep === 'form') setFlowStep('otp');
-      else onView('onboarding');
+      if (!acceptedTerms) {
+        setError('Please accept the Terms of Service and Privacy Policy.');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await authApi.register({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          organizationName: organizationName.trim(),
+          email: email.trim(),
+          password,
+        });
+        setVerificationCode('');
+        setFlowStep('otp');
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Account creation failed.');
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
     if (mode === 'forgot') {
@@ -72,8 +124,29 @@ export function AuthPage({
       else onView('login');
       return;
     }
-    if (mode === 'login') onView('app');
-    else onView('app');
+    if (mode === 'login') {
+      setSubmitting(true);
+      try {
+        const tokens = await authApi.login({ email: email.trim(), password });
+        saveAuthTokens(tokens, remember);
+        const progress = await onboardingApi.get();
+        onView(progress.onboardingCompletedAt ? 'app' : 'onboarding');
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 403) {
+          try {
+            await authApi.resendVerification(email.trim());
+          } catch {
+            // The verification screen still allows a manual retry.
+          }
+          setVerificationCode('');
+          setFlowStep('otp');
+        } else {
+          setError(caught instanceof Error ? caught.message : 'Sign in failed.');
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    } else onView('app');
   };
   return (
     <div className="auth-page">
@@ -125,85 +198,74 @@ export function AuthPage({
           {mode === 'register' && flowStep === 'form' && (
             <div className="divider">or use work email</div>
           )}
-          {mode === 'mfa' || flowStep === 'otp' ? (
-            <>
-              <label>
-                {mode === 'mfa' && useRecoveryCode ? 'Recovery code' : 'Verification code'}
-                {mode === 'mfa' && useRecoveryCode ? (
-                  <input autoFocus placeholder="Enter your recovery code" />
-                ) : (
-                  <div className="otp-inputs">
-                    {[1, 2, 3, 4, 5, 6].map((i) => (
-                      <input
-                        key={i}
-                        maxLength={1}
-                        inputMode="numeric"
-                        defaultValue={mode === 'mfa' && i < 3 ? String(i) : ''}
-                      />
-                    ))}
-                  </div>
-                )}
-              </label>
-              <p className="auth-help">
-                {mode !== 'mfa'
-                  ? 'The code expires in 10 minutes.'
-                  : useRecoveryCode
-                    ? 'Use one of the recovery codes saved when MFA was configured.'
-                    : 'Open your authenticator app to view your code.'}
-              </p>
-            </>
-          ) : flowStep === 'new-password' ? (
-            <div className="form-stack">
-              <label>
-                New password
-                <div className="input-icon">
-                  <LockKeyhole size={17} />
-                  <input type={showPassword ? 'text' : 'password'} autoFocus />
-                  <button
-                    type="button"
-                    className="password-toggle"
-                    onClick={() => setShowPassword((visible) => !visible)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    aria-pressed={showPassword}
-                  >
-                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                  </button>
-                </div>
-              </label>
-              <label>
-                Confirm new password
-                <div className="input-icon">
-                  <LockKeyhole size={17} />
-                  <input type={showPassword ? 'text' : 'password'} />
-                </div>
-              </label>
-            </div>
-          ) : (
-            <div className="form-stack">
-              {mode === 'register' && (
+          <form onSubmit={submit}>
+            {mode === 'mfa' || flowStep === 'otp' ? (
+              <>
                 <label>
-                  Company name
-                  <input placeholder="e.g. Acme Holdings" />
+                  {mode === 'mfa' && useRecoveryCode ? 'Recovery code' : 'Verification code'}
+                  {mode === 'mfa' && useRecoveryCode ? (
+                    <input autoFocus placeholder="Enter your recovery code" />
+                  ) : (
+                    <div className="otp-inputs">
+                      {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <input
+                          key={i}
+                          maxLength={1}
+                          inputMode="numeric"
+                          autoComplete={i === 0 ? 'one-time-code' : 'off'}
+                          value={verificationCode[i] ?? ''}
+                          required
+                          onPaste={(event) => {
+                            const pasted = event.clipboardData
+                              .getData('text')
+                              .replace(/\D/g, '')
+                              .slice(0, 6);
+                            if (pasted) {
+                              event.preventDefault();
+                              setVerificationCode(pasted);
+                            }
+                          }}
+                          onChange={(event) => {
+                            const digit = event.target.value.replace(/\D/g, '').slice(-1);
+                            setVerificationCode((current) => {
+                              const digits = current.padEnd(6, ' ').split('');
+                              digits[i] = digit || ' ';
+                              return digits.join('').trimEnd();
+                            });
+                            if (digit) {
+                              (
+                                event.currentTarget.nextElementSibling as HTMLInputElement | null
+                              )?.focus();
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Backspace' && !verificationCode[i]) {
+                              (
+                                event.currentTarget
+                                  .previousElementSibling as HTMLInputElement | null
+                              )?.focus();
+                            }
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </label>
-              )}
-              <label>
-                Work email
-                <div className="input-icon">
-                  <Mail size={17} />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="you@company.com"
-                  />
-                </div>
-              </label>
-              {mode !== 'forgot' && (
+                <p className="auth-help">
+                  {mode !== 'mfa'
+                    ? 'The code expires in 10 minutes.'
+                    : useRecoveryCode
+                      ? 'Use one of the recovery codes saved when MFA was configured.'
+                      : 'Open your authenticator app to view your code.'}
+                </p>
+              </>
+            ) : flowStep === 'new-password' ? (
+              <div className="form-stack">
                 <label>
-                  Password
+                  New password
                   <div className="input-icon">
                     <LockKeyhole size={17} />
-                    <input type={showPassword ? 'text' : 'password'} />
+                    <input type={showPassword ? 'text' : 'password'} autoFocus />
                     <button
                       type="button"
                       className="password-toggle"
@@ -215,28 +277,141 @@ export function AuthPage({
                     </button>
                   </div>
                 </label>
-              )}
-            </div>
-          )}
-          {mode === 'login' && (
-            <div className="form-options">
-              <label>
-                <input type="checkbox" />
-                Remember me
+                <label>
+                  Confirm new password
+                  <div className="input-icon">
+                    <LockKeyhole size={17} />
+                    <input type={showPassword ? 'text' : 'password'} />
+                  </div>
+                </label>
+              </div>
+            ) : (
+              <div className="form-stack">
+                {mode === 'register' && (
+                  <>
+                    <div className="auth-name-fields">
+                      <label>
+                        First name
+                        <input
+                          value={firstName}
+                          onChange={(event) => setFirstName(event.target.value)}
+                          autoComplete="given-name"
+                          maxLength={80}
+                          required
+                        />
+                      </label>
+                      <label>
+                        Last name
+                        <input
+                          value={lastName}
+                          onChange={(event) => setLastName(event.target.value)}
+                          autoComplete="family-name"
+                          maxLength={80}
+                          required
+                        />
+                      </label>
+                    </div>
+                    <label>
+                      Company name
+                      <input
+                        value={organizationName}
+                        onChange={(event) => setOrganizationName(event.target.value)}
+                        autoComplete="organization"
+                        placeholder="e.g. Acme Holdings"
+                        maxLength={120}
+                        required
+                      />
+                    </label>
+                  </>
+                )}
+                <label>
+                  Work email
+                  <div className="input-icon">
+                    <Mail size={17} />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="you@company.com"
+                      autoComplete="email"
+                      maxLength={254}
+                      required
+                    />
+                  </div>
+                </label>
+                {mode !== 'forgot' && (
+                  <label>
+                    Password
+                    <div className="input-icon">
+                      <LockKeyhole size={17} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                        minLength={mode === 'register' ? 12 : undefined}
+                        maxLength={128}
+                        pattern={
+                          mode === 'register'
+                            ? '(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{12,128}'
+                            : undefined
+                        }
+                        title={
+                          mode === 'register'
+                            ? 'Use at least 12 characters with uppercase, lowercase, and a number.'
+                            : undefined
+                        }
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowPassword((visible) => !visible)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
+                  </label>
+                )}
+              </div>
+            )}
+            {mode === 'login' && (
+              <div className="form-options">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(event) => setRemember(event.target.checked)}
+                  />
+                  Remember me
+                </label>
+                <button type="button" onClick={() => onView('forgot')}>
+                  Forgot password?
+                </button>
+              </div>
+            )}
+            {mode === 'register' && flowStep === 'form' && (
+              <label className="terms">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(event) => setAcceptedTerms(event.target.checked)}
+                />
+                <span>I agree to the Terms of Service and Privacy Policy.</span>
               </label>
-              <button onClick={() => onView('forgot')}>Forgot password?</button>
-            </div>
-          )}
-          {mode === 'register' && flowStep === 'form' && (
-            <label className="terms">
-              <input type="checkbox" defaultChecked />
-              <span>I agree to the Terms of Service and Privacy Policy.</span>
-            </label>
-          )}
-          <button className="button auth-submit" onClick={submit}>
-            {flowContent.button}
-            <ArrowRight size={17} />
-          </button>
+            )}
+            {error && (
+              <div className="auth-error" role="alert">
+                {error}
+              </div>
+            )}
+            <button className="button auth-submit" type="submit" disabled={submitting}>
+              {submitting ? 'Please wait…' : flowContent.button}
+              <ArrowRight size={17} />
+            </button>
+          </form>
           {mode === 'login' && (
             <p className="auth-switch">
               New to Cephas? <button onClick={() => onView('register')}>Create an account</button>
@@ -249,12 +424,34 @@ export function AuthPage({
           )}
           {flowStep === 'otp' && mode !== 'mfa' && (
             <div className="auth-flow-links">
-              <button className="link-center" onClick={() => setFlowStep('form')}>
+              <button
+                type="button"
+                className="link-center"
+                onClick={() => {
+                  setError('');
+                  setVerificationCode('');
+                  setFlowStep('form');
+                }}
+              >
                 Change email
               </button>
               <button
+                type="button"
                 className="link-center"
-                onClick={() => confirmAction(`A new verification code was sent to ${email}`)}
+                disabled={submitting}
+                onClick={async () => {
+                  setError('');
+                  setSubmitting(true);
+                  try {
+                    const result = await authApi.resendVerification(email.trim());
+                    setVerificationCode('');
+                    confirmAction(result.message);
+                  } catch (caught) {
+                    setError(caught instanceof Error ? caught.message : 'Could not resend code.');
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
               >
                 Resend verification code
               </button>
@@ -324,6 +521,40 @@ const setupHeadings = [
 
 type SetupData = Record<string, string>;
 
+const setupFieldNames = [
+  [
+    'businessName',
+    'legalName',
+    'registrationNumber',
+    'taxId',
+    'industry',
+    'businessType',
+    'businessAddress',
+    'phone',
+    'website',
+  ],
+  [
+    'baseCurrency',
+    'fiscalYearStart',
+    'accountingMethod',
+    'paymentTerms',
+    'inventoryValuation',
+    'timezone',
+  ],
+  ['primaryBranch', 'branchCount', 'departments', 'defaultCostCentre', 'projectTracking'],
+  ['taxCountry', 'vatRegistered', 'salesVatRate', 'taxFrequency', 'taxNotes'],
+  ['inviteEmail', 'inviteRole', 'inviteMessage'],
+] as const;
+
+function getStepPayload(step: number, data: SetupData): Record<string, string> {
+  const payload: Record<string, string> = {};
+  for (const key of setupFieldNames[step]) {
+    const value = data[key]?.trim();
+    if (value) payload[key] = value;
+  }
+  return payload;
+}
+
 export function OnboardingPage({
   onComplete,
   onSaveExit,
@@ -342,28 +573,70 @@ export function OnboardingPage({
       return {};
     }
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
 
+  useEffect(() => {
+    let active = true;
+    onboardingApi
+      .get()
+      .then((progress) => {
+        if (!active) return;
+        const remoteData = Object.assign({}, ...Object.values(progress.onboardingData));
+        setData((current) => ({ ...remoteData, ...current }));
+        setStep((current) =>
+          Math.max(current, Math.min(progress.onboardingStep, setupSteps.length - 1)),
+        );
+        if (progress.onboardingCompletedAt) onComplete();
+      })
+      .catch((caught) => {
+        if (active) setError(caught instanceof Error ? caught.message : 'Could not load setup.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [onComplete]);
+
   const saveForm = () => {
-    if (!formRef.current) return;
+    if (!formRef.current) return data;
     const next = { ...data };
     new FormData(formRef.current).forEach((value, key) => (next[key] = String(value)));
     setData(next);
     localStorage.setItem('cephas:onboarding-data', JSON.stringify(next));
     localStorage.setItem('cephas:onboarding-step', String(step));
     localStorage.setItem('cephas:onboarding-complete', 'false');
+    return next;
   };
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const saveCurrentStep = (values: SetupData) =>
+    onboardingApi.saveStep(onboardingSteps[step], getStepPayload(step, values));
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    saveForm();
-    if (step === setupSteps.length - 1) {
-      localStorage.setItem('cephas:onboarding-step', String(setupSteps.length));
-      onComplete();
-    } else {
-      const next = step + 1;
-      setStep(next);
-      localStorage.setItem('cephas:onboarding-step', String(next));
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    setError('');
+    setSaving(true);
+    try {
+      const values = saveForm();
+      await saveCurrentStep(values);
+      if (step === setupSteps.length - 1) {
+        await onboardingApi.complete();
+        localStorage.removeItem('cephas:onboarding-data');
+        localStorage.removeItem('cephas:onboarding-step');
+        onComplete();
+      } else {
+        const next = step + 1;
+        setStep(next);
+        localStorage.setItem('cephas:onboarding-step', String(next));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not save this step.');
+    } finally {
+      setSaving(false);
     }
   };
   const back = () => {
@@ -407,7 +680,18 @@ export function OnboardingPage({
           </div>
           <h1>{setupHeadings[step][0]}</h1>
           <p>{setupHeadings[step][1]}</p>
-          <form ref={formRef} onSubmit={submit}>
+          {loading && <div className="onboarding-status">Loading your saved setup…</div>}
+          {error && (
+            <div className="auth-error" role="alert">
+              {error}
+            </div>
+          )}
+          <form
+            key={`${step}-${loading}`}
+            ref={formRef}
+            onSubmit={submit}
+            aria-busy={saving || loading}
+          >
             <div className="form-grid">
               <SetupFields step={step} data={data} />
             </div>
@@ -421,19 +705,40 @@ export function OnboardingPage({
                 <button
                   type="button"
                   className="button button--ghost"
-                  onClick={() => {
-                    saveForm();
-                    confirmAction('Progress saved. Resume setup from Organisation Settings.');
-                    onSaveExit();
+                  disabled={saving || loading}
+                  onClick={async () => {
+                    setError('');
+                    setSaving(true);
+                    try {
+                      const values = saveForm();
+                      if (formRef.current?.checkValidity()) {
+                        await saveCurrentStep(values);
+                        confirmAction('Progress saved. Resume setup from your dashboard.');
+                      } else {
+                        confirmAction(
+                          'Your draft is saved on this device. Resume setup from your dashboard.',
+                        );
+                      }
+                      onSaveExit();
+                    } catch {
+                      confirmAction(
+                        'Your draft is saved on this device and can be resumed from your dashboard.',
+                      );
+                      onSaveExit();
+                    } finally {
+                      setSaving(false);
+                    }
                   }}
                 >
                   Save and exit
                 </button>
               </div>
-              <button className="button" type="submit">
-                {step === setupSteps.length - 1
-                  ? 'Finish setup'
-                  : `Continue to ${setupSteps[step + 1][0].toLowerCase()}`}{' '}
+              <button className="button" type="submit" disabled={saving || loading}>
+                {saving
+                  ? 'Saving…'
+                  : step === setupSteps.length - 1
+                    ? 'Finish setup'
+                    : `Continue to ${setupSteps[step + 1][0].toLowerCase()}`}{' '}
                 <ArrowRight size={17} />
               </button>
             </div>
@@ -452,7 +757,8 @@ function SetupFields({ step, data }: { step: number; data: SetupData }) {
           Business name
           <input
             name="businessName"
-            defaultValue={data.businessName ?? 'Acme Holdings Limited'}
+            defaultValue={data.businessName}
+            placeholder="e.g. Acme Holdings Limited"
             required
           />
         </label>
@@ -589,8 +895,8 @@ function SetupFields({ step, data }: { step: number; data: SetupData }) {
           Number of branches
           <select name="branchCount" defaultValue={data.branchCount ?? '1'}>
             <option>1</option>
-            <option>2â€“5</option>
-            <option>6â€“20</option>
+            <option value="2-5">2–5</option>
+            <option value="6-20">6–20</option>
             <option>More than 20</option>
           </select>
         </label>
@@ -677,12 +983,12 @@ function SetupFields({ step, data }: { step: number; data: SetupData }) {
       </label>
       <label>
         Starting role
-        <select name="inviteRole" defaultValue={data.inviteRole ?? 'Accountant'}>
-          <option>Administrator</option>
-          <option>Accountant</option>
-          <option>Approver</option>
-          <option>Member</option>
-          <option>Auditor</option>
+        <select name="inviteRole" defaultValue={data.inviteRole ?? 'ACCOUNTANT'}>
+          <option value="ADMIN">Administrator</option>
+          <option value="ACCOUNTANT">Accountant</option>
+          <option value="APPROVER">Approver</option>
+          <option value="MEMBER">Member</option>
+          <option value="AUDITOR">Auditor</option>
         </select>
       </label>
       <label className="full">

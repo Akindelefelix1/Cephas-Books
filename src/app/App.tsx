@@ -28,9 +28,11 @@ import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
 import type { MarketingView } from '@/types/app';
+import { ApiError, clearAuthTokens, hasAuthTokens } from '@/services/auth';
+import { onboardingApi } from '@/services/onboarding';
 
 export function App() {
-  const [view, setView] = useState<View>('landing');
+  const [view, setView] = useState<View>(() => (hasAuthTokens() ? 'app' : 'landing'));
   const [active, setActive] = useState('dashboard');
   const [quick, setQuick] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(
@@ -39,6 +41,19 @@ export function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [view]);
+  useEffect(() => {
+    if (!hasAuthTokens()) return;
+    onboardingApi
+      .get()
+      .then((progress) => {
+        const complete = Boolean(progress.onboardingCompletedAt);
+        setOnboardingComplete(complete);
+        localStorage.setItem('cephas:onboarding-complete', String(complete));
+      })
+      .catch((caught) => {
+        if (caught instanceof ApiError && caught.status === 401) setView('login');
+      });
+  }, []);
   const navigate = (id: string) => {
     setActive(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -65,7 +80,14 @@ export function App() {
     );
   const content = (() => {
     if (active === 'dashboard')
-      return <DashboardPage onNavigate={navigate} onCreate={() => setQuick(true)} />;
+      return (
+        <DashboardPage
+          onNavigate={navigate}
+          onCreate={() => setQuick(true)}
+          onboardingComplete={onboardingComplete}
+          onResumeOnboarding={() => setView('onboarding')}
+        />
+      );
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
     if (active === 'banking' || active === 'transactions') return <BankingPage />;
     if (active === 'reconciliation') return <BankingPage reconciliation />;
@@ -75,7 +97,15 @@ export function App() {
     if (active === 'ai-assistant') return <AIAssistantPage />;
     if (active === 'users') return <UsersPage />;
     if (active === 'notifications') return <NotificationsPage />;
-    if (active === 'profile') return <ProfilePage onLogout={() => setView('landing')} />;
+    if (active === 'profile')
+      return (
+        <ProfilePage
+          onLogout={() => {
+            clearAuthTokens();
+            setView('landing');
+          }}
+        />
+      );
     if (['settings', 'security', 'integrations', 'branches', 'currencies'].includes(active))
       return (
         <SettingsPage

@@ -21,9 +21,13 @@ import { confirmAction } from '@/utils/actions';
 export function DashboardPage({
   onNavigate,
   onCreate,
+  onboardingComplete,
+  onResumeOnboarding,
 }: {
   onNavigate: (id: string) => void;
   onCreate: () => void;
+  onboardingComplete: boolean;
+  onResumeOnboarding: () => void;
 }) {
   const [period, setPeriod] = useState('This month');
   const [chartRange, setChartRange] = useState('Last 6 months');
@@ -43,6 +47,17 @@ export function DashboardPage({
   ];
   return (
     <>
+      {!onboardingComplete && (
+        <div className="onboarding-resume">
+          <div>
+            <strong>Finish setting up your organisation</strong>
+            <p>Your progress is saved. Continue from the next incomplete setup step anytime.</p>
+          </div>
+          <button className="button" onClick={onResumeOnboarding}>
+            Resume setup
+          </button>
+        </div>
+      )}
       <div className="dashboard-heading">
         <div>
           <p>{today}</p>
@@ -125,8 +140,13 @@ export function DashboardPage({
         <div className="dashboard-feature-grid">
           {bankingFeatures.map(([title, description, id, Icon]) => (
             <button key={title} onClick={() => onNavigate(id)}>
-              <i><Icon size={19} /></i>
-              <span><strong>{title}</strong><small>{description}</small></span>
+              <i>
+                <Icon size={19} />
+              </i>
+              <span>
+                <strong>{title}</strong>
+                <small>{description}</small>
+              </span>
               <ChevronDown className="feature-arrow" size={16} />
             </button>
           ))}
