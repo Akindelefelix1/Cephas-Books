@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Download, Plus, RefreshCw } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { bankingApi, type BankAccount } from '@/services/banking';
 import {
@@ -27,6 +28,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
   const canEdit = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role),
     canRequest = canEdit || role === 'MEMBER',
     canApprove = canEdit || role === 'APPROVER',
+    canDelete = ['OWNER', 'ADMIN'].includes(role),
     allowedCreate =
       view === 'purchase-requests' ? canRequest : view === 'expenses' ? canRequest : canEdit;
   const [rows, setRows] = useState<(PurchaseRow | Supplier)[]>([]),
@@ -41,7 +43,8 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [modal, setModal] = useState(false),
-    [selected, setSelected] = useState<Supplier | null>(null);
+    [selected, setSelected] = useState<Supplier | null>(null),
+    [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -96,8 +99,10 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
       setSelected(null);
       confirmAction(msg);
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to save record');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -195,7 +200,21 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
                             r,
                             canEdit,
                             canApprove,
-                            (f, m) => void run(f, m),
+                            canDelete,
+                            (f, m) => {
+                              setError('');
+                              setConfirmation({
+                                title: 'Confirm action',
+                                message:
+                                  'Please confirm this workflow action. Related purchase, payable, expense, or banking records may be updated.',
+                                confirmLabel: m,
+                                requireText: /permanently/.test(m.toLowerCase())
+                                  ? 'DELETE'
+                                  : undefined,
+                                onConfirm: () =>
+                                  void run(f, m).then((ok) => ok && setConfirmation(null)),
+                              });
+                            },
                             () => {
                               if (view === 'suppliers') {
                                 setSelected(r as Supplier);
@@ -244,6 +263,13 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
             `${titles[view]} saved`,
           )
         }
+      />
+      <ConfirmModal
+        key={confirmation?.title}
+        confirmation={confirmation}
+        busy={busy}
+        error={error}
+        onClose={() => setConfirmation(null)}
       />
     </>
   );
@@ -341,6 +367,7 @@ function rowActions(
   r: PurchaseRow | Supplier,
   edit: boolean,
   approve: boolean,
+  canDelete: boolean,
   run: (f: () => Promise<unknown>, m: string) => void,
   onEdit: () => void,
 ) {
@@ -355,6 +382,24 @@ function rowActions(
           >
             Archive
           </button>
+        )}
+        {!(r as Supplier).isActive && (
+          <>
+            <button
+              onClick={() => run(() => purchasesApi.restoreSupplier(r.id), 'Supplier restored')}
+            >
+              Restore
+            </button>
+            {canDelete && (
+              <button
+                onClick={() =>
+                  run(() => purchasesApi.deleteSupplier(r.id), 'Supplier permanently deleted')
+                }
+              >
+                Delete permanently
+              </button>
+            )}
+          </>
         )}
       </>
     );

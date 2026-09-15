@@ -65,6 +65,12 @@ export const purchasesApi = {
   updateSupplier: (id: string, d: object) => post(`/purchases/suppliers/${id}`, d, 'PATCH'),
   archiveSupplier: (id: string) =>
     authorizedRequest(`/purchases/suppliers/${id}`, { method: 'DELETE' }),
+  deleteSupplier: (id: string) =>
+    authorizedRequest<{ deleted: true }>(`/purchases/suppliers/${id}/permanent`, {
+      method: 'DELETE',
+    }),
+  restoreSupplier: (id: string) =>
+    authorizedRequest<Supplier>(`/purchases/suppliers/${id}/restore`, { method: 'PATCH' }),
   list: (view: PurchaseView, s = '', status = '') =>
     authorizedRequest<PurchaseRow[]>(
       `/purchases/${view === 'purchase-requests' ? 'requests' : view === 'purchase-orders' ? 'orders' : view === 'supplier-payments' ? 'payments' : view}?${query(s, status)}`,

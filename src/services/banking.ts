@@ -55,7 +55,8 @@ const query = (filters: TransactionFilters = {}) => {
 };
 export const bankingApi = {
   summary: () => authorizedRequest<BankingSummary>('/banking/summary'),
-  accounts: () => authorizedRequest<BankAccount[]>('/banking/accounts'),
+  accounts: (includeArchived = false) =>
+    authorizedRequest<BankAccount[]>(`/banking/accounts?includeArchived=${includeArchived}`),
   createAccount: (data: {
     name: string;
     bankName?: string;
@@ -78,6 +79,8 @@ export const bankingApi = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
+  deleteAccount: (id: string) =>
+    authorizedRequest<{ deleted: true }>(`/banking/accounts/${id}`, { method: 'DELETE' }),
   transactions: (filters: TransactionFilters = {}) =>
     authorizedRequest<{
       data: BankTransaction[];

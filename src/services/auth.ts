@@ -137,7 +137,7 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
     fetch(`${API_BASE_URL}/v1${path}`, {
       ...init,
       headers: {
-        'Content-Type': 'application/json',
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
         Authorization: `Bearer ${accessToken}`,
         ...init.headers,
       },

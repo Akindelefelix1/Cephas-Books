@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { Download, MoreHorizontal, Plus, RefreshCw, Upload } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { ApiError } from '@/services/auth';
 import {
@@ -49,13 +50,15 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
   >(null);
   const [selected, setSelected] = useState<BankAccount | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const [nextAccounts, nextSummary, nextTransactions] = await Promise.all([
-        bankingApi.accounts(),
+        bankingApi.accounts(true),
         bankingApi.summary(),
         bankingApi.transactions(filters),
       ]);
@@ -83,8 +86,10 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
       setFile(null);
       confirmAction(message);
       await load();
+      return true;
     } catch (e) {
       setError(errorMessage(e));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -112,6 +117,8 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
       : view === 'transactions'
         ? 'Track every cash movement across your accounts.'
         : 'Review and resolve unreconciled bank transactions.';
+  const activeAccounts = accounts.filter((account) => account.isActive);
+  const visibleAccounts = showArchived ? accounts : activeAccounts;
 
   return (
     <>
@@ -137,14 +144,14 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
             <>
               <button
                 className="button button--secondary"
-                disabled={accounts.length < 2}
+                disabled={activeAccounts.length < 2}
                 onClick={() => setModal('transfer')}
               >
                 Transfer funds
               </button>
               <button
                 className="button"
-                disabled={!accounts.length}
+                disabled={!activeAccounts.length}
                 onClick={() => setModal('transaction')}
               >
                 <Plus size={17} /> Add transaction
@@ -154,7 +161,7 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
           {canManage && view === 'reconciliation' && (
             <button
               className="button"
-              disabled={!accounts.length}
+              disabled={!activeAccounts.length}
               onClick={() => setModal('import')}
             >
               <Upload size={17} /> Import statement
@@ -183,7 +190,7 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
                   change:
                     summary.totalsByCurrency.length > 1
                       ? `${summary.totalsByCurrency.length} currencies tracked separately`
-                      : `${accounts.length} active account${accounts.length === 1 ? '' : 's'}`,
+                      : `${activeAccounts.length} active account${activeAccounts.length === 1 ? '' : 's'}`,
                 },
                 {
                   label: 'Money in',
@@ -206,46 +213,99 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
             />
           )}
           {view === 'banking' && (
-            <div className="bank-accounts">
-              {accounts.map((account, i) => (
-                <article className="bank-card" key={account.id}>
-                  <header>
-                    <span className={`bank-logo bank-logo--${i % 3}`}>
-                      {account.name.slice(0, 2)}
+            <>
+              <div className="banking-filters">
+                <button
+                  className={`filter-button ${showArchived ? 'active' : ''}`}
+                  onClick={() => setShowArchived((current) => !current)}
+                >
+                  {showArchived ? 'Hide archived accounts' : 'Show archived accounts'}
+                </button>
+              </div>
+              <div className="bank-accounts">
+                {visibleAccounts.map((account, i) => (
+                  <article
+                    className={`bank-card ${account.isActive ? '' : 'is-archived'}`}
+                    key={account.id}
+                  >
+                    <header>
+                      <span className={`bank-logo bank-logo--${i % 3}`}>
+                        {account.name.slice(0, 2)}
+                      </span>
+                      {canManage && account.isActive && (
+                        <button
+                          className="icon-button"
+                          aria-label={`Edit ${account.name}`}
+                          onClick={() => {
+                            setSelected(account);
+                            setModal('edit');
+                          }}
+                        >
+                          <MoreHorizontal />
+                        </button>
+                      )}
+                    </header>
+                    <p>
+                      {account.name}{' '}
+                      <small>
+                        {account.accountNumberLast4
+                          ? `•••• ${account.accountNumberLast4}`
+                          : account.accountType.replace('_', ' ')}
+                      </small>
+                    </p>
+                    <strong>{money(account.currentBalance, account.currency)}</strong>
+                    <span className="bank-card-footer">
+                      <i className={account._count.transactions ? 'warning' : ''} />
+                      {!account.isActive
+                        ? 'Archived account'
+                        : account._count.transactions
+                          ? `${account._count.transactions} to reconcile`
+                          : 'Up to date'}
                     </span>
-                    {canManage && (
-                      <button
-                        className="icon-button"
-                        aria-label={`Edit ${account.name}`}
-                        onClick={() => {
-                          setSelected(account);
-                          setModal('edit');
-                        }}
-                      >
-                        <MoreHorizontal />
-                      </button>
+                    {canManage && !account.isActive && (
+                      <div className="inline-actions">
+                        <button
+                          onClick={() =>
+                            setConfirmation({
+                              title: 'Restore bank account?',
+                              message: `${account.name} will become available for transactions and payments again.`,
+                              confirmLabel: 'Restore account',
+                              onConfirm: () =>
+                                void submit(
+                                  () => bankingApi.updateAccount(account.id, { isActive: true }),
+                                  'Bank account restored',
+                                ).then((ok) => ok && setConfirmation(null)),
+                            })
+                          }
+                        >
+                          Restore
+                        </button>
+                        <button
+                          onClick={() =>
+                            setConfirmation({
+                              title: 'Permanently delete bank account?',
+                              message:
+                                'This cannot be undone. Accounts with any financial history are protected and cannot be deleted.',
+                              confirmLabel: 'Delete permanently',
+                              requireText: 'DELETE',
+                              onConfirm: () =>
+                                void submit(
+                                  () => bankingApi.deleteAccount(account.id),
+                                  'Bank account permanently deleted',
+                                ).then((ok) => ok && setConfirmation(null)),
+                            })
+                          }
+                        >
+                          Delete permanently
+                        </button>
+                      </div>
                     )}
-                  </header>
-                  <p>
-                    {account.name}{' '}
-                    <small>
-                      {account.accountNumberLast4
-                        ? `•••• ${account.accountNumberLast4}`
-                        : account.accountType.replace('_', ' ')}
-                    </small>
-                  </p>
-                  <strong>{money(account.currentBalance, account.currency)}</strong>
-                  <span className="bank-card-footer">
-                    <i className={account._count.transactions ? 'warning' : ''} />
-                    {account._count.transactions
-                      ? `${account._count.transactions} to reconcile`
-                      : 'Up to date'}
-                  </span>
-                </article>
-              ))}
-            </div>
+                  </article>
+                ))}
+              </div>
+            </>
           )}
-          {view === 'banking' && !accounts.length && (
+          {view === 'banking' && !visibleAccounts.length && (
             <Empty
               text="No bank accounts yet. Add your first account to start tracking cash."
               action={canManage ? 'Add bank account' : undefined}
@@ -261,15 +321,36 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
               setFilters={setFilters}
               reconciliation={view === 'reconciliation'}
               canManage={canManage}
-              onStatus={(id, status) =>
-                void submit(
-                  () => bankingApi.reconcile(id, status),
-                  status === 'RECONCILED' ? 'Transaction reconciled' : 'Transaction excluded',
-                )
-              }
-              onReverse={(id) =>
-                void submit(() => bankingApi.reverseTransaction(id), 'Transaction reversed')
-              }
+              onStatus={(id, status) => {
+                const reconcile = status === 'RECONCILED';
+                setError('');
+                setConfirmation({
+                  title: reconcile ? 'Reconcile transaction?' : 'Exclude transaction?',
+                  message: reconcile
+                    ? 'This transaction will be marked as reconciled and removed from the outstanding reconciliation queue.'
+                    : 'This transaction will be excluded from reconciliation. Its financial value will remain in the account.',
+                  confirmLabel: reconcile ? 'Reconcile transaction' : 'Exclude transaction',
+                  onConfirm: () =>
+                    void submit(
+                      () => bankingApi.reconcile(id, status),
+                      reconcile ? 'Transaction reconciled' : 'Transaction excluded',
+                    ).then((ok) => ok && setConfirmation(null)),
+                });
+              }}
+              onReverse={(id) => {
+                setError('');
+                setConfirmation({
+                  title: 'Reverse transaction?',
+                  message:
+                    'The transaction will be marked reversed and the account balance recalculated.',
+                  confirmLabel: 'Reverse transaction',
+                  onConfirm: () =>
+                    void submit(
+                      () => bankingApi.reverseTransaction(id),
+                      'Transaction reversed',
+                    ).then((ok) => ok && setConfirmation(null)),
+                });
+              }}
             />
           )}
         </>
@@ -280,13 +361,20 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
         busy={busy}
         error={error}
         onClose={() => setModal(null)}
-        onArchive={() =>
-          selected &&
-          void submit(
-            () => bankingApi.updateAccount(selected.id, { isActive: false }),
-            'Bank account archived',
-          )
-        }
+        onArchive={() => {
+          if (!selected) return;
+          setModal(null);
+          setConfirmation({
+            title: 'Archive bank account?',
+            message: `${selected.name} will be hidden from new transactions, transfers and payments. Its history and balance will remain available.`,
+            confirmLabel: 'Archive account',
+            onConfirm: () =>
+              void submit(
+                () => bankingApi.updateAccount(selected.id, { isActive: false }),
+                'Bank account archived',
+              ).then((ok) => ok && setConfirmation(null)),
+          });
+        }}
         onSubmit={(data) =>
           void submit(
             () =>
@@ -304,7 +392,7 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
       />
       <TransactionModal
         open={modal === 'transaction'}
-        accounts={accounts}
+        accounts={activeAccounts}
         busy={busy}
         error={error}
         onClose={() => setModal(null)}
@@ -314,7 +402,7 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
       />
       <TransferModal
         open={modal === 'transfer'}
-        accounts={accounts}
+        accounts={activeAccounts}
         busy={busy}
         error={error}
         onClose={() => setModal(null)}
@@ -353,7 +441,7 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
               <option value="" disabled>
                 Select account
               </option>
-              {accounts.map((a) => (
+              {activeAccounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
@@ -372,6 +460,13 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
           {error && <p className="form-error full">{error}</p>}
         </form>
       </Modal>
+      <ConfirmModal
+        key={confirmation?.title}
+        confirmation={confirmation}
+        busy={busy}
+        error={error}
+        onClose={() => setConfirmation(null)}
+      />
     </>
   );
 }
@@ -380,7 +475,11 @@ function Empty({ text, action, onClick }: { text: string; action?: string; onCli
   return (
     <div className="banking-state">
       <strong>{text}</strong>
-      {action && onClick && <button className="button" onClick={onClick}>{action}</button>}
+      {action && onClick && (
+        <button className="button" onClick={onClick}>
+          {action}
+        </button>
+      )}
     </div>
   );
 }
@@ -480,21 +579,23 @@ function TransactionPanel({
                 <td className="is-right">
                   {row.type === 'MONEY_OUT' ? money(row.amount, row.bankAccount.currency) : '—'}
                 </td>
-                {canManage && <td>
-                  <span className="banking-status">{row.reconciliationStatus.toLowerCase()}</span>
-                </td>}
                 <td>
-                  <div className="inline-actions">
-                    {reconciliation ? (
-                      <>
-                        <button onClick={() => onStatus(row.id, 'RECONCILED')}>Reconcile</button>
-                        <button onClick={() => onStatus(row.id, 'EXCLUDED')}>Exclude</button>
-                      </>
-                    ) : (
-                      <button onClick={() => onReverse(row.id)}>Reverse</button>
-                    )}
-                  </div>
+                  <span className="banking-status">{row.reconciliationStatus.toLowerCase()}</span>
                 </td>
+                {canManage && (
+                  <td>
+                    <div className="inline-actions">
+                      {reconciliation ? (
+                        <>
+                          <button onClick={() => onStatus(row.id, 'RECONCILED')}>Reconcile</button>
+                          <button onClick={() => onStatus(row.id, 'EXCLUDED')}>Exclude</button>
+                        </>
+                      ) : (
+                        <button onClick={() => onReverse(row.id)}>Reverse</button>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
             {!rows.length && (

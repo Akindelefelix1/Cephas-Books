@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Download, Plus, RefreshCw } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import {
   salesApi,
@@ -29,7 +30,8 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [modal, setModal] = useState(false),
-    [selected, setSelected] = useState<Customer | null>(null);
+    [selected, setSelected] = useState<Customer | null>(null),
+    [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -81,8 +83,10 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
       setSelected(null);
       confirmAction(message);
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to save record');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -201,7 +205,17 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                           {actions(
                             view,
                             r,
-                            (op, msg) => void run(op, msg),
+                            (op, msg) => {
+                              setError('');
+                              setConfirmation({
+                                title: 'Confirm action',
+                                message:
+                                  'Please confirm this workflow action. Related documents, balances, or statuses may be updated.',
+                                confirmLabel: msg,
+                                onConfirm: () =>
+                                  void run(op, msg).then((ok) => ok && setConfirmation(null)),
+                              });
+                            },
                             () => {
                               if (view === 'customers') {
                                 setSelected(r as Customer);
@@ -216,10 +230,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                 ))}
                 {!rows.length && (
                   <tr>
-                    <td
-                      className="table-empty"
-                      colSpan={columns(view).length + (canEdit ? 1 : 0)}
-                    >
+                    <td className="table-empty" colSpan={columns(view).length + (canEdit ? 1 : 0)}>
                       No records found.
                     </td>
                   </tr>
@@ -244,6 +255,13 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
           setSelected(null);
         }}
         submit={(data) => void run(() => create(view, data, selected), `${title[view]} saved`)}
+      />
+      <ConfirmModal
+        key={confirmation?.title}
+        confirmation={confirmation}
+        busy={busy}
+        error={error}
+        onClose={() => setConfirmation(null)}
       />
     </>
   );
@@ -331,6 +349,15 @@ function actions(
         {(r as Customer).isActive && (
           <button onClick={() => run(() => salesApi.archiveCustomer(r.id), 'Customer archived')}>
             Archive
+          </button>
+        )}
+        {!(r as Customer).isActive && (
+          <button
+            onClick={() =>
+              run(() => salesApi.updateCustomer(r.id, { isActive: true }), 'Customer restored')
+            }
+          >
+            Restore
           </button>
         )}
       </>
