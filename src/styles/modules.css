@@ -563,6 +563,29 @@
 .reconcile-grid > .panel {
   padding: 19px;
 }
+
+.banking-alert {
+  align-items: center;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  color: #b42318;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 13px 16px;
+}
+.banking-alert button { background: transparent; border: 0; color: inherit; cursor: pointer; font-weight: 700; text-decoration: underline; }
+.banking-state { align-items: center; background: #fff; border: 1px dashed #cbd5e1; border-radius: 16px; color: #64748b; display: flex; flex-direction: column; gap: 14px; justify-content: center; min-height: 180px; padding: 28px; text-align: center; }
+.banking-filters { display: grid; gap: 10px; grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(140px, 1fr)); padding: 16px 20px; }
+.banking-filters input, .banking-filters select { background: #fff; border: 1px solid #d7deeb; border-radius: 9px; color: #0f172a; min-width: 0; padding: 11px 12px; }
+.banking-status { background: #eef2ff; border-radius: 999px; color: #3346c8; display: inline-block; font-size: 12px; font-weight: 700; padding: 5px 9px; text-transform: capitalize; }
+.inline-actions { display: flex; gap: 7px; }
+.inline-actions button { background: #fff; border: 1px solid #ccd5e5; border-radius: 7px; color: #1736c8; cursor: pointer; font-weight: 700; padding: 7px 9px; }
+.spin { animation: banking-spin 1s linear infinite; }
+@keyframes banking-spin { to { transform: rotate(360deg); } }
+@media (max-width: 1050px) { .banking-filters { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .banking-filters { grid-template-columns: 1fr; } .banking-alert { align-items: flex-start; gap: 8px; } }
 .match-row {
   display: grid;
   grid-template-columns: auto 1fr auto 110px;

@@ -20,10 +20,10 @@ import { getFallbackModule } from '@/data/fallbackModules';
 import {
   AccountingPage,
   AIAssistantPage,
-  BankingPage,
   ReportsPage,
   SimpleFeaturePage,
 } from '@/pages/SpecialPages';
+import { BankingPage } from '@/pages/BankingPage';
 import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
@@ -101,13 +101,12 @@ export function App() {
           onCreate={() => setQuick(true)}
           onboardingComplete={onboardingComplete}
           onResumeOnboarding={() => setView('onboarding')}
-          firstName={identity.firstName}
           companyName={identity.companyName}
         />
       );
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
-    if (active === 'banking' || active === 'transactions') return <BankingPage />;
-    if (active === 'reconciliation') return <BankingPage reconciliation />;
+    if (active === 'banking' || active === 'transactions' || active === 'reconciliation')
+      return <BankingPage key={active} view={active} role={identity.role} />;
     if (['chart-of-accounts', 'journals', 'general-ledger', 'trial-balance'].includes(active))
       return <AccountingPage type={active} />;
     if (active === 'reports') return <ReportsPage />;

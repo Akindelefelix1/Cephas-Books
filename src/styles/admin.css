@@ -466,13 +466,13 @@
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   padding: 1.35rem 1.5rem 1.35rem 5rem;
-  border: 1px solid #88a5ff;
-  border-left: 5px solid #173bd1;
+  border: 1px solid #fdba74;
+  border-left: 5px solid #dc2626;
   border-radius: 16px;
   background:
-    radial-gradient(circle at 88% -40%, rgb(0 186 255 / 24%), transparent 42%),
-    linear-gradient(110deg, #eef3ff 0%, #f5fbff 65%, #e9f5ff 100%);
-  box-shadow: 0 12px 30px rgb(23 59 209 / 12%);
+    radial-gradient(circle at 88% -40%, rgb(239 68 68 / 24%), transparent 42%),
+    linear-gradient(110deg, #fff7ed 0%, #fff1e8 58%, #fee2e2 100%);
+  box-shadow: 0 12px 30px rgb(220 38 38 / 13%);
   position: relative;
   overflow: hidden;
 }
@@ -486,21 +486,21 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: linear-gradient(135deg, #173bd1, #00aeea);
-  box-shadow: 0 7px 16px rgb(23 59 209 / 28%);
+  background: linear-gradient(135deg, #f97316, #dc2626);
+  box-shadow: 0 7px 16px rgb(220 38 38 / 28%);
   color: #fff;
   font-size: 1.25rem;
   font-weight: 800;
 }
 
 .onboarding-resume strong {
-  color: #0b1b4d;
+  color: #7f1d1d;
   font-size: 1rem;
 }
 
 .onboarding-resume p {
   margin: 0.4rem 0 0;
-  color: #52617d;
+  color: #7c4a3a;
   line-height: 1.5;
 }
 
@@ -508,8 +508,8 @@
   flex: 0 0 auto;
   min-width: 150px;
   border: 0;
-  background: linear-gradient(135deg, #173bd1, #0758ec);
-  box-shadow: 0 8px 20px rgb(23 59 209 / 28%);
+  background: linear-gradient(135deg, #f97316, #dc2626);
+  box-shadow: 0 8px 20px rgb(220 38 38 / 28%);
   transition:
     transform 160ms ease,
     box-shadow 160ms ease;
@@ -517,7 +517,7 @@
 
 .onboarding-resume .button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 11px 24px rgb(23 59 209 / 35%);
+  box-shadow: 0 11px 24px rgb(220 38 38 / 36%);
 }
 
 @media (max-width: 700px) {

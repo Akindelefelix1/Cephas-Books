@@ -14,27 +14,53 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { confirmAction } from '@/utils/actions';
+import {
+  bankingApi,
+  type BankAccount,
+  type BankingSummary,
+  type BankTransaction,
+} from '@/services/banking';
 
 export function DashboardPage({
   onNavigate,
   onCreate,
   onboardingComplete,
   onResumeOnboarding,
-  firstName,
   companyName,
 }: {
   onNavigate: (id: string) => void;
   onCreate: () => void;
   onboardingComplete: boolean;
   onResumeOnboarding: () => void;
-  firstName: string;
   companyName: string;
 }) {
   const [period, setPeriod] = useState('This month');
   const [chartRange, setChartRange] = useState('Last 6 months');
+  const [bankSummary, setBankSummary] = useState<BankingSummary | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [recentBankTransactions, setRecentBankTransactions] = useState<BankTransaction[]>([]);
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      bankingApi.summary(),
+      bankingApi.accounts(),
+      bankingApi.transactions({ limit: 5 }),
+    ])
+      .then(([summary, accounts, transactions]) => {
+        if (active) {
+          setBankSummary(summary);
+          setBankAccounts(accounts);
+          setRecentBankTransactions(transactions.data);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
   const bankingFeatures = [
     ['Bank accounts', 'Balances and account details', 'banking', Landmark],
     ['Transactions', 'Review money in and out', 'transactions', CreditCard],
@@ -45,14 +71,12 @@ export function DashboardPage({
   const hour = new Date().getHours();
   const dayPeriod = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
   const displayCompany = companyName || 'your company';
-  const displayName = firstName || displayCompany;
-  const transactions = [
-    ['INV-00245', 'Apex Retail Limited', 'Invoice', '₦2,500,000', 'Partially paid'],
-    ['PAY-00831', 'Northstar Schools', 'Payment', '₦1,280,000', 'Paid'],
-    ['EXP-00194', 'Meta Platforms', 'Marketing', '−₦420,000', 'Approved'],
-    ['BILL-00482', 'Cloud Systems Ltd', 'Software', '−₦680,000', 'Pending'],
-    ['TRF-00072', 'GTBank → Access Bank', 'Transfer', '−₦2,000,000', 'Completed'],
-  ];
+  const formatMoney = (value: string, currency: string) =>
+    new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    }).format(Number(value));
   return (
     <>
       {!onboardingComplete && (
@@ -70,7 +94,7 @@ export function DashboardPage({
         <div>
           <p>{today}</p>
           <h1>
-            Good {dayPeriod}, {displayName}.
+            Good {dayPeriod}, {displayCompany}.
           </h1>
           <span>Here’s how {displayCompany} is performing.</span>
         </div>
@@ -250,23 +274,21 @@ export function DashboardPage({
           </header>
           <div className="cash-total">
             <span>Available cash</span>
-            <strong>₦26,945,200</strong>
+            <strong>
+              {bankSummary ? formatMoney(bankSummary.totalCash, bankSummary.baseCurrency) : '—'}
+            </strong>
             <small>
               <ArrowUpRight size={14} /> ₦2.4m this month
             </small>
           </div>
-          {[
-            ['GTBank Current', '₦18,450,200'],
-            ['Access Operations', '₦6,820,000'],
-            ['Petty Cash', '₦1,675,000'],
-          ].map((account, index) => (
-            <div className="account-row" key={account[0]}>
+          {bankAccounts.slice(0, 3).map((account, index) => (
+            <div className="account-row" key={account.id}>
               <i className={`account-marker account-marker--${index + 1}`} />
               <span>
-                <strong>{account[0]}</strong>
-                <small>NGN account</small>
+                <strong>{account.name}</strong>
+                <small>{account.currency} account</small>
               </span>
-              <b>{account[1]}</b>
+              <b>{formatMoney(account.currentBalance, account.currency)}</b>
             </div>
           ))}
           <button className="panel-link" onClick={() => onNavigate('banking')}>
@@ -392,10 +414,10 @@ export function DashboardPage({
           </div>
           <div className="budget-values">
             <span>
-              Spent <b>â‚¦18.4m</b>
+              Spent <b>₦18.4m</b>
             </span>
             <span>
-              Remaining <b>â‚¦8.6m</b>
+              Remaining <b>₦8.6m</b>
             </span>
           </div>
           <small className="budget-status">On track · 14 days remaining</small>
@@ -411,21 +433,22 @@ export function DashboardPage({
             </button>
           </header>
           <div className="activity-list">
-            {transactions.map((t) => (
-              <div key={t[0]}>
-                <i
-                  className={t[2] === 'Payment' ? 'is-green' : t[3].startsWith('−') ? 'is-red' : ''}
-                >
-                  {t[2] === 'Payment' ? <CreditCard /> : <ReceiptText />}
+            {recentBankTransactions.map((transaction) => (
+              <div key={transaction.id}>
+                <i className={transaction.type === 'MONEY_IN' ? 'is-green' : 'is-red'}>
+                  {transaction.type === 'MONEY_IN' ? <CreditCard /> : <ReceiptText />}
                 </i>
                 <span>
-                  <strong>{t[1]}</strong>
+                  <strong>{transaction.description}</strong>
                   <small>
-                    {t[0]} · {t[2]}
+                    {transaction.reference || 'No reference'} · {transaction.bankAccount.name}
                   </small>
                 </span>
-                <b>{t[3]}</b>
-                <Badge>{t[4]}</Badge>
+                <b>
+                  {transaction.type === 'MONEY_OUT' ? '−' : '+'}
+                  {formatMoney(transaction.amount, transaction.bankAccount.currency)}
+                </b>
+                <Badge>{transaction.reconciliationStatus.toLowerCase()}</Badge>
               </div>
             ))}
           </div>

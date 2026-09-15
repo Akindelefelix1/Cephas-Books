@@ -849,10 +849,10 @@ function SetupFields({ step, data }: { step: number; data: SetupData }) {
         <label>
           Base currency
           <select name="baseCurrency" defaultValue={data.baseCurrency ?? 'NGN'}>
-            <option value="NGN">NGN â€” Nigerian Naira</option>
-            <option value="USD">USD â€” US Dollar</option>
-            <option value="GBP">GBP â€” British Pound</option>
-            <option value="GHS">GHS â€” Ghanaian Cedi</option>
+            <option value="NGN">₦ NGN — Nigerian Naira</option>
+            <option value="USD">$ USD — US Dollar</option>
+            <option value="GBP">£ GBP — British Pound</option>
+            <option value="GHS">₵ GHS — Ghanaian Cedi</option>
           </select>
         </label>
         <label>
