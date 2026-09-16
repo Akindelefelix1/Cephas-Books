@@ -15,7 +15,7 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { ModulePage } from '@/pages/ModulePage';
 import { modules } from '@/data/modules';
 import { getFallbackModule } from '@/data/fallbackModules';
-import { AIAssistantPage, ReportsPage, SimpleFeaturePage } from '@/pages/SpecialPages';
+import { SimpleFeaturePage } from '@/pages/SpecialPages';
 import { BankingPage } from '@/pages/BankingPage';
 import { SalesIncomePage } from '@/pages/SalesIncomePage';
 import { PurchasesSpendingPage } from '@/pages/PurchasesSpendingPage';
@@ -24,6 +24,8 @@ import { InventoryOperationsPage } from '@/pages/InventoryOperationsPage';
 import type { AccountingView } from '@/services/accounting';
 import type { PurchaseView } from '@/services/purchases';
 import type { OperationsView } from '@/services/operations';
+import type { InsightsView } from '@/services/insights';
+import { InsightsAutomationPage } from '@/pages/InsightsAutomationPage';
 import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
@@ -200,8 +202,8 @@ export function App() {
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
     if (active === 'banking' || active === 'transactions' || active === 'reconciliation')
       return <BankingPage key={active} view={active} role={identity.role} />;
-    if (active === 'reports') return <ReportsPage />;
-    if (active === 'ai-assistant') return <AIAssistantPage />;
+    if (['reports', 'custom-reports', 'analytics', 'ai-assistant', 'excel-sync'].includes(active))
+      return <InsightsAutomationPage key={active} view={active as InsightsView} role={identity.role} />;
     if (active === 'users') return <UsersPage />;
     if (active === 'notifications') return <NotificationsPage />;
     if (active === 'profile')
@@ -228,9 +230,7 @@ export function App() {
         'approvals',
         'documents',
         'audit-logs',
-        'excel-sync',
         'workflows',
-        'custom-reports',
       ].includes(active)
     )
       return <SimpleFeaturePage type={active === 'audit-logs' ? 'audit' : active} />;
