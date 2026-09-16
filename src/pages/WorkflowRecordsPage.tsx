@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Bell, Download, FileText, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Bell, Download, FileText, Play, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction } from '@/utils/actions';
 import {
   workflowApi,
@@ -170,10 +171,7 @@ export function WorkflowRecordsPage({ view, role }: { view: WorkflowView; role: 
           </div>
         )}
         {loading ? (
-          <div className="banking-state">
-            <RefreshCw className="spin" />
-            Loading records…
-          </div>
+          <LoadingState label="Loading workflow records…" />
         ) : (
           <RecordsTable
             view={view}

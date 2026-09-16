@@ -6,10 +6,11 @@ import {
   type FormEvent,
   type SetStateAction,
 } from 'react';
-import { Download, MoreHorizontal, Plus, RefreshCw, Upload } from 'lucide-react';
+import { Download, MoreHorizontal, Plus, Upload } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiError } from '@/services/auth';
 import {
   bankingApi,
@@ -190,9 +191,7 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
         </div>
       )}
       {loading ? (
-        <div className="banking-state">
-          <RefreshCw className="spin" /> Loading banking data…
-        </div>
+        <LoadingState label="Loading banking data…" />
       ) : (
         <>
           {summary && (

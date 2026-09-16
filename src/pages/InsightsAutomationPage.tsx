@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Bot, Download, Plus, RefreshCw, Send, Sparkles, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
 import {
   insightsApi,
@@ -114,9 +115,7 @@ function ReportingPage({ analytics }: { analytics: boolean }) {
         )}
       </section>
       {loading ? (
-        <div className="banking-state">
-          <RefreshCw className="spin" /> Loading insights…
-        </div>
+        <LoadingState label="Loading insights…" />
       ) : (
         data && (
           <>
@@ -294,9 +293,7 @@ function SavedReportsPage({ canEdit, canDelete }: { canEdit: boolean; canDelete:
           </div>
         )}
         {loading ? (
-          <div className="banking-state">
-            <RefreshCw className="spin" /> Loading…
-          </div>
+          <LoadingState label="Loading saved reports…" />
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">
@@ -611,9 +608,7 @@ function AiPage({ canManage }: { canManage: boolean }) {
         </div>
       </section>
       {loading ? (
-        <div className="banking-state">
-          <RefreshCw className="spin" /> Loading…
-        </div>
+        <LoadingState label="Loading Cephas AI history…" />
       ) : (
         <section className="panel cephas-ai-history">
           <div className="cephas-ai-history__heading">
@@ -700,9 +695,7 @@ function SyncPage({ canEdit, canDelete }: { canEdit: boolean; canDelete: boolean
           </div>
         )}
         {loading ? (
-          <div className="banking-state">
-            <RefreshCw className="spin" /> Loading…
-          </div>
+          <LoadingState label="Loading data connections…" />
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">

@@ -1,10 +1,18 @@
-import { useEffect, useState, type PropsWithChildren } from 'react';
-import { Bell, ChevronDown, ChevronRight, Command, Menu, Plus, Search, X } from 'lucide-react';
+import { useState, type PropsWithChildren } from 'react';
+import {
+  Bell,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Command,
+  Menu,
+  Plus,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { allNavigation, primaryNavigation, secondaryNavigation } from '@/data/navigation';
-import { salesApi } from '@/services/sales';
-import { bankingApi } from '@/services/banking';
-import { workflowApi } from '@/services/workflow';
 
 interface AppShellProps extends PropsWithChildren {
   active: string;
@@ -22,97 +30,22 @@ interface AppShellProps extends PropsWithChildren {
 
 export function AppShell({ active, onNavigate, onQuickCreate, identity, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarTheme, setSidebarTheme] = useState<SidebarTheme>(() => {
+    const savedTheme = localStorage.getItem('cephas:sidebar-theme');
+    return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'default';
+  });
   const activeParent = allNavigation.find((item) =>
     item.children?.some((child) => child.id === active),
   )?.id;
   const [expanded, setExpanded] = useState<string | null>(activeParent ?? null);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [searchResults, setSearchResults] = useState<
-    Array<{ type: string; title: string; meta: string; id: string }>
-  >([]);
-  const [searching, setSearching] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const companyName = identity.companyName || 'Your company';
   const companyInitials = getInitials(companyName);
   const userName = [identity.firstName, identity.lastName].filter(Boolean).join(' ');
-  useEffect(() => {
-    let mounted = true;
-    void workflowApi
-      .summary()
-      .then((summary) => mounted && setUnreadNotifications(summary.unreadNotifications))
-      .catch(() => undefined);
-    return () => {
-      mounted = false;
-    };
-  }, [active]);
-  useEffect(() => {
-    if (!searchOpen) return;
-    let mounted = true;
-    const timer = window.setTimeout(async () => {
-      setSearching(true);
-      const [customers, invoices, accounts, transactions] = await Promise.allSettled([
-        salesApi.customers(search),
-        salesApi.invoices(),
-        bankingApi.accounts(),
-        bankingApi.transactions({ search, limit: 8 }),
-      ]);
-      if (!mounted) return;
-      const term = search.trim().toLowerCase();
-      setSearchResults(
-        [
-          ...(invoices.status === 'fulfilled'
-            ? invoices.value
-                .filter(
-                  (x) =>
-                    !term || `${x.number} ${x.customer.displayName}`.toLowerCase().includes(term),
-                )
-                .slice(0, 4)
-                .map((x) => ({
-                  type: 'Invoice',
-                  title: x.number,
-                  meta: `${x.customer.displayName} · ${x.currency} ${Number(x.total).toLocaleString()}`,
-                  id: 'invoices',
-                }))
-            : []),
-          ...(customers.status === 'fulfilled'
-            ? customers.value.data.slice(0, 4).map((x) => ({
-                type: 'Customer',
-                title: x.displayName,
-                meta: x.email || x.companyName || 'Customer record',
-                id: 'customers',
-              }))
-            : []),
-          ...(accounts.status === 'fulfilled'
-            ? accounts.value
-                .filter(
-                  (x) => !term || `${x.name} ${x.bankName ?? ''}`.toLowerCase().includes(term),
-                )
-                .slice(0, 3)
-                .map((x) => ({
-                  type: 'Account',
-                  title: x.name,
-                  meta: `${x.currency} ${Number(x.currentBalance).toLocaleString()} balance`,
-                  id: 'banking',
-                }))
-            : []),
-          ...(transactions.status === 'fulfilled'
-            ? transactions.value.data.slice(0, 4).map((x) => ({
-                type: 'Transaction',
-                title: x.description,
-                meta: `${x.reference || 'No reference'} · ${x.bankAccount.name}`,
-                id: 'transactions',
-              }))
-            : []),
-        ].slice(0, 10),
-      );
-      setSearching(false);
-    }, 250);
-    return () => {
-      mounted = false;
-      window.clearTimeout(timer);
-    };
-  }, [search, searchOpen]);
+  const updateSidebarTheme = (theme: SidebarTheme) => {
+    setSidebarTheme(theme);
+    localStorage.setItem('cephas:sidebar-theme', theme);
+  };
   const navigate = (id: string) => {
     const parent = allNavigation.find((item) => item.children?.some((child) => child.id === id));
     if (parent) setExpanded(parent.id);
@@ -160,7 +93,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
-      <aside className={`sidebar ${mobileOpen ? 'is-open' : ''}`}>
+      <aside className={`sidebar sidebar--${sidebarTheme} ${mobileOpen ? 'is-open' : ''}`}>
         <div className="sidebar__brand">
           <Logo />
           <button className="icon-button mobile-only" onClick={() => setMobileOpen(false)}>
@@ -177,6 +110,34 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
           <p className="nav-label">Manage</p>
           {navGroup(secondaryNavigation)}
         </nav>
+        <div className="sidebar-theme-picker">
+          <span>Background</span>
+          <div role="group" aria-label="Sidebar background colour">
+            {SIDEBAR_THEMES.map((theme) => (
+              <button
+                key={theme.id}
+                type="button"
+                className={sidebarTheme === theme.id ? 'active' : ''}
+                onClick={() => updateSidebarTheme(theme.id)}
+                aria-pressed={sidebarTheme === theme.id}
+                title={`${theme.label} sidebar`}
+              >
+                <i className={`theme-swatch theme-swatch--${theme.id}`} aria-hidden="true" />
+                <span>{theme.label}</span>
+                {sidebarTheme === theme.id && <Check size={12} aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="sidebar__plan">
+          <span>
+            <Sparkles size={15} /> Business plan
+          </span>
+          <div>
+            <i className="plan-usage" />
+          </div>
+          <small>7 of 10 seats used</small>
+        </div>
         <button className="organisation" onClick={() => navigate('settings')}>
           <span className="avatar avatar--square">{companyInitials}</span>
           <span>
@@ -213,7 +174,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
               onClick={() => navigate('notifications')}
             >
               <Bell size={19} />
-              {unreadNotifications > 0 && <i />}
+              <i />
             </button>
             <button
               className="profile"
@@ -238,39 +199,27 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
           <section className="command-palette" onMouseDown={(e) => e.stopPropagation()}>
             <div className="command-input">
               <Search size={20} />
-              <input
-                autoFocus
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={`Search anything in ${companyName}…`}
-              />
+              <input autoFocus placeholder={`Search anything in ${companyName}…`} />
               <kbd>ESC</kbd>
             </div>
-            <p className="command-label">{search ? 'Search results' : 'Recent records'}</p>
-            {searching ? (
-              <div className="command-empty">Searching…</div>
-            ) : (
-              searchResults.map((x) => (
-                <button
-                  className="search-result"
-                  key={x.title}
-                  onClick={() => {
-                    setSearchOpen(false);
-                    navigate(x.id);
-                  }}
-                >
-                  <span>{x.type.slice(0, 2)}</span>
-                  <div>
-                    <strong>{x.title}</strong>
-                    <small>{x.meta}</small>
-                  </div>
-                  <ChevronRight size={16} />
-                </button>
-              ))
-            )}
-            {!searching && !searchResults.length && (
-              <div className="command-empty">No matching records found.</div>
-            )}
+            <p className="command-label">Recent results</p>
+            {MOCK_SEARCH_RESULTS.map((x) => (
+              <button
+                className="search-result"
+                key={x.title}
+                onClick={() => {
+                  setSearchOpen(false);
+                  navigate(x.id);
+                }}
+              >
+                <span>{x.type.slice(0, 2)}</span>
+                <div>
+                  <strong>{x.title}</strong>
+                  <small>{x.meta}</small>
+                </div>
+                <ChevronRight size={16} />
+              </button>
+            ))}
             <div className="command-footer">
               <span>
                 <kbd>↑↓</kbd> Navigate
@@ -285,6 +234,25 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
     </div>
   );
 }
+
+type SidebarTheme = 'default' | 'light' | 'dark';
+
+const SIDEBAR_THEMES: { id: SidebarTheme; label: string }[] = [
+  { id: 'default', label: 'Default' },
+  { id: 'light', label: 'White' },
+  { id: 'dark', label: 'Dark' },
+];
+
+const MOCK_SEARCH_RESULTS = [
+  { type: 'Invoice', title: 'INV-00245', meta: 'Apex Retail Limited · ₦2,500,000', id: 'invoices' },
+  { type: 'Customer', title: 'Northstar Schools', meta: '₦1,280,000 outstanding', id: 'customers' },
+  {
+    type: 'Account',
+    title: '1020 · GTBank Current',
+    meta: '₦18,450,200 balance',
+    id: 'chart-of-accounts',
+  },
+];
 
 function getInitials(value: string): string {
   return value

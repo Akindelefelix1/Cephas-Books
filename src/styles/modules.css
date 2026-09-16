@@ -1197,6 +1197,96 @@
 .spin {
   animation: banking-spin 1s linear infinite;
 }
+.global-loading {
+  min-height: 230px;
+  padding: 42px 20px;
+  border: 1px solid #dfe5ef;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 50% 35%, #eaf0ff 0, transparent 38%),
+    linear-gradient(145deg, #fff, #f8faff);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  box-shadow: 0 12px 30px #14255b0a;
+}
+.global-loading__spinner {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  padding: 5px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #1233cc, #00baff, #b5c2ff, #1233cc);
+  animation: global-loader-spin 0.9s linear infinite;
+  box-shadow: 0 10px 25px #1233cc33;
+}
+.global-loading__spinner::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: #fff;
+}
+.global-loading__spinner i {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #00baff;
+  transform: translateX(-50%);
+}
+.global-loading__copy strong,
+.global-loading__copy small {
+  display: block;
+}
+.global-loading__copy strong {
+  color: #111a32;
+  font-size: 0.88rem;
+}
+.global-loading__copy small {
+  margin-top: 5px;
+  color: #7c879b;
+  font-size: 0.66rem;
+}
+.global-loading--compact {
+  min-height: 100px;
+  flex-direction: row;
+  padding: 20px;
+}
+.global-loading--compact .global-loading__spinner {
+  width: 34px;
+  height: 34px;
+  padding: 4px;
+}
+@keyframes global-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 600px) {
+  .global-loading {
+    min-height: 190px;
+    padding: 32px 16px;
+    border-radius: 12px;
+  }
+  .global-loading__spinner {
+    width: 50px;
+    height: 50px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .global-loading__spinner,
+  .spin {
+    animation-duration: 2.4s;
+  }
+}
 @keyframes banking-spin {
   to {
     transform: rotate(360deg);

@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiError, authApi, saveAuthTokens } from '@/services/auth';
 import { onboardingApi, onboardingSteps } from '@/services/onboarding';
 import { useEffect } from 'react';
@@ -700,7 +701,7 @@ export function OnboardingPage({
           </div>
           <h1>{setupHeadings[step][0]}</h1>
           <p>{setupHeadings[step][1]}</p>
-          {loading && <div className="onboarding-status">Loading your saved setup…</div>}
+          {loading && <LoadingState compact label="Loading your saved setup…" />}
           {error && (
             <div className="auth-error" role="alert">
               {error}

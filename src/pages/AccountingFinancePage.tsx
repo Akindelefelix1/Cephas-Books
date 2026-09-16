@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
+import { LoadingState } from '@/components/ui/LoadingState';
 import {
   accountingApi,
   type AccountingView,
@@ -138,9 +139,7 @@ export function AccountingFinancePage({ view, role }: { view: AccountingView; ro
           </div>
         )}
         {loading ? (
-          <div className="banking-state">
-            <RefreshCw className="spin" /> Loading…
-          </div>
+          <LoadingState label="Loading accounting and finance…" />
         ) : (
           <Table view={view} rows={rows} canEdit={canEdit} canApprove={canApprove} ask={ask} />
         )}

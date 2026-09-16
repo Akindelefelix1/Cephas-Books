@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Download, Plus, RefreshCw } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
+import { LoadingState } from '@/components/ui/LoadingState';
 import {
   salesApi,
   type CreditNote,
@@ -192,10 +193,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
           </div>
         )}
         {loading ? (
-          <div className="banking-state">
-            <RefreshCw className="spin" />
-            Loading…
-          </div>
+          <LoadingState label="Loading sales and income…" />
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">

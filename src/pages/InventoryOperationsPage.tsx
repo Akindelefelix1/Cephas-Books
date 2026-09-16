@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Download, Plus, RefreshCw, Sparkles } from 'lucide-react';
+import { Download, Plus, Sparkles } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
 import {
   operationsApi,
@@ -175,9 +176,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
           </div>
         )}
         {loading ? (
-          <div className="banking-state">
-            <RefreshCw className="spin" /> Loading…
-          </div>
+          <LoadingState label="Loading inventory and operations…" />
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">
