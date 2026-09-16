@@ -91,7 +91,13 @@ export const authApi = {
 };
 
 const TOKEN_KEY = 'cephas:auth';
+export const AUTH_EXPIRED_EVENT = 'cephas:auth-expired';
 let refreshPromise: Promise<AuthTokens> | null = null;
+
+function expireSession(): void {
+  clearAuthTokens();
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+}
 
 export function saveAuthTokens(tokens: AuthTokens, remember: boolean): void {
   const target = remember ? localStorage : sessionStorage;
@@ -131,7 +137,10 @@ export function hasAuthTokens(): boolean {
 
 export async function authorizedRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   let tokens = getAuthTokens();
-  if (!tokens) throw new ApiError('Your session has expired. Please sign in again.', 401);
+  if (!tokens) {
+    expireSession();
+    throw new ApiError('Your session has expired. Please sign in again.', 401);
+  }
 
   const send = (accessToken: string) =>
     fetch(`${API_BASE_URL}/v1${path}`, {
@@ -153,10 +162,16 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
       saveAuthTokens(tokens, remember);
       response = await send(tokens.accessToken);
     } catch {
-      clearAuthTokens();
-      window.dispatchEvent(new Event('cephas:auth-expired'));
+      expireSession();
       throw new ApiError('Your session has expired. Please sign in again.', 401);
     }
+  }
+
+  // A successful refresh can still be rejected when the user or organisation was
+  // disabled while the session was open. Treat that as an expired session too.
+  if (response.status === 401) {
+    expireSession();
+    throw new ApiError('Your session has expired. Please sign in again.', 401);
   }
 
   const payload = (await response.json().catch(() => null)) as T | ApiErrorBody | null;
