@@ -29,16 +29,17 @@ interface AppShellProps extends PropsWithChildren {
 
 export function AppShell({ active, onNavigate, onQuickCreate, identity, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [expanded, setExpanded] = useState<string[]>([]);
+  const activeParent = allNavigation.find((item) =>
+    item.children?.some((child) => child.id === active),
+  )?.id;
+  const [expanded, setExpanded] = useState<string | null>(activeParent ?? null);
   const [searchOpen, setSearchOpen] = useState(false);
   const companyName = identity.companyName || 'Your company';
   const companyInitials = getInitials(companyName);
   const userName = [identity.firstName, identity.lastName].filter(Boolean).join(' ');
   const navigate = (id: string) => {
     const parent = allNavigation.find((item) => item.children?.some((child) => child.id === id));
-    if (parent) {
-      setExpanded((value) => (value.includes(parent.id) ? value : [...value, parent.id]));
-    }
+    if (parent) setExpanded(parent.id);
     onNavigate(id);
     setMobileOpen(false);
   };
@@ -50,23 +51,19 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
         <div className="nav-entry" key={item.id}>
           <button
             className={`nav-item ${isParentActive ? 'active' : ''}`}
-            aria-expanded={item.children ? expanded.includes(item.id) : undefined}
+            aria-expanded={item.children ? expanded === item.id : undefined}
             onClick={() =>
               item.children
-                ? setExpanded((value) =>
-                    value.includes(item.id)
-                      ? value.filter((id) => id !== item.id)
-                      : [...value, item.id],
-                  )
+                ? setExpanded((value) => (value === item.id ? null : item.id))
                 : navigate(item.id)
             }
           >
             <item.icon size={18} />
             <span>{item.label}</span>
             {item.children &&
-              (expanded.includes(item.id) ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
+              (expanded === item.id ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
           </button>
-          {item.children && expanded.includes(item.id) && (
+          {item.children && expanded === item.id && (
             <div className="subnav">
               {item.children.map((child) => (
                 <button

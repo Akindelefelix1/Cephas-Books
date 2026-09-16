@@ -16,8 +16,8 @@ import {
 } from '@/services/operations';
 
 type Row = Product | Warehouse | StockMovement | StockAdjustment | Project;
-const money = (value: string | number) =>
-  new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(value));
+const money = (value: string | number, currency = 'NGN') =>
+  new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value));
 const date = (value?: string) => (value ? new Date(value).toLocaleDateString('en-NG') : '—');
 const titles: Record<OperationsView, string> = {
   products: 'Products & services',
@@ -30,7 +30,7 @@ const titles: Record<OperationsView, string> = {
 
 export function InventoryOperationsPage({ view, role }: { view: OperationsView; role: string }) {
   const canEdit = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role);
-  const canApprove = [...(canEdit ? [role] : []), 'APPROVER'].includes(role);
+  const canApprove = canEdit || role === 'APPROVER';
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -44,6 +44,10 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   const [selected, setSelected] = useState<Row | null>(null);
 
   const load = useCallback(async () => {
+    if (view === 'project-ai') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -103,7 +107,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       [
         columns(view).join(','),
         ...rows.map((row) =>
-          values(view, row)
+          values(view, row, summary?.baseCurrency)
             .map((x) => `"${String(x).replace(/"/g, '""')}"`)
             .join(','),
         ),
@@ -130,8 +134,11 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       {summary && (
         <StatsGrid
           stats={[
-            { label: 'Inventory value', value: money(summary.inventoryValue) },
-            { label: 'Active products', value: String(summary.products) },
+            {
+              label: 'Inventory value',
+              value: money(summary.inventoryValue, summary.baseCurrency),
+            },
+            { label: 'Active items', value: String(summary.products) },
             {
               label: 'Low / out of stock',
               value: `${summary.lowStock} / ${summary.outOfStock}`,
@@ -185,7 +192,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id}>
-                    {values(view, row).map((x, index) => (
+                    {values(view, row, summary?.baseCurrency).map((x, index) => (
                       <td key={index}>{x}</td>
                     ))}
                     {(canEdit || canApprove) && (
@@ -209,7 +216,10 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
                 ))}
                 {!rows.length && (
                   <tr>
-                    <td className="table-empty" colSpan={columns(view).length + 1}>
+                    <td
+                      className="table-empty"
+                      colSpan={columns(view).length + (canEdit || canApprove ? 1 : 0)}
+                    >
                       No records found.
                     </td>
                   </tr>
@@ -248,7 +258,7 @@ function columns(view: OperationsView) {
     return ['Reference', 'Item', 'Warehouse', 'Date / quantity', 'Status'];
   return ['Code', 'Project / client', 'Owner', 'Timeline', 'Budget / actual', 'Status'];
 }
-function values(view: OperationsView, row: Row) {
+function values(view: OperationsView, row: Row, currency = 'NGN') {
   if (view === 'products') {
     const x = row as Product;
     return [
@@ -256,8 +266,8 @@ function values(view: OperationsView, row: Row) {
       x.name,
       `${x.type} · ${x.category || 'Uncategorised'}`,
       x.type === 'SERVICE'
-        ? money(x.salePrice)
-        : `${x.stockQuantity} ${x.unit} · ${money(x.stockValue)}`,
+        ? money(x.salePrice, currency)
+        : `${x.stockQuantity} ${x.unit} · ${money(x.stockValue, currency)}`,
       x.isActive ? 'ACTIVE' : 'ARCHIVED',
     ];
   }
@@ -291,7 +301,7 @@ function values(view: OperationsView, row: Row) {
     `${x.name}${x.client ? ` · ${x.client}` : ''}`,
     x.owner,
     `${date(x.startDate)} – ${date(x.endDate)}`,
-    `${money(x.budget)} / ${money(x.actualCost)}`,
+    `${money(x.budget, currency)} / ${money(x.actualCost, currency)}`,
     x.status,
   ];
 }
@@ -624,14 +634,7 @@ function OperationsModal({
             </label>
             <label className="full">
               Description
-              <textarea
-                name="description"
-                defaultValue={
-                  'description' in (p || {})
-                    ? (p as Product & { description?: string }).description
-                    : ''
-                }
-              />
+              <textarea name="description" defaultValue={p?.description} />
             </label>
           </>
         )}

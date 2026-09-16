@@ -8,6 +8,7 @@ export interface Product {
   name: string;
   type: 'PRODUCT' | 'SERVICE';
   category?: string;
+  description?: string;
   unit: string;
   salePrice: string;
   costPrice: string;
@@ -64,6 +65,7 @@ export interface Project {
   tasks: Array<{ title?: string; phase?: string; priority?: string }>;
 }
 export interface OperationsSummary {
+  baseCurrency: string;
   inventoryValue: string;
   products: number;
   warehouses: number;
