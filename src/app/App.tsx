@@ -28,7 +28,9 @@ import type { InsightsView } from '@/services/insights';
 import { InsightsAutomationPage } from '@/pages/InsightsAutomationPage';
 import { WorkflowRecordsPage } from '@/pages/WorkflowRecordsPage';
 import type { WorkflowView } from '@/services/workflow';
-import { ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
+import { ProfilePage } from '@/pages/AdminPages';
+import { OrganizationSettingsPage } from '@/pages/OrganizationSettingsPage';
+import type { OrganizationView } from '@/services/organization';
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
 import type { MarketingView } from '@/types/app';
@@ -208,7 +210,6 @@ export function App() {
       return (
         <InsightsAutomationPage key={active} view={active as InsightsView} role={identity.role} />
       );
-    if (active === 'users') return <UsersPage />;
     if (['documents', 'approvals', 'notifications', 'workflows'].includes(active))
       return (
         <WorkflowRecordsPage key={active} view={active as WorkflowView} role={identity.role} />
@@ -221,16 +222,25 @@ export function App() {
           }}
         />
       );
-    if (['settings', 'security', 'integrations', 'branches', 'currencies'].includes(active))
+    if (
+      [
+        'settings',
+        'security',
+        'integrations',
+        'branches',
+        'currencies',
+        'users',
+        'audit-logs',
+      ].includes(active)
+    )
       return (
-        <SettingsPage
-          type={active}
-          onboardingComplete={onboardingComplete}
-          onResumeOnboarding={() => setView('onboarding')}
+        <OrganizationSettingsPage
+          key={active}
+          view={active as OrganizationView}
+          role={identity.role}
         />
       );
-    if (['budgets', 'tax', 'payroll', 'audit-logs'].includes(active))
-      return <SimpleFeaturePage type={active === 'audit-logs' ? 'audit' : active} />;
+    if (['budgets', 'tax', 'payroll'].includes(active)) return <SimpleFeaturePage type={active} />;
     return <ModulePage key={active} definition={getFallbackModule(active)} />;
   })();
   return (
