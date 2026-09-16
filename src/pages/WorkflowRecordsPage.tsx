@@ -177,6 +177,7 @@ export function WorkflowRecordsPage({ view, role }: { view: WorkflowView; role: 
         ) : (
           <RecordsTable
             view={view}
+            role={role}
             rows={rows}
             busy={busy}
             canManage={canManage}
@@ -254,6 +255,7 @@ function Filters({
 
 function RecordsTable({
   view,
+  role,
   rows,
   busy,
   canManage,
@@ -263,6 +265,7 @@ function RecordsTable({
   onSelect,
 }: {
   view: WorkflowView;
+  role: string;
   rows: Array<DocumentRecord | ApprovalRequest | AppNotification | WorkflowRule>;
   busy: boolean;
   canManage: boolean;
@@ -356,6 +359,8 @@ function RecordsTable({
                   )}
                   {view === 'approvals' &&
                     canApprove &&
+                    (['OWNER', 'ADMIN'].includes(role) ||
+                      (row as ApprovalRequest).assignedRole === role) &&
                     (row as ApprovalRequest).status === 'PENDING' && (
                       <button disabled={busy} onClick={() => onSelect(row as ApprovalRequest)}>
                         Review
@@ -743,7 +748,12 @@ const RuleFields = () => (
     </label>
     <label className="form-grid__full">
       Condition
-      <input name="condition" required placeholder="e.g. amount exceeds 500000" maxLength={300} />
+      <input
+        name="condition"
+        required
+        placeholder="Always, or: amount exceeds 500000"
+        maxLength={300}
+      />
     </label>
     <label>
       Action
