@@ -708,9 +708,163 @@
   text-decoration: underline;
 }
 
+.cephas-ai-page {
+  width: min(100%, 1120px);
+  margin-inline: auto;
+}
+
+.cephas-ai-header {
+  margin-bottom: 22px;
+}
+
+.cephas-ai-composer {
+  padding: 26px;
+  overflow: hidden;
+  border-color: #dce3f2;
+  background: radial-gradient(circle at 100% 0, rgb(18 51 204 / 7%), transparent 34%), #fff;
+  box-shadow: 0 10px 30px rgb(15 23 42 / 5%);
+}
+
+.cephas-ai-composer__intro {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 20px;
+}
+
+.cephas-ai-composer__intro > span {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), #6178ea);
+  box-shadow: 0 8px 18px rgb(18 51 204 / 20%);
+}
+
+.cephas-ai-composer__intro h2,
+.cephas-ai-history__heading h2 {
+  margin: 0 0 3px;
+  color: var(--color-ink);
+  font-size: 1rem;
+}
+
+.cephas-ai-composer__intro p,
+.cephas-ai-history__heading p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.cephas-ai-form label {
+  display: grid;
+  gap: 8px;
+  color: #344054;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cephas-ai-form textarea {
+  width: 100%;
+  min-height: 118px;
+  padding: 15px 16px;
+  resize: vertical;
+  border: 1px solid #ccd5e5;
+  border-radius: 13px;
+  outline: none;
+  color: var(--color-ink);
+  background: #fbfcff;
+  font-size: 0.94rem;
+  font-weight: 500;
+  line-height: 1.55;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.cephas-ai-form textarea:focus {
+  border-color: #6178ea;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgb(18 51 204 / 9%);
+}
+
+.cephas-ai-form__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 13px;
+}
+
+.cephas-ai-form__footer small {
+  color: #8a93a6;
+  font-size: 0.72rem;
+}
+
+.cephas-ai-form__footer .button {
+  min-width: 164px;
+}
+
+.cephas-ai-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 17px;
+  border-top: 1px solid #edf0f6;
+}
+
+.cephas-ai-suggestions button {
+  padding: 8px 11px;
+  cursor: pointer;
+  border: 1px solid #dbe2ef;
+  border-radius: 999px;
+  color: #3e4b68;
+  background: #f8faff;
+  font-size: 0.72rem;
+  font-weight: 650;
+  transition: 150ms ease;
+}
+
+.cephas-ai-suggestions button:hover {
+  border-color: #aebbea;
+  color: var(--color-primary);
+  background: #eef2ff;
+  transform: translateY(-1px);
+}
+
+.cephas-ai-history {
+  margin-top: 18px;
+  padding: 8px 24px 4px;
+}
+
+.cephas-ai-history__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 0;
+  border-bottom: 1px solid #e8ecf3;
+}
+
+.cephas-ai-history__heading > span {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--color-primary);
+  background: #edf1ff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .insight-answer {
-  padding: 18px 0;
-  border-bottom: 1px solid #e4e8f1;
+  padding: 20px 0;
+  border-bottom: 1px solid #e8ecf3;
 }
 
 .insight-answer:last-child {
@@ -719,23 +873,127 @@
 
 .insight-answer header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
 }
 
 .insight-answer header svg {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border-radius: 10px;
   color: var(--color-primary);
+  background: #edf1ff;
+}
+
+.insight-answer header strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #20283b;
+  font-size: 0.84rem;
 }
 
 .insight-answer header small {
   color: var(--color-muted);
+  font-size: 0.68rem;
+  white-space: nowrap;
 }
 
 .insight-answer p {
-  margin: 10px 0 0 30px;
-  color: var(--color-muted);
-  line-height: 1.65;
+  margin: 10px 0 0 44px;
+  color: #566078;
+  font-size: 0.84rem;
+  line-height: 1.7;
+}
+
+@media (max-width: 900px) {
+  .cephas-ai-page {
+    width: 100%;
+  }
+  .cephas-ai-composer {
+    padding: 22px;
+  }
+  .cephas-ai-form textarea {
+    min-height: 106px;
+  }
+}
+
+@media (max-width: 600px) {
+  .cephas-ai-header {
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .cephas-ai-header .button {
+    width: 100%;
+  }
+  .cephas-ai-composer {
+    padding: 18px 15px;
+    border-radius: 14px;
+  }
+  .cephas-ai-composer__intro {
+    align-items: flex-start;
+    margin-bottom: 17px;
+  }
+  .cephas-ai-composer__intro > span {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+  .cephas-ai-form textarea {
+    min-height: 126px;
+    padding: 13px;
+    font-size: 0.88rem;
+  }
+  .cephas-ai-form__footer {
+    align-items: flex-end;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .cephas-ai-form__footer .button {
+    width: 100%;
+  }
+  .cephas-ai-suggestions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .cephas-ai-suggestions button {
+    min-height: 40px;
+    border-radius: 10px;
+    text-align: left;
+  }
+  .cephas-ai-history {
+    margin-top: 14px;
+    padding: 4px 15px;
+    border-radius: 14px;
+  }
+  .cephas-ai-history__heading {
+    padding: 15px 0;
+  }
+  .insight-answer {
+    padding: 17px 0;
+  }
+  .insight-answer header {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .insight-answer header svg {
+    width: 32px;
+    height: 32px;
+  }
+  .insight-answer header small {
+    grid-column: 2;
+    white-space: normal;
+  }
+  .insight-answer p {
+    margin: 10px 0 0;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .cephas-ai-suggestions {
+    grid-template-columns: 1fr;
+  }
 }
 .form-alert {
   grid-column: 1 / -1;

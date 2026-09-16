@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Bot, Download, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
+import { Bot, Download, Plus, RefreshCw, Send, Sparkles, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { confirmAction, downloadText } from '@/utils/actions';
@@ -534,9 +534,15 @@ function AiPage({ canManage }: { canManage: boolean }) {
       setBusy(false);
     }
   };
+  const suggestions = [
+    'How profitable are we?',
+    'What are our receivables?',
+    'Summarise our cash position',
+    'What is our inventory value?',
+  ];
   return (
-    <>
-      <div className="page-header">
+    <div className="cephas-ai-page">
+      <div className="page-header cephas-ai-header">
         <div>
           <h1>Cephas AI</h1>
           <p>
@@ -561,11 +567,21 @@ function AiPage({ canManage }: { canManage: boolean }) {
           </button>
         )}
       </div>
-      <section className="panel">
-        <form onSubmit={ask}>
-          <label>
-            Ask about profit, cash, receivables, payables, or inventory
+      <section className="panel cephas-ai-composer">
+        <div className="cephas-ai-composer__intro">
+          <span>
+            <Sparkles size={20} />
+          </span>
+          <div>
+            <h2>Ask Cephas</h2>
+            <p>Get a concise answer based on your latest business records.</p>
+          </div>
+        </div>
+        <form onSubmit={ask} className="cephas-ai-form">
+          <label htmlFor="cephas-ai-question">
+            Your question
             <textarea
+              id="cephas-ai-question"
               value={question}
               maxLength={500}
               required
@@ -578,18 +594,35 @@ function AiPage({ canManage }: { canManage: boolean }) {
               {error}
             </div>
           )}
-          <button className="button" disabled={busy}>
-            <Send size={16} />
-            {busy ? 'Analysing…' : 'Ask Cephas AI'}
-          </button>
+          <div className="cephas-ai-form__footer">
+            <small>{question.length}/500</small>
+            <button className="button" disabled={busy || !question.trim()}>
+              {busy ? <RefreshCw className="spin" size={16} /> : <Send size={16} />}
+              {busy ? 'Analysing…' : 'Ask Cephas AI'}
+            </button>
+          </div>
         </form>
+        <div className="cephas-ai-suggestions" aria-label="Suggested questions">
+          {suggestions.map((suggestion) => (
+            <button type="button" key={suggestion} onClick={() => setQuestion(suggestion)}>
+              {suggestion}
+            </button>
+          ))}
+        </div>
       </section>
       {loading ? (
         <div className="banking-state">
           <RefreshCw className="spin" /> Loading…
         </div>
       ) : (
-        <section className="panel">
+        <section className="panel cephas-ai-history">
+          <div className="cephas-ai-history__heading">
+            <div>
+              <h2>Recent insights</h2>
+              <p>Your organisation’s latest Cephas AI questions.</p>
+            </div>
+            <span>{rows.length}</span>
+          </div>
           {rows.map((x) => (
             <article className="insight-answer" key={x.id}>
               <header>
@@ -607,7 +640,7 @@ function AiPage({ canManage }: { canManage: boolean }) {
           )}
         </section>
       )}
-    </>
+    </div>
   );
 }
 
