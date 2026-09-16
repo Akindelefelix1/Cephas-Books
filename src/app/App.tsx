@@ -26,7 +26,9 @@ import type { PurchaseView } from '@/services/purchases';
 import type { OperationsView } from '@/services/operations';
 import type { InsightsView } from '@/services/insights';
 import { InsightsAutomationPage } from '@/pages/InsightsAutomationPage';
-import { NotificationsPage, ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
+import { WorkflowRecordsPage } from '@/pages/WorkflowRecordsPage';
+import type { WorkflowView } from '@/services/workflow';
+import { ProfilePage, SettingsPage, UsersPage } from '@/pages/AdminPages';
 import { Modal } from '@/components/ui/Modal';
 import type { View } from '@/types/app';
 import type { MarketingView } from '@/types/app';
@@ -203,9 +205,14 @@ export function App() {
     if (active === 'banking' || active === 'transactions' || active === 'reconciliation')
       return <BankingPage key={active} view={active} role={identity.role} />;
     if (['reports', 'custom-reports', 'analytics', 'ai-assistant', 'excel-sync'].includes(active))
-      return <InsightsAutomationPage key={active} view={active as InsightsView} role={identity.role} />;
+      return (
+        <InsightsAutomationPage key={active} view={active as InsightsView} role={identity.role} />
+      );
     if (active === 'users') return <UsersPage />;
-    if (active === 'notifications') return <NotificationsPage />;
+    if (['documents', 'approvals', 'notifications', 'workflows'].includes(active))
+      return (
+        <WorkflowRecordsPage key={active} view={active as WorkflowView} role={identity.role} />
+      );
     if (active === 'profile')
       return (
         <ProfilePage
@@ -222,17 +229,7 @@ export function App() {
           onResumeOnboarding={() => setView('onboarding')}
         />
       );
-    if (
-      [
-        'budgets',
-        'tax',
-        'payroll',
-        'approvals',
-        'documents',
-        'audit-logs',
-        'workflows',
-      ].includes(active)
-    )
+    if (['budgets', 'tax', 'payroll', 'audit-logs'].includes(active))
       return <SimpleFeaturePage type={active === 'audit-logs' ? 'audit' : active} />;
     return <ModulePage key={active} definition={getFallbackModule(active)} />;
   })();
