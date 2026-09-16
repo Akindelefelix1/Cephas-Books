@@ -1,7 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  ArrowLeft,
-  Camera,
   ChevronRight,
   FileText,
   Landmark,
@@ -36,6 +34,7 @@ import {
   authApi,
   clearAuthTokens,
   hasAuthTokens,
+  logoutSession,
 } from '@/services/auth';
 import { onboardingApi } from '@/services/onboarding';
 
@@ -209,8 +208,7 @@ export function App() {
       return (
         <ProfilePage
           onLogout={() => {
-            clearAuthTokens();
-            setView('landing');
+            void logoutSession().finally(() => setView('landing'));
           }}
         />
       );
@@ -267,148 +265,42 @@ function QuickCreate({
   onClose: () => void;
   onComplete: (id: string) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const choices = [
     ['Invoice', 'Bill a customer', FileText, 'invoices'],
     ['Expense', 'Record spend or scan receipt', ReceiptText, 'expenses'],
     ['Payment', 'Receive customer payment', WalletCards, 'payments'],
     ['Bill', 'Record a supplier bill', ShoppingCart, 'bills'],
     ['Transaction', 'Deposit, withdrawal or transfer', Landmark, 'transactions'],
-    ['Capture receipt', 'Use camera or upload file', Camera, 'expenses'],
   ];
-  const selected = choices.find((choice) => choice[0] === selectedId);
-  const close = () => {
-    setSelectedId(null);
-    onClose();
-  };
-  const complete = () => {
-    if (!selected) return;
-    setSelectedId(null);
-    onComplete(String(selected[3]));
-  };
   return (
     <Modal
       open={open}
-      onClose={close}
-      title={selected ? `Create ${String(selected[0]).toLowerCase()}` : 'Quick create'}
-      subtitle={selected ? String(selected[1]) : 'What would you like to do?'}
-      wide={Boolean(selected)}
-      footer={
-        selected ? (
-          <>
-            <button className="button button--secondary" onClick={() => setSelectedId(null)}>
-              <ArrowLeft size={16} /> Back
-            </button>
-            <button className="button" type="submit" form="quick-action-form">
-              Save {String(selected[0]).toLowerCase()}
-            </button>
-          </>
-        ) : undefined
-      }
+      onClose={onClose}
+      title="Quick create"
+      subtitle="Choose a record to open its complete creation form."
     >
-      {selected ? (
-        <QuickActionForm action={String(selected[0])} onSubmit={complete} />
-      ) : (
-        <div className="quick-create-grid">
-          {choices.map(([title, desc, Icon, target]) => (
-            <button
-              key={String(title)}
-              onClick={() => {
-                if (target === 'bills' || target === 'expenses') {
-                  sessionStorage.setItem('cephas:quick-create', String(target));
-                  onComplete(String(target));
-                } else setSelectedId(String(title));
-              }}
-            >
-              <i>
-                <Icon />
-              </i>
-              <span>
-                <strong>{String(title)}</strong>
-                <small>{String(desc)}</small>
-              </span>
-              <ChevronRight />
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="quick-create-grid">
+        {choices.map(([title, desc, Icon, target]) => (
+          <button
+            key={String(title)}
+            onClick={() => {
+              const id = String(target);
+              sessionStorage.setItem('cephas:quick-create', id);
+              window.dispatchEvent(new CustomEvent('cephas:quick-create', { detail: id }));
+              onComplete(id);
+            }}
+          >
+            <i>
+              <Icon />
+            </i>
+            <span>
+              <strong>{String(title)}</strong>
+              <small>{String(desc)}</small>
+            </span>
+            <ChevronRight />
+          </button>
+        ))}
+      </div>
     </Modal>
-  );
-}
-
-function QuickActionForm({ action, onSubmit }: { action: string; onSubmit: () => void }) {
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    onSubmit();
-  };
-  if (action === 'Capture receipt') {
-    return (
-      <form id="quick-action-form" className="quick-action-form" onSubmit={submit}>
-        <label className="full upload-field">
-          <input type="file" accept="image/*,.pdf" required />
-          <span>
-            Take a photo or <b>choose a receipt</b>
-          </span>
-          <small>JPG, PNG or PDF · max 10 MB</small>
-        </label>
-        <label>
-          Merchant
-          <input placeholder="Merchant name" required />
-        </label>
-        <label>
-          Amount
-          <input type="number" min="0.01" step="0.01" placeholder="₦ 0.00" required />
-        </label>
-        <label className="full">
-          Notes
-          <textarea placeholder="Add context or notes..." />
-        </label>
-      </form>
-    );
-  }
-
-  const isMoneyIn = action === 'Invoice' || action === 'Payment';
-  const today = new Date().toLocaleDateString('en-CA');
-  return (
-    <form id="quick-action-form" className="quick-action-form" onSubmit={submit}>
-      <label>
-        {isMoneyIn ? 'Customer' : action === 'Transaction' ? 'Account' : 'Supplier / merchant'}
-        <input placeholder={isMoneyIn ? 'Select or enter customer' : 'Enter details'} required />
-      </label>
-      <label>
-        Amount
-        <input type="number" min="0.01" step="0.01" placeholder="₦ 0.00" required />
-      </label>
-      <label>
-        Date
-        <input type="date" defaultValue={today} required />
-      </label>
-      <label>
-        {action === 'Transaction' ? 'Transaction type' : 'Category'}
-        <select>
-          {action === 'Transaction' ? (
-            <>
-              <option>Deposit</option>
-              <option>Withdrawal</option>
-              <option>Transfer</option>
-            </>
-          ) : (
-            <>
-              <option>Sales / services</option>
-              <option>Operations</option>
-              <option>Other</option>
-            </>
-          )}
-        </select>
-      </label>
-      <label className="full">
-        Reference
-        <input placeholder={`${action} reference`} />
-      </label>
-      <label className="full">
-        Description
-        <textarea placeholder="Add notes or context..." />
-      </label>
-    </form>
   );
 }

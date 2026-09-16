@@ -74,6 +74,20 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     const t = setTimeout(() => void load(), 250);
     return () => clearTimeout(t);
   }, [load]);
+  useEffect(() => {
+    const openQuickCreate = (event?: Event) => {
+      const requested =
+        event instanceof CustomEvent
+          ? String(event.detail)
+          : sessionStorage.getItem('cephas:quick-create');
+      if (requested !== view || !['invoices', 'payments'].includes(view)) return;
+      sessionStorage.removeItem('cephas:quick-create');
+      if (canEdit) setModal(true);
+    };
+    openQuickCreate();
+    window.addEventListener('cephas:quick-create', openQuickCreate);
+    return () => window.removeEventListener('cephas:quick-create', openQuickCreate);
+  }, [canEdit, view]);
   const run = async (fn: () => Promise<unknown>, message: string) => {
     setBusy(true);
     setError('');

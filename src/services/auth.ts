@@ -87,6 +87,7 @@ export const authApi = {
   resendVerification: (email: string) =>
     post<{ message: string; expiresIn: number }>('/auth/resend-verification', { email }),
   refresh: (refreshToken: string) => post<AuthTokens>('/auth/refresh', { refreshToken }),
+  logout: (refreshToken: string) => post<void>('/auth/logout', { refreshToken }),
   me: () => authorizedRequest<CurrentUserProfile>('/auth/me'),
 };
 
@@ -109,6 +110,15 @@ export function saveAuthTokens(tokens: AuthTokens, remember: boolean): void {
 export function clearAuthTokens(): void {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+}
+
+export async function logoutSession(): Promise<void> {
+  const refreshToken = getAuthTokens()?.refreshToken;
+  try {
+    if (refreshToken) await authApi.logout(refreshToken);
+  } finally {
+    clearAuthTokens();
+  }
 }
 
 function refreshSession(refreshToken: string): Promise<AuthTokens> {

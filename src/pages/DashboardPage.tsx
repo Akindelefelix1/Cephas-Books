@@ -16,13 +16,14 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
-import { confirmAction } from '@/utils/actions';
 import {
   bankingApi,
   type BankAccount,
   type BankingSummary,
   type BankTransaction,
 } from '@/services/banking';
+import { salesApi, type SalesSummary } from '@/services/sales';
+import { purchasesApi, type PurchaseSummary } from '@/services/purchases';
 
 export function DashboardPage({
   onNavigate,
@@ -37,26 +38,28 @@ export function DashboardPage({
   onResumeOnboarding: () => void;
   companyName: string;
 }) {
-  const [period, setPeriod] = useState('This month');
-  const [chartRange, setChartRange] = useState('Last 6 months');
   const [bankSummary, setBankSummary] = useState<BankingSummary | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [recentBankTransactions, setRecentBankTransactions] = useState<BankTransaction[]>([]);
+  const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null);
+  const [purchaseSummary, setPurchaseSummary] = useState<PurchaseSummary | null>(null);
   useEffect(() => {
     let active = true;
-    Promise.all([
+    Promise.allSettled([
       bankingApi.summary(),
       bankingApi.accounts(),
       bankingApi.transactions({ limit: 5 }),
-    ])
-      .then(([summary, accounts, transactions]) => {
-        if (active) {
-          setBankSummary(summary);
-          setBankAccounts(accounts);
-          setRecentBankTransactions(transactions.data);
-        }
-      })
-      .catch(() => undefined);
+      salesApi.summary(),
+      purchasesApi.summary(),
+    ]).then(([summary, accounts, transactions, sales, purchases]) => {
+      if (active) {
+        if (summary.status === 'fulfilled') setBankSummary(summary.value);
+        if (accounts.status === 'fulfilled') setBankAccounts(accounts.value);
+        if (transactions.status === 'fulfilled') setRecentBankTransactions(transactions.value.data);
+        if (sales.status === 'fulfilled') setSalesSummary(sales.value);
+        if (purchases.status === 'fulfilled') setPurchaseSummary(purchases.value);
+      }
+    });
     return () => {
       active = false;
     };
@@ -77,6 +80,9 @@ export function DashboardPage({
       currency,
       maximumFractionDigits: 2,
     }).format(Number(value));
+  const currency = bankSummary?.baseCurrency ?? 'NGN';
+  const revenue = Number(salesSummary?.invoiced ?? 0);
+  const expenses = Number(purchaseSummary?.expenses ?? 0);
   return (
     <>
       {!onboardingComplete && (
@@ -99,24 +105,10 @@ export function DashboardPage({
           <span>Here’s how {displayCompany} is performing.</span>
         </div>
         <div>
-          <label className="period-button">
+          <div className="period-button">
             <CalendarDays size={17} />
-            <span className="sr-only">Reporting period</span>
-            <select
-              value={period}
-              onChange={(event) => {
-                const nextPeriod = event.target.value;
-                setPeriod(nextPeriod);
-                confirmAction(`Reporting period set to ${nextPeriod.toLowerCase()}`);
-              }}
-            >
-              <option>This month</option>
-              <option>Last month</option>
-              <option>This quarter</option>
-              <option>This year</option>
-            </select>
-            <ChevronDown size={15} />
-          </label>
+            <span>All records</span>
+          </div>
           <button className="button" onClick={onCreate}>
             + Quick create
           </button>
@@ -126,26 +118,34 @@ export function DashboardPage({
         {[
           {
             label: 'Total revenue',
-            value: '₦48,240,000',
-            delta: '12.8%',
+            value: formatMoney(String(revenue), currency),
+            delta: salesSummary ? `${salesSummary.customers} customers` : 'Loading',
             up: true,
             icon: TrendingUp,
           },
           {
             label: 'Total expenses',
-            value: '₦29,860,000',
-            delta: '5.2%',
+            value: formatMoney(String(expenses), currency),
+            delta: purchaseSummary ? `${purchaseSummary.suppliers} suppliers` : 'Loading',
             up: false,
             icon: ReceiptText,
           },
           {
             label: 'Net profit',
-            value: '₦14,620,000',
-            delta: '8.4%',
-            up: true,
+            value: formatMoney(String(revenue - expenses), currency),
+            delta: revenue
+              ? `${(((revenue - expenses) / revenue) * 100).toFixed(1)}% margin`
+              : 'No revenue',
+            up: revenue - expenses >= 0,
             icon: CircleDollarSign,
           },
-          { label: 'Cash balance', value: '₦26,945,200', delta: 'Healthy', up: true, icon: Wallet },
+          {
+            label: 'Cash balance',
+            value: formatMoney(bankSummary?.totalCash ?? '0', currency),
+            delta: bankSummary ? `${bankSummary.unreconciledCount} unreconciled` : 'Loading',
+            up: true,
+            icon: Wallet,
+          },
         ].map((k) => (
           <article className="kpi-card" key={k.label}>
             <header>
@@ -159,7 +159,7 @@ export function DashboardPage({
               <b className={k.up ? 'up' : 'down'}>
                 {k.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {k.delta}
               </b>
-              <span>vs last month</span>
+              <span>live records</span>
             </footer>
           </article>
         ))}
@@ -193,15 +193,7 @@ export function DashboardPage({
               <h2>Revenue & expenses</h2>
               <p>Income and spending over time</p>
             </div>
-            <label className="select-button account-filter">
-              <span className="sr-only">Chart range</span>
-              <select value={chartRange} onChange={(event) => setChartRange(event.target.value)}>
-                <option>Last 3 months</option>
-                <option>Last 6 months</option>
-                <option>Last 12 months</option>
-              </select>
-              <ChevronDown size={14} />
-            </label>
+            <span className="select-button account-filter">Illustrative trend</span>
           </header>
           <div className="chart-legend">
             <span>
@@ -308,16 +300,16 @@ export function DashboardPage({
                 <i className="blue" />
                 Receivable
               </span>
-              <strong>₦8.42m</strong>
-              <small>₦3.12m overdue</small>
+              <strong>{formatMoney(salesSummary?.receivable ?? '0', currency)}</strong>
+              <small>{salesSummary?.openQuotations ?? 0} open quotations</small>
             </div>
             <div>
               <span>
                 <i className="cyan" />
                 Payable
               </span>
-              <strong>₦5.68m</strong>
-              <small>₦1.24m overdue</small>
+              <strong>{formatMoney(purchaseSummary?.payable ?? '0', currency)}</strong>
+              <small>{purchaseSummary?.pendingRequests ?? 0} requests awaiting approval</small>
             </div>
           </div>
           <div className="ageing">

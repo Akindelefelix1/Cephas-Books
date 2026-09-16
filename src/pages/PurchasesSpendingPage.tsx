@@ -82,13 +82,18 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     return () => clearTimeout(t);
   }, [load]);
   useEffect(() => {
-    if (sessionStorage.getItem('cephas:quick-create') === view) {
+    const openQuickCreate = (event?: Event) => {
+      const requested =
+        event instanceof CustomEvent
+          ? String(event.detail)
+          : sessionStorage.getItem('cephas:quick-create');
+      if (requested !== view) return;
       sessionStorage.removeItem('cephas:quick-create');
-      if (allowedCreate) {
-        const timer = window.setTimeout(() => setModal(true), 0);
-        return () => window.clearTimeout(timer);
-      }
-    }
+      if (allowedCreate) setModal(true);
+    };
+    openQuickCreate();
+    window.addEventListener('cephas:quick-create', openQuickCreate);
+    return () => window.removeEventListener('cephas:quick-create', openQuickCreate);
   }, [allowedCreate, view]);
   const run = async (fn: () => Promise<unknown>, msg: string) => {
     setBusy(true);

@@ -76,6 +76,20 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+  useEffect(() => {
+    const openQuickCreate = (event?: Event) => {
+      const requested =
+        event instanceof CustomEvent
+          ? String(event.detail)
+          : sessionStorage.getItem('cephas:quick-create');
+      if (requested !== 'transactions' || view !== 'transactions') return;
+      sessionStorage.removeItem('cephas:quick-create');
+      if (canManage) setModal('transaction');
+    };
+    openQuickCreate();
+    window.addEventListener('cephas:quick-create', openQuickCreate);
+    return () => window.removeEventListener('cephas:quick-create', openQuickCreate);
+  }, [canManage, view]);
 
   const submit = async (operation: () => Promise<unknown>, message: string) => {
     setBusy(true);
