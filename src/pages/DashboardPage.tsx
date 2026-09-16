@@ -1,6 +1,7 @@
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Bell,
   CalendarDays,
   ChevronDown,
   CircleDollarSign,
@@ -26,7 +27,11 @@ import { salesApi, type SalesSummary } from '@/services/sales';
 import { purchasesApi, type PurchaseSummary } from '@/services/purchases';
 import { insightsApi, type AiInsight, type InsightAnalytics } from '@/services/insights';
 import { accountingApi, type FinanceRecord } from '@/services/accounting';
-import { workflowApi, type WorkflowSummary } from '@/services/workflow';
+import {
+  workflowApi,
+  type AppNotification,
+  type WorkflowSummary,
+} from '@/services/workflow';
 import type { Invoice } from '@/services/sales';
 
 const dateUntil = (value: string | undefined, now: number) => {
@@ -34,6 +39,11 @@ const dateUntil = (value: string | undefined, now: number) => {
   const days = Math.ceil((new Date(value).getTime() - now) / 86400000);
   return days >= 0 ? `${days} days remaining` : `${Math.abs(days)} days overdue`;
 };
+
+const formatNotificationDate = (value: string) =>
+  new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeStyle: 'short' }).format(
+    new Date(value),
+  );
 
 export function DashboardPage({
   onNavigate,
@@ -57,6 +67,7 @@ export function DashboardPage({
   const [taxRecords, setTaxRecords] = useState<FinanceRecord[]>([]);
   const [budgetRecords, setBudgetRecords] = useState<FinanceRecord[]>([]);
   const [workflowSummary, setWorkflowSummary] = useState<WorkflowSummary | null>(null);
+  const [recentNotifications, setRecentNotifications] = useState<AppNotification[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [aiHistory, setAiHistory] = useState<AiInsight[]>([]);
   const [dashboardError, setDashboardError] = useState('');
@@ -73,6 +84,7 @@ export function DashboardPage({
       accountingApi.records('TAX'),
       accountingApi.records('BUDGET'),
       workflowApi.summary(),
+      workflowApi.notifications(),
       salesApi.invoices(),
       insightsApi.aiHistory(),
     ]).then(
@@ -86,6 +98,7 @@ export function DashboardPage({
         tax,
         budgets,
         workflow,
+        notifications,
         invoiceData,
         ai,
       ]) => {
@@ -100,6 +113,12 @@ export function DashboardPage({
           if (tax.status === 'fulfilled') setTaxRecords(tax.value);
           if (budgets.status === 'fulfilled') setBudgetRecords(budgets.value);
           if (workflow.status === 'fulfilled') setWorkflowSummary(workflow.value);
+          if (notifications.status === 'fulfilled')
+            setRecentNotifications(
+              [...notifications.value]
+                .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+                .slice(0, 5),
+            );
           if (invoiceData.status === 'fulfilled') setInvoices(invoiceData.value);
           if (ai.status === 'fulfilled') setAiHistory(ai.value);
           const failed = [
@@ -112,6 +131,7 @@ export function DashboardPage({
             tax,
             budgets,
             workflow,
+            notifications,
             invoiceData,
             ai,
           ].filter((result) => result.status === 'rejected').length;
@@ -569,6 +589,41 @@ export function DashboardPage({
             ))}
             {!recentBankTransactions.length && (
               <div className="dashboard-empty-inline">No bank transactions have been recorded.</div>
+            )}
+          </div>
+        </article>
+        <article className="panel notifications-dashboard-panel">
+          <header className="panel-header">
+            <div>
+              <h2>Recent notifications</h2>
+              <p>Latest updates for your organisation</p>
+            </div>
+            <button className="text-button" onClick={() => onNavigate('notifications')}>
+              View all
+            </button>
+          </header>
+          <div className="dashboard-notification-list">
+            {recentNotifications.map((notification) => (
+              <button
+                className={`dashboard-notification ${notification.isRead ? '' : 'is-unread'}`}
+                key={notification.id}
+                onClick={() => onNavigate('notifications')}
+              >
+                <i>
+                  <Bell size={15} />
+                </i>
+                <span>
+                  <strong>{notification.title}</strong>
+                  <small>{notification.message}</small>
+                  <time dateTime={notification.createdAt}>
+                    {formatNotificationDate(notification.createdAt)}
+                  </time>
+                </span>
+                {!notification.isRead && <b aria-label="Unread notification" />}
+              </button>
+            ))}
+            {!recentNotifications.length && (
+              <div className="dashboard-empty-inline">No notifications have been recorded.</div>
             )}
           </div>
         </article>

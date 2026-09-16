@@ -770,7 +770,8 @@
     flex-wrap: wrap;
   }
   .chart-panel,
-  .activity-panel {
+  .activity-panel,
+  .notifications-dashboard-panel {
     grid-column: span 1;
   }
   .profitability-panel {
