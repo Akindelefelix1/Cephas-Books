@@ -707,6 +707,18 @@
   font-weight: 700;
   text-decoration: underline;
 }
+.form-alert {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.form-alert span {
+  display: grid;
+  gap: 3px;
+}
+.form-alert small {
+  color: inherit;
+  font-size: 0.86rem;
+}
 .banking-state {
   align-items: center;
   background: #fff;

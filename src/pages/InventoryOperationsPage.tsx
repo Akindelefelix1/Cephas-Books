@@ -895,11 +895,22 @@ function ProjectAiPage({ canEdit }: { canEdit: boolean }) {
               targetDate: String(f.get('targetDate') || ''),
               budget: Number(f.get('budget') || 0),
             };
+            if (next.targetDate && next.targetDate < next.startDate) {
+              setError('Target date cannot be before the project start date.');
+              setPlan(null);
+              return;
+            }
             setDraft(next);
             setBusy(true);
             setError('');
             operationsApi
-              .planProject(next)
+              .planProject({
+                name: next.name,
+                objective: next.objective,
+                owner: next.owner,
+                targetDate: next.targetDate || undefined,
+                budget: next.budget,
+              })
               .then(setPlan)
               .catch((e: unknown) =>
                 setError(e instanceof Error ? e.message : 'Unable to generate plan'),
@@ -935,7 +946,17 @@ function ProjectAiPage({ canEdit }: { canEdit: boolean }) {
             Objective
             <textarea name="objective" required />
           </label>
-          {error && <p className="form-error full">{error}</p>}
+          {error && (
+            <div className="banking-alert form-alert full" role="alert" aria-live="polite">
+              <span>
+                <strong>Unable to generate the project plan</strong>
+                <small>{error}</small>
+              </span>
+              <button type="button" onClick={() => setError('')}>
+                Dismiss
+              </button>
+            </div>
+          )}
           <div className="full">
             <button className="button" disabled={busy || !canEdit}>
               <Sparkles size={17} /> {busy ? 'Generating…' : 'Generate project plan'}

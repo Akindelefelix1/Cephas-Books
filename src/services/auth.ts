@@ -1,3 +1,5 @@
+import { notifyError } from '@/utils/actions';
+
 export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ?? 'https://cephasbooks-be.onrender.com/api'
 ).replace(/\/$/, '');
@@ -49,7 +51,27 @@ export class ApiError extends Error {
   ) {
     super(message);
     this.name = 'ApiError';
+    notifyError(message);
   }
+}
+
+function formatApiMessage(message: string): string {
+  const unsupported = message.match(/^property (.+) should not exist$/i);
+  if (unsupported) return `The request included an unsupported field: ${unsupported[1]}.`;
+  const normalized = message.trim();
+  if (!normalized) return '';
+  const sentence = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
+function errorMessage(body?: ApiErrorBody): string | undefined {
+  const messages = Array.isArray(body?.message)
+    ? body.message
+    : body?.message
+      ? [body.message]
+      : [];
+  const formatted = messages.map(formatApiMessage).filter(Boolean).join(' ');
+  return formatted || (body?.error ? formatApiMessage(body.error) : undefined);
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -69,10 +91,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   if (!response.ok) {
     const errorBody =
       payload && typeof payload === 'object' ? (payload as ApiErrorBody) : undefined;
-    const apiMessage = errorBody?.message;
-    const message = Array.isArray(apiMessage)
-      ? apiMessage.join('. ')
-      : apiMessage || errorBody?.error;
+    const message = errorMessage(errorBody);
     throw new ApiError(message || 'Something went wrong. Please try again.', response.status);
   }
 
@@ -188,10 +207,7 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
   if (!response.ok) {
     const errorBody =
       payload && typeof payload === 'object' ? (payload as ApiErrorBody) : undefined;
-    const apiMessage = errorBody?.message;
-    const message = Array.isArray(apiMessage)
-      ? apiMessage.join('. ')
-      : apiMessage || errorBody?.error;
+    const message = errorMessage(errorBody);
     throw new ApiError(message || 'Something went wrong. Please try again.', response.status);
   }
   return payload as T;
