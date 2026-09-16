@@ -264,7 +264,7 @@ export function DashboardPage({
               <b className={k.up ? 'up' : 'down'}>
                 {k.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {k.delta}
               </b>
-              <span>live records</span>
+              {/* <span>live records</span> */}
             </footer>
           </article>
         ))}
