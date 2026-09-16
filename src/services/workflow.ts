@@ -68,8 +68,8 @@ export const workflowApi = {
     req<{ name: string; mimeType: string; contentBase64: string }>(
       `/workflow/documents/${id}/download`,
     ),
-  archiveDocument: (id: string) =>
-    req<{ id: string; status: string }>(`/workflow/documents/${id}/archive`, 'PATCH'),
+  documentStatus: (id: string, status: string) =>
+    req<{ id: string; status: string }>(`/workflow/documents/${id}/status`, 'PATCH', { status }),
   deleteDocument: (id: string) => req<{ deleted: boolean }>(`/workflow/documents/${id}`, 'DELETE'),
   approvals: (filters = {}) => req<ApprovalRequest[]>(`/workflow/approvals?${query(filters)}`),
   createApproval: (data: object) => req<ApprovalRequest>('/workflow/approvals', 'POST', data),

@@ -279,7 +279,6 @@ function RecordsTable({
     link.download = result.name;
     link.click();
     URL.revokeObjectURL(url);
-    confirmAction(`${result.name} downloaded`);
   };
   if (!rows.length)
     return (
@@ -308,21 +307,37 @@ function RecordsTable({
                 <div className="inline-actions">
                   {view === 'documents' && (
                     <>
-                      <button disabled={busy} onClick={() => void download(row as DocumentRecord)}>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void onRun(
+                            () => download(row as DocumentRecord),
+                            `${(row as DocumentRecord).name} downloaded`,
+                          )
+                        }
+                      >
                         <Download size={15} />
                         Download
                       </button>
-                      {canManage && (row as DocumentRecord).status === 'ACTIVE' && (
+                      {canManage && (
                         <button
                           disabled={busy}
                           onClick={() =>
                             void onRun(
-                              () => workflowApi.archiveDocument(row.id),
-                              'Document archived',
+                              () =>
+                                workflowApi.documentStatus(
+                                  row.id,
+                                  (row as DocumentRecord).status === 'ACTIVE'
+                                    ? 'ARCHIVED'
+                                    : 'ACTIVE',
+                                ),
+                              (row as DocumentRecord).status === 'ACTIVE'
+                                ? 'Document archived'
+                                : 'Document restored',
                             )
                           }
                         >
-                          Archive
+                          {(row as DocumentRecord).status === 'ACTIVE' ? 'Archive' : 'Restore'}
                         </button>
                       )}
                       {canDelete && (
