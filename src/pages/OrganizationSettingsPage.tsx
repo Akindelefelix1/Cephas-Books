@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Building2, Check, Database, Plus, ShieldCheck, Users } from 'lucide-react';
+import { Building2, Check, Database, MoreHorizontal, Plus, ShieldCheck, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Modal } from '@/components/ui/Modal';
@@ -55,6 +55,7 @@ const arrayValue = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value a
 
 export function OrganizationSettingsPage({ view, role }: { view: OrganizationView; role: string }) {
   const canManage = role === 'OWNER' || role === 'ADMIN';
+  const canViewAdministration = canManage || role === 'AUDITOR';
   const [admin, setAdmin] = useState<OrganizationAdmin | null>(null);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [logs, setLogs] = useState<AuditEntry[]>([]);
@@ -62,6 +63,8 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [dialog, setDialog] = useState<'branch' | 'currency' | 'invite' | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [auditSearch, setAuditSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,14 +72,15 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
     try {
       const base = await organizationApi.admin();
       setAdmin(base);
-      if (view === 'users') setMembers(await organizationApi.users());
-      if (view === 'audit-logs') setLogs(await organizationApi.auditLogs());
+      if (view === 'users' && canViewAdministration) setMembers(await organizationApi.users());
+      if (view === 'audit-logs' && canViewAdministration)
+        setLogs(await organizationApi.auditLogs(auditSearch));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to load organisation settings');
     } finally {
       setLoading(false);
     }
-  }, [view]);
+  }, [auditSearch, canViewAdministration, view]);
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
@@ -88,6 +92,7 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
     try {
       await operation();
       setDialog(null);
+      setEditingIndex(null);
       confirmAction(message);
       await load();
     } catch (caught) {
@@ -218,7 +223,13 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
               <p>{branches.length} branches and centres configured.</p>
             </div>
             {canManage && (
-              <button className="button" onClick={() => setDialog('branch')}>
+              <button
+                className="button"
+                onClick={() => {
+                  setEditingIndex(null);
+                  setDialog('branch');
+                }}
+              >
                 <Plus /> Add branch
               </button>
             )}
@@ -234,6 +245,18 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
                   <small>{branch.address}</small>
                 </div>
                 <Badge>{branch.status}</Badge>
+                {canManage && (
+                  <button
+                    className="row-action"
+                    aria-label={`Edit ${branch.name}`}
+                    onClick={() => {
+                      setEditingIndex(branches.indexOf(branch));
+                      setDialog('branch');
+                    }}
+                  >
+                    <MoreHorizontal />
+                  </button>
+                )}
               </div>
             ))
           ) : (
@@ -249,7 +272,13 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
               <p>Rates are expressed against {admin.organization.baseCurrency}.</p>
             </div>
             {canManage && (
-              <button className="button" onClick={() => setDialog('currency')}>
+              <button
+                className="button"
+                onClick={() => {
+                  setEditingIndex(null);
+                  setDialog('currency');
+                }}
+              >
                 <Plus /> Add currency
               </button>
             )}
@@ -272,11 +301,24 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
                     ? 'Active'
                     : 'Inactive'}
               </Badge>
+              {canManage && item.code !== admin.organization.baseCurrency && (
+                <button
+                  className="row-action"
+                  aria-label={`Edit ${item.code}`}
+                  onClick={() => {
+                    setEditingIndex(currencies.indexOf(item));
+                    setDialog('currency');
+                  }}
+                >
+                  <MoreHorizontal />
+                </button>
+              )}
             </div>
           ))}
         </section>
       )}
-      {view === 'users' && (
+      {view === 'users' && !canViewAdministration && <AccessDenied />}
+      {view === 'users' && canViewAdministration && (
         <UsersSection
           members={members}
           canManage={canManage}
@@ -287,12 +329,18 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
           }
         />
       )}
-      {view === 'audit-logs' && <AuditSection logs={logs} />}
+      {view === 'audit-logs' && !canViewAdministration && <AccessDenied />}
+      {view === 'audit-logs' && canViewAdministration && (
+        <AuditSection logs={logs} search={auditSearch} onSearch={setAuditSearch} />
+      )}
       {view === 'security' && (
         <section className="panel settings-api-panel">
           <header className="settings-heading">
-            <h2>Security controls</h2>
-            <p>Apply consistent safeguards across the organisation.</p>
+            <h2>Security policy preferences</h2>
+            <p>
+              Record the controls your organisation requires. Enforcement depends on the
+              corresponding platform capability.
+            </p>
           </header>
           <div className="security-score">
             <div>
@@ -301,13 +349,13 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
             <span>
               <strong>Security posture</strong>
               <p>
-                {securityControls.filter(([key]) => security[key] !== false).length} of{' '}
+                {securityControls.filter(([key]) => security[key] === true).length} of{' '}
                 {securityControls.length} controls enabled.
               </p>
             </span>
           </div>
           {securityControls.map(([key, label]) => {
-            const enabled = security[key] !== false;
+            const enabled = security[key] === true;
             return (
               <div className="setting-toggle" key={key}>
                 <ShieldCheck />
@@ -338,8 +386,11 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
       {view === 'integrations' && (
         <section className="panel settings-api-panel">
           <header className="settings-heading">
-            <h2>Connected apps</h2>
-            <p>Connection status is saved to your organisation.</p>
+            <h2>Integration preferences</h2>
+            <p>
+              Track which external services your organisation intends to use. Provider authorisation
+              is completed separately.
+            </p>
           </header>
           <div className="integration-grid">
             {integrationCatalogue.map(([id, name, description]) => {
@@ -382,39 +433,44 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
         dialog={dialog}
         busy={busy}
         currencies={currencies}
-        onClose={() => setDialog(null)}
+        editingBranch={editingIndex === null ? undefined : branches[editingIndex]}
+        editingCurrency={editingIndex === null ? undefined : currencies[editingIndex]}
+        onClose={() => {
+          setDialog(null);
+          setEditingIndex(null);
+        }}
         onSubmit={(kind, form) => {
           if (kind === 'branch')
             void saveSection(
               'branches',
               {
                 items: [
-                  ...branches,
+                  ...branches.filter((_, index) => index !== editingIndex),
                   {
                     name: String(form.get('name')),
                     address: String(form.get('address')),
-                    status: 'Active',
+                    status: String(form.get('status') || 'Active'),
                   },
                 ],
               },
-              'Branch added',
+              editingIndex === null ? 'Branch added' : 'Branch updated',
             );
           if (kind === 'currency')
             void saveSection(
               'currencies',
               {
                 items: [
-                  ...currencies,
+                  ...currencies.filter((_, index) => index !== editingIndex),
                   {
                     code: String(form.get('code')).toUpperCase(),
                     name: String(form.get('name')),
                     symbol: String(form.get('symbol')),
                     rate: String(form.get('rate')),
-                    active: true,
+                    active: String(form.get('active')) !== 'false',
                   },
                 ],
               },
-              'Currency added',
+              editingIndex === null ? 'Currency added' : 'Currency updated',
             );
           if (kind === 'invite')
             void run(
@@ -508,9 +564,11 @@ function UsersSection({
                       disabled={!canManage || busy || member.role === 'OWNER'}
                       onChange={(event) => onUpdate(member.id, { role: event.target.value })}
                     >
-                      {roles.map((item) => (
-                        <option key={item}>{item}</option>
-                      ))}
+                      {roles
+                        .filter((item) => item !== 'OWNER' || member.role === 'OWNER')
+                        .map((item) => (
+                          <option key={item}>{item}</option>
+                        ))}
                     </select>
                   </td>
                   <td>
@@ -537,12 +595,38 @@ function UsersSection({
   );
 }
 
-function AuditSection({ logs }: { logs: AuditEntry[] }) {
+function AccessDenied() {
+  return (
+    <div className="banking-alert" role="alert">
+      You do not have permission to view this administration area.
+    </div>
+  );
+}
+
+function AuditSection({
+  logs,
+  search,
+  onSearch,
+}: {
+  logs: AuditEntry[];
+  search: string;
+  onSearch: (value: string) => void;
+}) {
   return (
     <section className="panel settings-api-panel">
       <header className="settings-heading">
-        <h2>Recorded activity</h2>
-        <p>Immutable organisation actions, newest first.</p>
+        <div>
+          <h2>Recorded activity</h2>
+          <p>Immutable organisation actions, newest first.</p>
+        </div>
+        <label className="audit-search">
+          Search audit logs
+          <input
+            value={search}
+            onChange={(event) => onSearch(event.target.value)}
+            placeholder="Action or area"
+          />
+        </label>
       </header>
       <div className="data-table-wrap">
         <table>
@@ -575,12 +659,16 @@ function CreateDialog({
   dialog,
   busy,
   currencies,
+  editingBranch,
+  editingCurrency,
   onClose,
   onSubmit,
 }: {
   dialog: 'branch' | 'currency' | 'invite' | null;
   busy: boolean;
   currencies: Currency[];
+  editingBranch?: Branch;
+  editingCurrency?: Currency;
   onClose: () => void;
   onSubmit: (kind: 'branch' | 'currency' | 'invite', form: FormData) => void;
 }) {
@@ -591,9 +679,13 @@ function CreateDialog({
       onClose={onClose}
       title={
         dialog === 'branch'
-          ? 'Add branch'
+          ? editingBranch
+            ? 'Edit branch'
+            : 'Add branch'
           : dialog === 'currency'
-            ? 'Add currency'
+            ? editingCurrency
+              ? 'Edit currency'
+              : 'Add currency'
             : 'Add existing user'
       }
       footer={
@@ -619,11 +711,18 @@ function CreateDialog({
           <>
             <label>
               Branch name
-              <input name="name" required autoFocus />
+              <input name="name" defaultValue={editingBranch?.name} required autoFocus />
             </label>
             <label>
               Address
-              <input name="address" required />
+              <input name="address" defaultValue={editingBranch?.address} required />
+            </label>
+            <label className="full">
+              Status
+              <select name="status" defaultValue={editingBranch?.status ?? 'Active'}>
+                <option>Active</option>
+                <option>Inactive</option>
+              </select>
             </label>
           </>
         )}
@@ -631,19 +730,40 @@ function CreateDialog({
           <>
             <label>
               Currency code
-              <input name="code" required minLength={3} maxLength={3} autoFocus />
+              <input
+                name="code"
+                defaultValue={editingCurrency?.code}
+                required
+                minLength={3}
+                maxLength={3}
+                autoFocus
+              />
             </label>
             <label>
               Name
-              <input name="name" required />
+              <input name="name" defaultValue={editingCurrency?.name} required />
             </label>
             <label>
               Symbol
-              <input name="symbol" required />
+              <input name="symbol" defaultValue={editingCurrency?.symbol} required />
             </label>
             <label>
               Exchange rate
-              <input name="rate" required type="number" min="0.000001" step="any" />
+              <input
+                name="rate"
+                defaultValue={editingCurrency?.rate}
+                required
+                type="number"
+                min="0.000001"
+                step="any"
+              />
+            </label>
+            <label className="full">
+              Status
+              <select name="active" defaultValue={String(editingCurrency?.active ?? true)}>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
             </label>
             {currencies.length > 12 && (
               <small className="full">

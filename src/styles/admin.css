@@ -489,6 +489,16 @@
 .mini-switch.on i {
   transform: translateX(16px);
 }
+.audit-search {
+  width: min(280px, 100%);
+  color: #657089;
+  font-size: 0.62rem;
+}
+.audit-search input {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+}
 .role-list header,
 .permission-matrix header,
 .settings-heading {
