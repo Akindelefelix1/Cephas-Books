@@ -380,6 +380,12 @@
   color: #8c94a4;
   font-size: 0.58rem;
 }
+.command-empty {
+  padding: 28px 20px;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
 .search-result {
   width: 100%;
   padding: 10px 17px;
@@ -1036,6 +1042,61 @@
 .workflow-primary strong,
 .workflow-primary small {
   display: block;
+}
+
+.dashboard-trend-bars {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(38px, 1fr));
+  align-items: end;
+  gap: 14px;
+  min-height: 270px;
+  padding: 22px 12px 0;
+  border-bottom: 1px solid #e7ebf2;
+  background: repeating-linear-gradient(to bottom, #eef1f6 0 1px, transparent 1px 52px);
+}
+.dashboard-trend-bars > div {
+  display: grid;
+  grid-template-rows: 220px auto;
+  gap: 9px;
+  min-width: 0;
+  text-align: center;
+}
+.dashboard-trend-bars > div > span {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 5px;
+}
+.dashboard-trend-bars i {
+  width: min(18px, 38%);
+  min-height: 4px;
+  border-radius: 6px 6px 2px 2px;
+}
+.dashboard-trend-bars i.revenue {
+  background: #1233cc;
+}
+.dashboard-trend-bars i.expense {
+  background: #00aee8;
+}
+.dashboard-trend-bars small {
+  color: var(--color-muted);
+  font-size: 0.68rem;
+}
+.dashboard-empty-inline {
+  padding: 22px 10px;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .dashboard-trend-bars {
+    gap: 7px;
+    padding-inline: 4px;
+  }
+  .dashboard-trend-bars > div {
+    grid-template-rows: 180px auto;
+  }
 }
 .workflow-primary small {
   max-width: 340px;

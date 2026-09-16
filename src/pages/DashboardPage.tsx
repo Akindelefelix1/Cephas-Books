@@ -24,6 +24,16 @@ import {
 } from '@/services/banking';
 import { salesApi, type SalesSummary } from '@/services/sales';
 import { purchasesApi, type PurchaseSummary } from '@/services/purchases';
+import { insightsApi, type AiInsight, type InsightAnalytics } from '@/services/insights';
+import { accountingApi, type FinanceRecord } from '@/services/accounting';
+import { workflowApi, type WorkflowSummary } from '@/services/workflow';
+import type { Invoice } from '@/services/sales';
+
+const dateUntil = (value: string | undefined, now: number) => {
+  if (!value) return 'No end date';
+  const days = Math.ceil((new Date(value).getTime() - now) / 86400000);
+  return days >= 0 ? `${days} days remaining` : `${Math.abs(days)} days overdue`;
+};
 
 export function DashboardPage({
   onNavigate,
@@ -43,6 +53,14 @@ export function DashboardPage({
   const [recentBankTransactions, setRecentBankTransactions] = useState<BankTransaction[]>([]);
   const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null);
   const [purchaseSummary, setPurchaseSummary] = useState<PurchaseSummary | null>(null);
+  const [analytics, setAnalytics] = useState<InsightAnalytics | null>(null);
+  const [taxRecords, setTaxRecords] = useState<FinanceRecord[]>([]);
+  const [budgetRecords, setBudgetRecords] = useState<FinanceRecord[]>([]);
+  const [workflowSummary, setWorkflowSummary] = useState<WorkflowSummary | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [aiHistory, setAiHistory] = useState<AiInsight[]>([]);
+  const [dashboardError, setDashboardError] = useState('');
+  const [dashboardNow] = useState(() => Date.now());
   useEffect(() => {
     let active = true;
     Promise.allSettled([
@@ -51,15 +69,59 @@ export function DashboardPage({
       bankingApi.transactions({ limit: 5 }),
       salesApi.summary(),
       purchasesApi.summary(),
-    ]).then(([summary, accounts, transactions, sales, purchases]) => {
-      if (active) {
-        if (summary.status === 'fulfilled') setBankSummary(summary.value);
-        if (accounts.status === 'fulfilled') setBankAccounts(accounts.value);
-        if (transactions.status === 'fulfilled') setRecentBankTransactions(transactions.value.data);
-        if (sales.status === 'fulfilled') setSalesSummary(sales.value);
-        if (purchases.status === 'fulfilled') setPurchaseSummary(purchases.value);
-      }
-    });
+      insightsApi.analytics(),
+      accountingApi.records('TAX'),
+      accountingApi.records('BUDGET'),
+      workflowApi.summary(),
+      salesApi.invoices(),
+      insightsApi.aiHistory(),
+    ]).then(
+      ([
+        summary,
+        accounts,
+        transactions,
+        sales,
+        purchases,
+        insightData,
+        tax,
+        budgets,
+        workflow,
+        invoiceData,
+        ai,
+      ]) => {
+        if (active) {
+          if (summary.status === 'fulfilled') setBankSummary(summary.value);
+          if (accounts.status === 'fulfilled') setBankAccounts(accounts.value);
+          if (transactions.status === 'fulfilled')
+            setRecentBankTransactions(transactions.value.data);
+          if (sales.status === 'fulfilled') setSalesSummary(sales.value);
+          if (purchases.status === 'fulfilled') setPurchaseSummary(purchases.value);
+          if (insightData.status === 'fulfilled') setAnalytics(insightData.value);
+          if (tax.status === 'fulfilled') setTaxRecords(tax.value);
+          if (budgets.status === 'fulfilled') setBudgetRecords(budgets.value);
+          if (workflow.status === 'fulfilled') setWorkflowSummary(workflow.value);
+          if (invoiceData.status === 'fulfilled') setInvoices(invoiceData.value);
+          if (ai.status === 'fulfilled') setAiHistory(ai.value);
+          const failed = [
+            summary,
+            accounts,
+            transactions,
+            sales,
+            purchases,
+            insightData,
+            tax,
+            budgets,
+            workflow,
+            invoiceData,
+            ai,
+          ].filter((result) => result.status === 'rejected').length;
+          if (failed)
+            setDashboardError(
+              `${failed} dashboard data source${failed === 1 ? '' : 's'} could not be loaded.`,
+            );
+        }
+      },
+    );
     return () => {
       active = false;
     };
@@ -80,9 +142,47 @@ export function DashboardPage({
       currency,
       maximumFractionDigits: 2,
     }).format(Number(value));
-  const currency = bankSummary?.baseCurrency ?? 'NGN';
-  const revenue = Number(salesSummary?.invoiced ?? 0);
-  const expenses = Number(purchaseSummary?.expenses ?? 0);
+  const currency = analytics?.currency ?? bankSummary?.baseCurrency ?? 'NGN';
+  const revenue = Number(analytics?.metrics.revenue ?? salesSummary?.invoiced ?? 0);
+  const expenses = Number(analytics?.metrics.expenses ?? purchaseSummary?.expenses ?? 0);
+  const trend = analytics?.trend.slice(-6) ?? [];
+  const latestTax = taxRecords[0];
+  const latestBudget = budgetRecords[0];
+  const overdueInvoices = invoices.filter((invoice) => invoice.status === 'OVERDUE');
+  const overdueAmount = overdueInvoices.reduce(
+    (sum, invoice) =>
+      sum +
+      Math.max(
+        0,
+        Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount),
+      ),
+    0,
+  );
+  const budgetTotal = Number(latestBudget?.amount ?? 0);
+  const budgetSpent = Number(latestBudget?.data.spent ?? expenses);
+  const budgetPercent =
+    budgetTotal > 0 ? Math.min(100, Math.round((budgetSpent / budgetTotal) * 100)) : 0;
+  const ageing = invoices.reduce(
+    (buckets, invoice) => {
+      const outstanding = Math.max(
+        0,
+        Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount),
+      );
+      if (!outstanding) return buckets;
+      const days = Math.floor((dashboardNow - new Date(invoice.dueDate).getTime()) / 86400000);
+      const index = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : days <= 90 ? 3 : 4;
+      buckets[index] += outstanding;
+      return buckets;
+    },
+    [0, 0, 0, 0, 0],
+  );
+  const margins = trend.map((item) =>
+    Number(item.revenue) > 0
+      ? ((Number(item.revenue) - Number(item.expenses)) / Number(item.revenue)) * 100
+      : 0,
+  );
+  const currentMargin = margins.at(-1) ?? 0;
+  const previousMargin = margins.at(-2) ?? currentMargin;
   return (
     <>
       {!onboardingComplete && (
@@ -114,6 +214,11 @@ export function DashboardPage({
           </button>
         </div>
       </div>
+      {dashboardError && (
+        <div className="banking-alert" role="alert">
+          {dashboardError}
+        </div>
+      )}
       <div className="kpi-grid">
         {[
           {
@@ -193,62 +298,51 @@ export function DashboardPage({
               <h2>Revenue & expenses</h2>
               <p>Income and spending over time</p>
             </div>
-            <span className="select-button account-filter">Illustrative trend</span>
+            <span className="select-button account-filter">Live monthly trend</span>
           </header>
           <div className="chart-legend">
             <span>
               <i className="blue" />
-              Revenue <b>₦94.3m</b>
+              Revenue <b>{formatMoney(analytics?.metrics.revenue ?? '0', currency)}</b>
             </span>
             <span>
               <i className="cyan" />
-              Expenses <b>₦62.1m</b>
+              Expenses <b>{formatMoney(analytics?.metrics.expenses ?? '0', currency)}</b>
             </span>
           </div>
-          <div className="main-chart">
-            <div className="y-labels">
-              <span>₦25m</span>
-              <span>₦20m</span>
-              <span>₦15m</span>
-              <span>₦10m</span>
-              <span>₦5m</span>
-              <span>₦0</span>
+          {trend.length ? (
+            <div className="dashboard-trend-bars">
+              {trend.map((item) => {
+                const maximum = Math.max(
+                  ...trend.flatMap((point) => [Number(point.revenue), Number(point.expenses)]),
+                  1,
+                );
+                return (
+                  <div key={item.month}>
+                    <span>
+                      <i
+                        className="revenue"
+                        style={{
+                          height: `${Math.max(3, (Number(item.revenue) / maximum) * 100)}%`,
+                        }}
+                      />
+                      <i
+                        className="expense"
+                        style={{
+                          height: `${Math.max(3, (Number(item.expenses) / maximum) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    <small>
+                      {new Date(`${item.month}-01`).toLocaleDateString('en-NG', { month: 'short' })}
+                    </small>
+                  </div>
+                );
+              })}
             </div>
-            <div className="chart-canvas">
-              <svg viewBox="0 0 700 260" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="revarea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stopColor="#1233cc" stopOpacity=".18" />
-                    <stop offset="1" stopColor="#1233cc" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                <path
-                  className="grid-lines"
-                  d="M0 10H700 M0 58H700 M0 106H700 M0 154H700 M0 202H700 M0 250H700"
-                />
-                <path
-                  fill="url(#revarea)"
-                  d="M0 208 C55 190 80 125 140 152 S220 185 280 103 S370 143 420 76 S510 122 560 62 S645 82 700 25 V260 H0Z"
-                />
-                <path
-                  className="revenue-line"
-                  d="M0 208 C55 190 80 125 140 152 S220 185 280 103 S370 143 420 76 S510 122 560 62 S645 82 700 25"
-                />
-                <path
-                  className="expense-line"
-                  d="M0 224 C55 210 90 183 140 196 S225 205 280 164 S360 186 420 145 S510 175 560 132 S655 151 700 115"
-                />
-              </svg>
-              <div className="x-labels">
-                <span>Mar</span>
-                <span>Apr</span>
-                <span>May</span>
-                <span>Jun</span>
-                <span>Jul</span>
-                <span>Aug</span>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <div className="banking-state">No revenue or expense activity recorded yet.</div>
+          )}
         </article>
         <article className="panel cash-panel">
           <header className="panel-header">
@@ -270,7 +364,16 @@ export function DashboardPage({
               {bankSummary ? formatMoney(bankSummary.totalCash, bankSummary.baseCurrency) : '—'}
             </strong>
             <small>
-              <ArrowUpRight size={14} /> ₦2.4m this month
+              {Number(bankSummary?.moneyIn ?? 0) - Number(bankSummary?.moneyOut ?? 0) >= 0 ? (
+                <ArrowUpRight size={14} />
+              ) : (
+                <ArrowDownRight size={14} />
+              )}
+              {formatMoney(
+                String(Number(bankSummary?.moneyIn ?? 0) - Number(bankSummary?.moneyOut ?? 0)),
+                currency,
+              )}{' '}
+              net movement
             </small>
           </div>
           {bankAccounts.slice(0, 3).map((account, index) => (
@@ -283,6 +386,9 @@ export function DashboardPage({
               <b>{formatMoney(account.currentBalance, account.currency)}</b>
             </div>
           ))}
+          {!bankAccounts.length && (
+            <div className="dashboard-empty-inline">No bank accounts have been added.</div>
+          )}
           <button className="panel-link" onClick={() => onNavigate('banking')}>
             View all bank accounts →
           </button>
@@ -313,11 +419,16 @@ export function DashboardPage({
             </div>
           </div>
           <div className="ageing">
-            <div className="ageing-current" />
-            <div className="ageing-30" />
-            <div className="ageing-60" />
-            <div className="ageing-90" />
-            <div className="ageing-older" />
+            {ageing.map((amount, index) => (
+              <div
+                key={index}
+                className={
+                  ['ageing-current', 'ageing-30', 'ageing-60', 'ageing-90', 'ageing-older'][index]
+                }
+                style={{ flex: amount || 0.05 }}
+                title={formatMoney(String(amount), currency)}
+              />
+            ))}
           </div>
           <div className="ageing-labels">
             <span>Current</span>
@@ -333,21 +444,21 @@ export function DashboardPage({
               <h2>Tax liability</h2>
               <p>Current filing period</p>
             </div>
-            <Badge>Due in 12 days</Badge>
+            {latestTax && <Badge>{latestTax.status}</Badge>}
           </header>
           <div className="tax-amount">
             <span>Estimated payable</span>
-            <strong>₦2,184,500</strong>
+            <strong>{latestTax ? formatMoney(latestTax.amount, currency) : '—'}</strong>
           </div>
           <div className="tax-lines">
             <span>
-              Output VAT <b>₦3,420,000</b>
+              Output VAT <b>{formatMoney(String(latestTax?.data.outputVat ?? 0), currency)}</b>
             </span>
             <span>
-              Input VAT <b>−₦1,235,500</b>
+              Input VAT <b>{formatMoney(String(latestTax?.data.inputVat ?? 0), currency)}</b>
             </span>
             <span>
-              WHT credit <b>₦420,000</b>
+              WHT credit <b>{formatMoney(String(latestTax?.data.whtCredit ?? 0), currency)}</b>
             </span>
           </div>
           <button className="panel-link" onClick={() => onNavigate('tax')}>
@@ -360,59 +471,72 @@ export function DashboardPage({
               <h2>Gross margin trend</h2>
               <p>Profitability after direct costs</p>
             </div>
-            <Badge>Healthy</Badge>
+            <Badge>{currentMargin >= 0 ? 'Positive' : 'Negative'}</Badge>
           </header>
           <div className="profitability-summary">
-            <strong>38.6%</strong>
+            <strong>{currentMargin.toFixed(1)}%</strong>
             <span>
-              <ArrowUpRight size={14} /> 4.2 pts vs last quarter
+              {currentMargin >= previousMargin ? (
+                <ArrowUpRight size={14} />
+              ) : (
+                <ArrowDownRight size={14} />
+              )}{' '}
+              {(currentMargin - previousMargin).toFixed(1)} pts vs prior month
             </span>
           </div>
           <div
             className="margin-chart"
-            aria-label="Gross margin increased from 29 to 38.6 percent over six months"
+            aria-label="Gross margin trend from live monthly revenue and expense records"
           >
-            {[29, 31, 30, 34, 36, 39].map((value, index) => (
+            {margins.map((value, index) => (
               <i
                 key={value}
-                style={{ height: `${value * 2}%` }}
-                className={index === 5 ? 'active' : ''}
+                style={{ height: `${Math.max(3, Math.min(100, value))}%` }}
+                className={index === margins.length - 1 ? 'active' : ''}
               >
                 <span>{value}%</span>
               </i>
             ))}
           </div>
           <div className="margin-months">
-            <span>Mar</span>
-            <span>Apr</span>
-            <span>May</span>
-            <span>Jun</span>
-            <span>Jul</span>
-            <span>Aug</span>
+            {trend.map((item) => (
+              <span key={item.month}>
+                {new Date(`${item.month}-01`).toLocaleDateString('en-NG', { month: 'short' })}
+              </span>
+            ))}
           </div>
         </article>
         <article className="panel budget-panel">
           <header className="panel-header">
             <div>
               <h2>Operating budget</h2>
-              <p>August budget utilisation</p>
+              <p>{latestBudget?.name ?? 'No active operating budget'}</p>
             </div>
           </header>
-          <div className="budget-ring" aria-label="68 percent of operating budget used">
+          <div
+            className="budget-ring"
+            aria-label={`${budgetPercent} percent of operating budget used`}
+            style={{ background: `conic-gradient(#1233cc ${budgetPercent}%, #edf0f6 0)` }}
+          >
             <div>
-              <strong>68%</strong>
+              <strong>{budgetPercent}%</strong>
               <small>used</small>
             </div>
           </div>
           <div className="budget-values">
             <span>
-              Spent <b>₦18.4m</b>
+              Spent <b>{formatMoney(String(budgetSpent), currency)}</b>
             </span>
             <span>
-              Remaining <b>₦8.6m</b>
+              Remaining{' '}
+              <b>{formatMoney(String(Math.max(0, budgetTotal - budgetSpent)), currency)}</b>
             </span>
           </div>
-          <small className="budget-status">On track · 14 days remaining</small>
+          <small className="budget-status">
+            {latestBudget
+              ? `${latestBudget.status} · ${dateUntil(latestBudget.endDate, dashboardNow)}`
+              : 'Create a budget to track utilisation'}
+          </small>
         </article>
         <article className="panel activity-panel">
           <header className="panel-header">
@@ -443,6 +567,9 @@ export function DashboardPage({
                 <Badge>{transaction.reconciliationStatus.toLowerCase()}</Badge>
               </div>
             ))}
+            {!recentBankTransactions.length && (
+              <div className="dashboard-empty-inline">No bank transactions have been recorded.</div>
+            )}
           </div>
         </article>
         <article className="panel ai-insight">
@@ -459,10 +586,12 @@ export function DashboardPage({
               <MoreHorizontal size={18} />
             </button>
           </header>
-          <h3>Your cash runway improved by 18 days.</h3>
+          <h3>{aiHistory[0]?.question ?? 'Live financial overview'}</h3>
           <p>
-            Faster customer collections and lower operating spend added an estimated ₦4.2m to your
-            90-day cash position.
+            {aiHistory[0]?.answer ??
+              (analytics
+                ? `Revenue is ${formatMoney(analytics.metrics.revenue, currency)}, expenses are ${formatMoney(analytics.metrics.expenses, currency)}, and available cash is ${formatMoney(analytics.metrics.cash, currency)}.`
+                : 'Ask Cephas AI a question to create your first business insight.')}
           </p>
           <button onClick={() => onNavigate('ai-assistant')}>Explore forecast →</button>
           <div className="ai-decoration" />
@@ -475,9 +604,24 @@ export function DashboardPage({
             </div>
           </header>
           {[
-            [Clock3, '6 invoices are overdue', '₦3.12m outstanding', 'Review invoices'],
-            [ReceiptText, '8 expenses need approval', 'Oldest waiting 3 days', 'Review approvals'],
-            [Wallet, 'Bank reconciliation due', '42 unmatched items', 'Reconcile now'],
+            [
+              Clock3,
+              `${overdueInvoices.length} invoices are overdue`,
+              `${formatMoney(String(overdueAmount), currency)} outstanding`,
+              'Review invoices',
+            ],
+            [
+              ReceiptText,
+              `${workflowSummary?.pendingApprovals ?? 0} requests need approval`,
+              `${workflowSummary?.unreadNotifications ?? 0} unread notifications`,
+              'Review approvals',
+            ],
+            [
+              Wallet,
+              'Bank reconciliation',
+              `${bankSummary?.unreconciledCount ?? 0} unmatched items`,
+              'Reconcile now',
+            ],
           ].map(([Icon, a, b, c], index) => (
             <div className="task-row" key={String(a)}>
               <i>
