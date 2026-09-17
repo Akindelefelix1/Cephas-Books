@@ -1,15 +1,28 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Minus, Plus, Search, ShoppingCart, Trash2, UserPlus } from 'lucide-react';
+import {
+  LayoutGrid,
+  List,
+  Minus,
+  Plus,
+  Search,
+  ShoppingCart,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { operationsApi, type Product, type Warehouse } from '@/services/operations';
 import { posApi, type PosRegister, type PosSale, type PosShift } from '@/services/pos';
 import { salesApi, type Customer } from '@/services/sales';
 const money = (v: number) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(v);
+const quantity = (value: string | number) =>
+  new Intl.NumberFormat('en-NG', { maximumFractionDigits: 3 }).format(Number(value));
 const paymentLabel = (method: string) =>
   ({ CASH: 'Cash', CARD: 'POS / Card', TRANSFER: 'Bank transfer', CREDIT: 'Customer credit' })[
     method
   ] ?? method;
+type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'CREDIT';
+type PaymentInput = { method: PaymentMethod; amount: string };
 type Line = Product & { quantity: number };
 export function PosPage({ role }: { role: string }) {
   const [products, setProducts] = useState<Product[]>([]),
@@ -21,8 +34,8 @@ export function PosPage({ role }: { role: string }) {
     [registerId, setRegisterId] = useState(''),
     [customerId, setCustomerId] = useState(''),
     [search, setSearch] = useState(''),
-    [method, setMethod] = useState('CASH'),
-    [received, setReceived] = useState(''),
+    [catalogView, setCatalogView] = useState<'TABLE' | 'CARDS'>('TABLE'),
+    [payments, setPayments] = useState<PaymentInput[]>([{ method: 'CASH', amount: '' }]),
     [setup, setSetup] = useState<'REGISTER' | 'SHIFT' | 'CUSTOMER' | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
@@ -45,6 +58,18 @@ export function PosPage({ role }: { role: string }) {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load POS data'));
   }, []);
+  useEffect(() => {
+    const register = registers.find((item) => item.id === registerId);
+    if (!register) return;
+    void operationsApi
+      .products({ status: 'active', warehouseId: register.warehouseId })
+      .then((items) => setProducts(items.filter((item) => item.isActive)))
+      .catch((requestError) =>
+        setError(
+          requestError instanceof Error ? requestError.message : 'Unable to load available stock',
+        ),
+      );
+  }, [registerId, registers]);
   const visible = useMemo(
       () =>
         products.filter((x) => `${x.name} ${x.sku}`.toLowerCase().includes(search.toLowerCase())),
@@ -56,13 +81,30 @@ export function PosPage({ role }: { role: string }) {
       0,
     ),
     total = subtotal + tax,
-    paid = Number(received || 0);
-  const add = (p: Product) =>
-    setCart((x) =>
-      x.some((y) => y.id === p.id)
-        ? x.map((y) => (y.id === p.id ? { ...y, quantity: y.quantity + 1 } : y))
-        : [...x, { ...p, quantity: 1 }],
+    paid = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    change = Math.max(0, paid - total),
+    remaining = Math.max(0, total - paid);
+  const available = (product: Product) =>
+    product.type === 'SERVICE' ? Infinity : Number(product.stockQuantity);
+  const cartQuantity = (productId: string) =>
+    cart.find((item) => item.id === productId)?.quantity ?? 0;
+  const canAdd = (product: Product) => cartQuantity(product.id) < available(product);
+  const add = (product: Product) => {
+    if (!canAdd(product)) {
+      setError(
+        `${product.name}: only ${quantity(product.stockQuantity)} available in this register's warehouse.`,
+      );
+      return;
+    }
+    setError('');
+    setCart((current) =>
+      current.some((item) => item.id === product.id)
+        ? current.map((item) =>
+            item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
+          )
+        : [...current, { ...product, quantity: 1 }],
     );
+  };
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -103,8 +145,15 @@ export function PosPage({ role }: { role: string }) {
     if (!registerId) return setError('Set up a register first.');
     if (!shift) return setError('Open a cashier shift first.');
     if (!cart.length) return setError('Add an item to the sale.');
-    if (method === 'CASH' && paid < total)
-      return setError('Amount received is less than total due.');
+    const settledPayments = payments
+      .map((payment) => ({ ...payment, amount: Number(payment.amount || 0) }))
+      .filter((payment) => payment.amount > 0);
+    if (!settledPayments.length) return setError('Enter a payment amount.');
+    if (paid < total) return setError(`Outstanding amount: ${money(remaining)}.`);
+    if (change > 0 && !settledPayments.some((payment) => payment.method === 'CASH'))
+      return setError('Only cash payments can exceed the amount due.');
+    if (settledPayments.some((payment) => payment.method === 'CREDIT') && !customerId)
+      return setError('Select a customer before using customer credit.');
     setBusy(true);
     try {
       const s = await posApi.complete({
@@ -112,11 +161,11 @@ export function PosPage({ role }: { role: string }) {
         customerId: customerId || undefined,
         idempotencyKey: crypto.randomUUID(),
         items: cart.map((x) => ({ productId: x.id, quantity: x.quantity })),
-        payments: [{ method, amount: method === 'CASH' ? paid : total }],
+        payments: settledPayments,
       });
       setSale(s);
       setCart([]);
-      setReceived('');
+      setPayments([{ method: 'CASH', amount: '' }]);
       setCustomerId('');
     } catch (x) {
       setError(x instanceof Error ? x.message : 'Unable to complete sale');
@@ -135,15 +184,84 @@ export function PosPage({ role }: { role: string }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-        <div className="pos-products">
-          {visible.map((p) => (
-            <button key={p.id} onClick={() => add(p)}>
-              <strong>{p.name}</strong>
-              <small>{p.sku}</small>
-              <b>{money(Number(p.salePrice))}</b>
+        <div className="pos-catalog__toolbar">
+          <small>
+            {registerId ? 'Stock for selected register' : 'Select a register to see stock'}
+          </small>
+          <div className="pos-view-toggle" aria-label="Product display">
+            <button
+              type="button"
+              className={catalogView === 'TABLE' ? 'active' : ''}
+              onClick={() => setCatalogView('TABLE')}
+              aria-label="Table view"
+            >
+              <List size={16} />
             </button>
-          ))}
+            <button
+              type="button"
+              className={catalogView === 'CARDS' ? 'active' : ''}
+              onClick={() => setCatalogView('CARDS')}
+              aria-label="Card view"
+            >
+              <LayoutGrid size={16} />
+            </button>
+          </div>
         </div>
+        {catalogView === 'TABLE' ? (
+          <div className="pos-product-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>SKU</th>
+                  <th>Available</th>
+                  <th>Price</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((product) => (
+                  <tr key={product.id}>
+                    <td>
+                      <strong>{product.name}</strong>
+                    </td>
+                    <td>{product.sku}</td>
+                    <td>
+                      {product.type === 'SERVICE'
+                        ? '—'
+                        : `${quantity(product.stockQuantity)} ${product.unit}`}
+                    </td>
+                    <td>{money(Number(product.salePrice))}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => add(product)}
+                        disabled={!canAdd(product)}
+                      >
+                        Add
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="pos-products">
+            {visible.map((product) => (
+              <button key={product.id} onClick={() => add(product)} disabled={!canAdd(product)}>
+                <strong>{product.name}</strong>
+                <small>{product.sku}</small>
+                <small>
+                  {product.type === 'SERVICE'
+                    ? 'Service'
+                    : `${quantity(product.stockQuantity)} ${product.unit} available`}
+                </small>
+                <b>{money(Number(product.salePrice))}</b>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
       <section className="panel pos-cart">
         <header>
@@ -159,6 +277,8 @@ export function PosPage({ role }: { role: string }) {
               onChange={(e) => {
                 setRegisterId(e.target.value);
                 setShift(null);
+                setCart([]);
+                setError('');
               }}
             >
               <option value="">Select register</option>
@@ -196,7 +316,14 @@ export function PosPage({ role }: { role: string }) {
         </div>
         {cart.map((x) => (
           <div className="pos-cart-lines" key={x.id}>
-            <span>{x.name}</span>
+            <span>
+              {x.name}
+              <small>
+                {x.type === 'SERVICE'
+                  ? 'Service'
+                  : `${quantity(x.stockQuantity)} ${x.unit} available`}
+              </small>
+            </span>
             <div className="pos-qty">
               <button
                 onClick={() =>
@@ -211,6 +338,7 @@ export function PosPage({ role }: { role: string }) {
               </button>
               <b>{x.quantity}</b>
               <button
+                disabled={x.quantity >= available(x)}
                 onClick={() =>
                   setCart((c) =>
                     c.map((y) => (y.id === x.id ? { ...y, quantity: y.quantity + 1 } : y)),
@@ -238,35 +366,94 @@ export function PosPage({ role }: { role: string }) {
           </strong>
         </div>
         <div className="pos-payment">
-          <select value={method} onChange={(e) => setMethod(e.target.value)}>
-            <option value="CASH">Cash</option>
-            <option value="CARD">POS / Card</option>
-            <option value="TRANSFER">Bank transfer</option>
-            <option value="CREDIT">Customer credit</option>
-          </select>
-          {method === 'CASH' && (
-            <input
-              type="number"
-              placeholder="Amount received"
-              value={received}
-              onChange={(e) => setReceived(e.target.value)}
-            />
-          )}
+          <div className="pos-payment__heading">
+            <strong>Payment</strong>
+            <button
+              type="button"
+              onClick={() => setPayments((current) => [...current, { method: 'CASH', amount: '' }])}
+            >
+              + Split payment
+            </button>
+          </div>
+          {payments.map((payment, index) => (
+            <div className="pos-payment__row" key={index}>
+              <select
+                aria-label={`Payment method ${index + 1}`}
+                value={payment.method}
+                onChange={(event) =>
+                  setPayments((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index
+                        ? { ...item, method: event.target.value as PaymentMethod }
+                        : item,
+                    ),
+                  )
+                }
+              >
+                <option value="CASH">Cash</option>
+                <option value="CARD">POS / Card</option>
+                <option value="TRANSFER">Bank transfer</option>
+                <option value="CREDIT">Customer credit</option>
+              </select>
+              <input
+                aria-label={`${paymentLabel(payment.method)} amount`}
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Amount"
+                value={payment.amount}
+                onChange={(event) =>
+                  setPayments((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, amount: event.target.value } : item,
+                    ),
+                  )
+                }
+              />
+              {payments.length > 1 && (
+                <button
+                  className="pos-payment__remove"
+                  type="button"
+                  aria-label={`Remove payment ${index + 1}`}
+                  onClick={() =>
+                    setPayments((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                  }
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+          <div className="pos-payment__totals">
+            <span>
+              Paid <b>{money(paid)}</b>
+            </span>
+            {remaining > 0 ? (
+              <span>
+                Outstanding <b>{money(remaining)}</b>
+              </span>
+            ) : (
+              <span>
+                Change <b>{money(change)}</b>
+              </span>
+            )}
+          </div>
         </div>
         {error && <p className="form-error">{error}</p>}
         <button className="button pos-pay" onClick={() => void complete()} disabled={busy}>
           Pay {money(total)}
         </button>
-      {sale && (
-        <div className="pos-receipt">
-          <strong>Sale completed: {sale.receiptNumber}</strong>
-          {sale.payments.map((payment) => (
-            <small key={`${payment.method}-${payment.reference ?? 'cash'}`}>
-              {paymentLabel(payment.method)} {payment.reference && `reference: ${payment.reference}`}
-            </small>
-          ))}
-        </div>
-      )}
+        {sale && (
+          <div className="pos-receipt">
+            <strong>Sale completed: {sale.receiptNumber}</strong>
+            {sale.payments.map((payment) => (
+              <small key={`${payment.method}-${payment.reference ?? 'cash'}`}>
+                {paymentLabel(payment.method)}{' '}
+                {payment.reference && `reference: ${payment.reference}`}
+              </small>
+            ))}
+          </div>
+        )}
       </section>
       <Modal
         open={!!setup}
