@@ -9,6 +9,7 @@ import {
   type OperationsSummary,
   type OperationsView,
   type Product,
+  type ProductCategory,
   type Project,
   type ProjectPlan,
   type StockAdjustment,
@@ -34,6 +35,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   const canApprove = canEdit || role === 'APPROVER';
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [search, setSearch] = useState('');
@@ -52,14 +54,16 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
     setLoading(true);
     setError('');
     try {
-      const [s, p, w] = await Promise.all([
+      const [s, p, w, c] = await Promise.all([
         operationsApi.summary(),
         operationsApi.products(),
         operationsApi.warehouses(),
+        operationsApi.categories(),
       ]);
       setSummary(s);
       setProducts(p.filter((x) => x.isActive && x.type === 'PRODUCT'));
       setWarehouses(w.filter((x) => x.isActive));
+      setCategories(c);
       if (view === 'products') setRows(await operationsApi.products({ search, status }));
       else if (view === 'warehouses') setRows(await operationsApi.warehouses({ search, status }));
       else if (view === 'stock-movements')
@@ -233,6 +237,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
         view={view}
         selected={selected}
         products={products}
+        categories={categories}
         warehouses={warehouses}
         busy={busy}
         error={error}
@@ -431,6 +436,7 @@ function OperationsModal({
   view,
   selected,
   products,
+  categories,
   warehouses,
   busy,
   error,
@@ -441,6 +447,7 @@ function OperationsModal({
   view: OperationsView;
   selected: Row | null;
   products: Product[];
+  categories: ProductCategory[];
   warehouses: Warehouse[];
   busy: boolean;
   error: string;
@@ -448,6 +455,10 @@ function OperationsModal({
   submit: (data: Record<string, unknown>, transfer: boolean) => void;
 }) {
   const [transfer, setTransfer] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const [categoryError, setCategoryError] = useState('');
   const today = new Date().toLocaleDateString('en-CA');
   const closeModal = () => {
     setTransfer(false);
@@ -464,7 +475,7 @@ function OperationsModal({
           sku: get('sku'),
           name: get('name'),
           type: get('type'),
-          category: get('category') || undefined,
+          category: selectedCategory || undefined,
           description: get('description') || undefined,
           unit: get('unit'),
           salePrice: num('salePrice'),
@@ -545,6 +556,21 @@ function OperationsModal({
   const p = selected as Product | null,
     w = selected as Warehouse | null,
     project = selected as Project | null;
+  useEffect(() => setSelectedCategory(p?.category || ''), [open, p?.category]);
+  const addCategory = async () => {
+    const name = newCategory.trim();
+    if (!name) return;
+    setCategoryError('');
+    try {
+      const category = await operationsApi.createCategory(name);
+      setSelectedCategory(category.name);
+      setNewCategory('');
+      setAddingCategory(false);
+      confirmAction(`Category “${category.name}” added`);
+    } catch (caught) {
+      setCategoryError(caught instanceof Error ? caught.message : 'Unable to add category');
+    }
+  };
   return (
     <Modal
       open={open}
@@ -581,7 +607,16 @@ function OperationsModal({
             </label>
             <label>
               Category
-              <input name="category" defaultValue={p?.category} />
+              <div className="category-picker">
+                <select name="category" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
+                  <option value="">Uncategorised</option>
+                  {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
+                  {selectedCategory && !categories.some((category) => category.name === selectedCategory) && <option value={selectedCategory}>{selectedCategory}</option>}
+                </select>
+                <button type="button" className="icon-button" aria-label="Add category" title="Add category" onClick={() => setAddingCategory((value) => !value)}><Plus size={16} /></button>
+              </div>
+              {addingCategory && <div className="category-picker__add"><input value={newCategory} placeholder="New category" onChange={(event) => setNewCategory(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void addCategory(); } }} /><button type="button" onClick={() => void addCategory()}>Add</button></div>}
+              {categoryError && <small className="form-error">{categoryError}</small>}
             </label>
             <label>
               Unit

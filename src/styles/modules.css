@@ -308,6 +308,12 @@
 .invoice-line-editor__row input { min-width: 0; }
 .invoice-line-editor__row .icon-button { width: 32px; height: 32px; color: #a94747; }
 .invoice-line-editor__add { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 0; border: 0; background: none; color: #1233cc; font-size: .68rem; font-weight: 750; }
+.category-picker { display: flex; align-items: center; gap: 7px; }
+.category-picker select { flex: 1; min-width: 0; }
+.category-picker .icon-button { flex: 0 0 34px; width: 34px; height: 34px; color: #1233cc; border: 1px solid #cfd8ef; }
+.category-picker__add { display: flex; gap: 6px; margin-top: 7px; }
+.category-picker__add input { min-width: 0; flex: 1; }
+.category-picker__add button { border: 0; border-radius: 7px; padding: 0 11px; background: #1233cc; color: #fff; font-size: .64rem; font-weight: 700; }
 .inline-actions button { display: inline-flex; align-items: center; gap: 4px; }
 .invoice-paper { margin: 18px 0; padding: 34px; border: 7px solid #604a34; background: #f8f1e2; color: #493b2e; box-shadow: 0 4px 16px #3d2c1b33; }
 .invoice-paper header,.invoice-paper footer,.invoice-paper__addresses { display: flex; justify-content: space-between; gap: 22px; }

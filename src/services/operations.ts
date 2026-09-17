@@ -18,6 +18,10 @@ export interface Product {
   stockValue: string;
   isActive: boolean;
 }
+export interface ProductCategory {
+  id: string;
+  name: string;
+}
 export interface Warehouse {
   id: string;
   code: string;
@@ -87,6 +91,9 @@ const req = <T>(path: string, method = 'GET', body?: object) =>
 export const operationsApi = {
   summary: () => req<OperationsSummary>('/operations/summary'),
   products: (filters = {}) => req<Product[]>(`/operations/products?${query(filters)}`),
+  categories: () => req<ProductCategory[]>('/operations/product-categories'),
+  createCategory: (name: string) =>
+    req<ProductCategory>('/operations/product-categories', 'POST', { name }),
   createProduct: (data: object) => req<Product>('/operations/products', 'POST', data),
   updateProduct: (id: string, data: object) =>
     req<Product>(`/operations/products/${id}`, 'PATCH', data),
