@@ -32,7 +32,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarTheme, setSidebarTheme] = useState<SidebarTheme>(() => {
     const savedTheme = localStorage.getItem('cephas:sidebar-theme');
-    return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'default';
+    return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'light';
   });
   const activeParent = allNavigation.find((item) =>
     item.children?.some((child) => child.id === active),
