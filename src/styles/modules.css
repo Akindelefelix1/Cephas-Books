@@ -1841,3 +1841,4 @@
   margin: 0;
   font-size: 0.68rem;
 }
+.pos-customer{display:grid;gap:8px;margin:14px 0}.pos-customer>div{display:grid;grid-template-columns:1fr auto;gap:8px}.pos-customer select{min-width:0}
