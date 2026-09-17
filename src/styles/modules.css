@@ -322,7 +322,8 @@
 .invoice-paper table { width: 100%; border-collapse: collapse; background: #fffdf8; border: 1px solid #a18e73; }
 .invoice-paper th { padding: 9px; background: #604a34; color: #fff; font-size: .55rem; text-align: left; }
 .invoice-paper td { padding: 10px 9px; border-bottom: 1px solid #dfd2bf; font-size: .66rem; }
-.invoice-paper td:not(:first-child) { text-align: right; }
+.invoice-paper th:nth-child(2),.invoice-paper td:nth-child(2) { text-align: center; }
+.invoice-paper th:nth-child(3),.invoice-paper th:nth-child(4),.invoice-paper td:nth-child(3),.invoice-paper td:nth-child(4) { text-align: right; }
 .invoice-paper footer { margin-top: 25px; }
 .invoice-paper footer > div { flex: 1; font-size: .65rem; }
 .invoice-paper footer em { display: block; margin-top: 26px; font-family: Georgia, serif; font-size: 1rem; }
