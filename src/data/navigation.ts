@@ -26,6 +26,7 @@ export const primaryNavigation: NavItem[] = [
     label: 'Sales & income',
     icon: ShoppingCart,
     children: [
+      { id: 'pos', label: 'POS / New sale' },
       { id: 'customers', label: 'Customers' },
       { id: 'quotations', label: 'Quotations' },
       { id: 'invoices', label: 'Invoices' },

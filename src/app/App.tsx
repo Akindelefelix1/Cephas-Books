@@ -18,6 +18,7 @@ import { getFallbackModule } from '@/data/fallbackModules';
 import { SimpleFeaturePage } from '@/pages/SpecialPages';
 import { BankingPage } from '@/pages/BankingPage';
 import { SalesIncomePage } from '@/pages/SalesIncomePage';
+import { PosPage } from '@/pages/PosPage';
 import { PurchasesSpendingPage } from '@/pages/PurchasesSpendingPage';
 import { AccountingFinancePage } from '@/pages/AccountingFinancePage';
 import { InventoryOperationsPage } from '@/pages/InventoryOperationsPage';
@@ -142,6 +143,7 @@ export function App() {
           companyName={identity.companyName}
         />
       );
+    if (active === 'pos') return <PosPage />;
     if (
       ['customers', 'quotations', 'invoices', 'payments', 'credit-notes', 'receivables'].includes(
         active,
