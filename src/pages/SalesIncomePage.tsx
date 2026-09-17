@@ -487,6 +487,14 @@ function CreateModal({
 }) {
   const document = view === 'quotations' || view === 'invoices';
   const [lineItems, setLineItems] = useState([{ description: '', quantity: '', unitPrice: '' }]);
+  const [invoiceNumber, setInvoiceNumber] = useState('Generating…');
+  useEffect(() => {
+    if (!open || view !== 'invoices') return;
+    setInvoiceNumber('Generating…');
+    void salesApi.nextInvoiceNumber()
+      .then(({ number }) => setInvoiceNumber(number))
+      .catch(() => setInvoiceNumber('Available after saving'));
+  }, [open, view]);
   const updateLine = (index: number, field: 'description' | 'quantity' | 'unitPrice', value: string) =>
     setLineItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
   return (
@@ -534,7 +542,7 @@ function CreateModal({
           else if (document)
             submit({
               customerId: get('customerId'),
-              number: get('number'),
+              ...(view === 'quotations' ? { number: get('number') } : {}),
               currency: 'NGN',
               issueDate: get('issueDate'),
               ...(view === 'quotations'
@@ -602,7 +610,7 @@ function CreateModal({
               <>
                 <label>
                   Number
-                  <input name="number" required />
+                  {view === 'invoices' ? <input value={invoiceNumber} readOnly aria-label="Automatically generated invoice number" /> : <input name="number" required />}
                 </label>
                 <label>
                   Issue date

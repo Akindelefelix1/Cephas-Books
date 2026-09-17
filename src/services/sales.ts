@@ -99,6 +99,7 @@ export const salesApi = {
   archiveCustomer: (id: string) =>
     authorizedRequest<Customer>(`/customers/${id}`, { method: 'DELETE' }),
   invoices: () => authorizedRequest<Invoice[]>('/invoices'),
+  nextInvoiceNumber: () => authorizedRequest<{ number: string }>('/invoices/next-number'),
   createInvoice: (data: object) =>
     authorizedRequest<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) }),
   sendInvoice: (id: string) =>
