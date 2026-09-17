@@ -36,6 +36,7 @@ export function PosPage({ role }: { role: string }) {
     [search, setSearch] = useState(''),
     [catalogView, setCatalogView] = useState<'TABLE' | 'CARDS'>('TABLE'),
     [payments, setPayments] = useState<PaymentInput[]>([{ method: 'CASH', amount: '' }]),
+    [splitMode, setSplitMode] = useState(false),
     [setup, setSetup] = useState<'REGISTER' | 'SHIFT' | 'CUSTOMER' | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
@@ -84,6 +85,12 @@ export function PosPage({ role }: { role: string }) {
     paid = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
     change = Math.max(0, paid - total),
     remaining = Math.max(0, total - paid);
+  useEffect(() => {
+    if (!splitMode)
+      setPayments((current) =>
+        current.length === 1 ? [{ ...current[0], amount: total > 0 ? String(total) : '' }] : current,
+      );
+  }, [splitMode, total]);
   const available = (product: Product) =>
     product.type === 'SERVICE' ? Infinity : Number(product.stockQuantity);
   const cartQuantity = (productId: string) =>
@@ -166,6 +173,7 @@ export function PosPage({ role }: { role: string }) {
       setSale(s);
       setCart([]);
       setPayments([{ method: 'CASH', amount: '' }]);
+      setSplitMode(false);
       setCustomerId('');
     } catch (x) {
       setError(x instanceof Error ? x.message : 'Unable to complete sale');
@@ -370,7 +378,13 @@ export function PosPage({ role }: { role: string }) {
             <strong>Payment</strong>
             <button
               type="button"
-              onClick={() => setPayments((current) => [...current, { method: 'CASH', amount: '' }])}
+              onClick={() => {
+                setSplitMode(true);
+                setPayments((current) => [
+                  ...current.map((payment) => ({ ...payment, amount: '' })),
+                  { method: 'CASH', amount: '' },
+                ]);
+              }}
             >
               + Split payment
             </button>

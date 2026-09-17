@@ -489,8 +489,8 @@ function OperationsModal({
           costPrice: num('costPrice'),
           taxRate: num('taxRate'),
           reorderLevel: num('reorderLevel'),
-          openingQuantity: num('openingQuantity'),
-          openingWarehouseId: get('openingWarehouseId') || undefined,
+          defaultWarehouseId: get('defaultWarehouseId') || undefined,
+          ...(p ? {} : { openingQuantity: num('openingQuantity') }),
         },
         false,
       );
@@ -675,17 +675,17 @@ function OperationsModal({
                 defaultValue={p?.reorderLevel || 0}
               />
             </label>
+            <label>
+              Default stock warehouse
+              <select name="defaultWarehouseId" defaultValue={p?.defaultWarehouseId || ""}>
+                <option value="">No default warehouse</option>
+                {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>)}
+              </select>
+            </label>
             {!p && <>
               <label>
                 Opening quantity
                 <input name="openingQuantity" type="number" min="0" step=".0001" defaultValue="0" />
-              </label>
-              <label>
-                Opening-stock warehouse
-                <select name="openingWarehouseId" defaultValue="">
-                  <option value="">Select warehouse if opening stock is entered</option>
-                  {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>)}
-                </select>
               </label>
             </>}
             <label className="full">

@@ -16,6 +16,7 @@ export interface Product {
   reorderLevel: string;
   stockQuantity: string;
   stockValue: string;
+  defaultWarehouseId?: string;
   isActive: boolean;
 }
 export interface ProductCategory {
