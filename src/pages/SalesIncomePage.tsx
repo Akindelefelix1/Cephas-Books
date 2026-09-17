@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Download, Plus } from 'lucide-react';
+import { Download, Eye, Plus, Send, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
@@ -32,6 +32,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     [error, setError] = useState(''),
     [modal, setModal] = useState(false),
     [selected, setSelected] = useState<Customer | null>(null),
+    [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
@@ -234,6 +235,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                                 setModal(true);
                               }
                             },
+                            (invoice) => setPreviewInvoice(invoice),
                           )}
                         </div>
                       </td>
@@ -275,6 +277,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         error={error}
         onClose={() => setConfirmation(null)}
       />
+      <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} />
     </>
   );
 }
@@ -353,7 +356,18 @@ function actions(
   r: Row,
   run: (f: () => Promise<unknown>, m: string) => void,
   edit: () => void,
+  preview: (invoice: Invoice) => void,
 ) {
+  if (v === 'invoices') {
+    const invoice = r as Invoice;
+    return (
+      <>
+        <button onClick={() => preview(invoice)}><Eye size={15} /> Preview</button>
+        <button onClick={() => printInvoice(invoice)}><Download size={15} /> Download</button>
+        <button onClick={() => run(() => salesApi.sendInvoice(invoice.id), 'Invoice emailed to customer')}><Send size={15} /> Send</button>
+      </>
+    );
+  }
   if (v === 'customers')
     return (
       <>
@@ -424,6 +438,32 @@ async function create(v: View, d: Record<string, unknown>, selected: Customer | 
   if (v === 'payments' || v === 'receivables') return salesApi.createPayment(d);
   return salesApi.createCredit(d);
 }
+function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose: () => void }) {
+  if (!invoice) return null;
+  return (
+    <Modal open title={`Invoice ${invoice.number}`} onClose={onClose} wide footer={<><button className="button button--secondary" onClick={onClose}>Close</button><button className="button button--secondary" onClick={() => printInvoice(invoice)}><Download size={16} /> Download PDF</button><button className="button" onClick={() => void salesApi.sendInvoice(invoice.id).then(() => confirmAction('Invoice emailed to customer'))}><Send size={16} /> Send email</button></>}>
+      <InvoicePaper invoice={invoice} />
+    </Modal>
+  );
+}
+function InvoicePaper({ invoice }: { invoice: Invoice }) {
+  const subtotal = invoice.items?.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0) ?? Number(invoice.subtotal);
+  return <article className="invoice-paper" id="invoice-paper">
+    <header><div><h1>INVOICE</h1><span>THANK YOU FOR YOUR BUSINESS</span></div><div className="invoice-paper__meta"><b>DATE</b><strong>{day(invoice.issueDate)}</strong><b>INVOICE NO.</b><strong>{invoice.number}</strong></div></header>
+    <section className="invoice-paper__addresses"><div><b>FROM</b><strong>Cephas Books</strong><span>Professional accounting made simple</span></div><div><b>BILL TO</b><strong>{invoice.customer.displayName}</strong><span>{invoice.customer.companyName || invoice.customer.email || 'Valued customer'}</span></div></section>
+    <table><thead><tr><th>DESCRIPTION</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>{invoice.items?.map((item, index) => <tr key={index}><td>{item.description}</td><td>{item.quantity}</td><td>{cash(String(item.unitPrice), invoice.currency)}</td><td>{cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency)}</td></tr>)}</tbody></table>
+    <footer><div><b>PAYMENT INFORMATION</b><p>Please remit payment by {day(invoice.dueDate)}.</p><em>Thank you!</em></div><div className="invoice-paper__totals"><span>SUBTOTAL <b>{cash(String(subtotal), invoice.currency)}</b></span><span>TAX <b>{cash(invoice.taxTotal, invoice.currency)}</b></span><strong>TOTAL DUE <b>{cash(invoice.total, invoice.currency)}</b></strong></div></footer>
+  </article>;
+}
+function printInvoice(invoice: Invoice) {
+  const source = document.getElementById('invoice-paper');
+  const popup = window.open('', '_blank', 'width=900,height=1100');
+  if (!popup) return;
+  const fallback = `<article class="invoice-paper"><header><div><h1>INVOICE</h1><span>THANK YOU FOR YOUR BUSINESS</span></div><div class="invoice-paper__meta"><b>DATE</b><strong>${day(invoice.issueDate)}</strong><b>INVOICE NO.</b><strong>${invoice.number}</strong></div></header><section class="invoice-paper__addresses"><div><b>FROM</b><strong>Cephas Books</strong></div><div><b>BILL TO</b><strong>${invoice.customer.displayName}</strong><span>${invoice.customer.email || ''}</span></div></section><table><thead><tr><th>DESCRIPTION</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>${(invoice.items || []).map((item) => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${cash(String(item.unitPrice), invoice.currency)}</td><td>${cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency)}</td></tr>`).join('')}</tbody></table><footer><div><b>PAYMENT INFORMATION</b><p>Please remit payment by ${day(invoice.dueDate)}.</p><em>Thank you!</em></div><div class="invoice-paper__totals"><strong>TOTAL DUE <b>${cash(invoice.total, invoice.currency)}</b></strong></div></footer></article>`;
+  popup.document.write(`<html><head><title>Invoice ${invoice.number}</title><style>${invoicePrintCss}</style></head><body>${source?.outerHTML || fallback}<script>window.onload=()=>window.print()</script></body></html>`);
+  popup.document.close();
+}
+const invoicePrintCss = `body{margin:0;background:#eee;font-family:Arial,sans-serif}.invoice-paper{box-sizing:border-box;width:210mm;min-height:297mm;margin:auto;padding:20mm;background:#f8f1e2;color:#493b2e;border:10px solid #604a34}.invoice-paper header,.invoice-paper footer,.invoice-paper__addresses{display:flex;justify-content:space-between;gap:28px}.invoice-paper h1{font-family:Georgia,serif;font-style:italic;font-size:35px;margin:0}.invoice-paper header span,.invoice-paper b{font-size:10px;letter-spacing:.7px}.invoice-paper__meta{display:grid;grid-template-columns:auto auto;gap:5px 16px}.invoice-paper__meta strong{font-size:12px}.invoice-paper__addresses{margin:45px 0 24px}.invoice-paper__addresses div{display:grid;gap:5px;min-width:180px}.invoice-paper__addresses strong{font-family:Georgia,serif}.invoice-paper__addresses span{font-size:12px}.invoice-paper table{width:100%;border-collapse:collapse;background:#fffdf8;border:1px solid #9a876e}.invoice-paper th{padding:10px;background:#604a34;color:white;font-size:10px;text-align:left}.invoice-paper td{padding:13px 10px;border-bottom:1px solid #ddd1bf;font-size:12px}.invoice-paper td:not(:first-child){text-align:right}.invoice-paper footer{margin-top:32px}.invoice-paper footer>div{flex:1;font-size:12px}.invoice-paper footer em{display:block;margin-top:45px;font-family:Georgia,serif;font-size:18px}.invoice-paper__totals{border:1px solid #9a876e;align-self:start}.invoice-paper__totals span,.invoice-paper__totals strong{display:flex;justify-content:space-between;padding:9px 12px;font-size:11px}.invoice-paper__totals strong{background:#604a34;color:#fff}@page{size:A4;margin:0}@media print{body{background:white}.invoice-paper{border-width:8px}}`;
 function CreateModal({
   open,
   view,
@@ -446,6 +486,9 @@ function CreateModal({
   submit: (d: Record<string, unknown>) => void;
 }) {
   const document = view === 'quotations' || view === 'invoices';
+  const [lineItems, setLineItems] = useState([{ description: '', quantity: '', unitPrice: '' }]);
+  const updateLine = (index: number, field: 'description' | 'quantity' | 'unitPrice', value: string) =>
+    setLineItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
   return (
     <Modal
       open={open}
@@ -497,14 +540,9 @@ function CreateModal({
               ...(view === 'quotations'
                 ? { expiryDate: get('dueDate') }
                 : { dueDate: get('dueDate'), status: 'DRAFT' }),
-              items: [
-                {
-                  description: get('description'),
-                  quantity: Number(get('quantity')),
-                  unitPrice: Number(get('unitPrice')),
-                  taxRate: Number(get('taxRate')),
-                },
-              ],
+              items: view === 'invoices'
+                ? lineItems.map((item) => ({ ...item, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), taxRate: Number(get('taxRate')) }))
+                : [{ description: get('description'), quantity: Number(get('quantity')), unitPrice: Number(get('unitPrice')), taxRate: Number(get('taxRate')) }],
               notes: get('notes') || undefined,
             });
           else if (view === 'credit-notes')
@@ -574,18 +612,24 @@ function CreateModal({
                   {view === 'quotations' ? 'Expiry' : 'Due'} date
                   <input name="dueDate" type="date" required />
                 </label>
-                <label className="full">
-                  Line description
-                  <input name="description" required />
-                </label>
-                <label>
-                  Quantity
-                  <input name="quantity" type="number" min=".0001" step=".0001" required />
-                </label>
-                <label>
-                  Unit price
-                  <input name="unitPrice" type="number" min="0" step=".01" required />
-                </label>
+                {view === 'invoices' ? (
+                  <div className="invoice-line-editor full">
+                    <div className="invoice-line-editor__heading"><span>Invoice items</span><small>Only these fields change for each line.</small></div>
+                    {lineItems.map((item, index) => (
+                      <div className="invoice-line-editor__row" key={index}>
+                        <label>Line description<input required value={item.description} onChange={(event) => updateLine(index, 'description', event.target.value)} /></label>
+                        <label>Quantity<input required type="number" min=".0001" step=".0001" value={item.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} /></label>
+                        <label>Unit price<input required type="number" min="0" step=".01" value={item.unitPrice} onChange={(event) => updateLine(index, 'unitPrice', event.target.value)} /></label>
+                        <button type="button" className="icon-button" aria-label={`Remove item ${index + 1}`} disabled={lineItems.length === 1} onClick={() => setLineItems((items) => items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={16} /></button>
+                      </div>
+                    ))}
+                    <button type="button" className="invoice-line-editor__add" onClick={() => setLineItems((items) => [...items, { description: '', quantity: '', unitPrice: '' }])}><Plus size={16} /> Add another item</button>
+                  </div>
+                ) : <>
+                  <label className="full">Line description<input name="description" required /></label>
+                  <label>Quantity<input name="quantity" type="number" min=".0001" step=".0001" required /></label>
+                  <label>Unit price<input name="unitPrice" type="number" min="0" step=".01" required /></label>
+                </>}
                 <label>
                   Tax %<input name="taxRate" type="number" min="0" step=".01" defaultValue="0" />
                 </label>

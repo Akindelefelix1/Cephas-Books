@@ -101,6 +101,8 @@ export const salesApi = {
   invoices: () => authorizedRequest<Invoice[]>('/invoices'),
   createInvoice: (data: object) =>
     authorizedRequest<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) }),
+  sendInvoice: (id: string) =>
+    authorizedRequest<{ sent: true }>(`/invoices/${id}/send`, { method: 'POST' }),
   quotations: (filters: Record<string, string>) =>
     authorizedRequest<Quotation[]>(`/sales/quotations?${q(filters)}`),
   createQuotation: (data: object) =>
