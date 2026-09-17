@@ -136,7 +136,14 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
           )}
         </div>
       </div>
-      {summary && (
+      {loading ? (
+        <StatsGrid stats={[
+          { label: 'Inventory value', value: 'Loading…' },
+          { label: 'Active items', value: 'Loading…' },
+          { label: 'Low / out of stock', value: 'Loading…' },
+          { label: view === 'projects' ? 'Active projects' : 'Warehouses', value: 'Loading…' },
+        ]} />
+      ) : summary && (
         <StatsGrid
           stats={[
             {
@@ -482,6 +489,8 @@ function OperationsModal({
           costPrice: num('costPrice'),
           taxRate: num('taxRate'),
           reorderLevel: num('reorderLevel'),
+          openingQuantity: num('openingQuantity'),
+          openingWarehouseId: get('openingWarehouseId') || undefined,
         },
         false,
       );
@@ -666,6 +675,19 @@ function OperationsModal({
                 defaultValue={p?.reorderLevel || 0}
               />
             </label>
+            {!p && <>
+              <label>
+                Opening quantity
+                <input name="openingQuantity" type="number" min="0" step=".0001" defaultValue="0" />
+              </label>
+              <label>
+                Opening-stock warehouse
+                <select name="openingWarehouseId" defaultValue="">
+                  <option value="">Select warehouse if opening stock is entered</option>
+                  {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>)}
+                </select>
+              </label>
+            </>}
             <label className="full">
               Description
               <textarea name="description" defaultValue={p?.description} />

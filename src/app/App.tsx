@@ -143,7 +143,7 @@ export function App() {
           companyName={identity.companyName}
         />
       );
-    if (active === 'pos') return <PosPage />;
+    if (active === 'pos') return <PosPage role={identity.role} />;
     if (
       ['customers', 'quotations', 'invoices', 'payments', 'credit-notes', 'receivables'].includes(
         active,
