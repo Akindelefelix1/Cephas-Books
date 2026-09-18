@@ -178,10 +178,19 @@ textarea:focus {
 }
 .input-icon input {
   border: 0;
+  background: transparent;
+  border-radius: 0;
   min-height: 0;
   padding: 0;
   line-height: 1.2;
   box-shadow: none !important;
+}
+.input-icon input:-webkit-autofill,
+.input-icon input:-webkit-autofill:hover,
+.input-icon input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #21283a;
+  -webkit-box-shadow: 0 0 0 1000px transparent inset;
+  transition: background-color 9999s ease-out 0s;
 }
 .input-icon svg {
   color: #8b93a3;
