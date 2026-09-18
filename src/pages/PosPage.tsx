@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Download,
   Printer,
+  ReceiptText,
   Trash2,
   UserPlus,
 } from 'lucide-react';
@@ -243,9 +244,7 @@ export function PosPage({ role, onNavigate }: { role: string; onNavigate: (id: s
               <tbody>
                 {visible.map((product) => (
                   <tr key={product.id}>
-                    <td>
-                      <strong>{product.name}</strong>
-                    </td>
+                    <td><strong>{product.name}</strong></td>
                     <td>{product.sku}</td>
                     <td>
                       {product.type === 'SERVICE'
@@ -294,14 +293,34 @@ export function PosPage({ role, onNavigate }: { role: string; onNavigate: (id: s
             View history
           </button>
         </header>
-        <div className="pos-recent-list">
-          {recentSales.map((recentSale) => (
-            <button type="button" key={recentSale.id} onClick={() => setSale(recentSale)}>
-              <span><strong>{recentSale.receiptNumber}</strong><small>{recentSale.customer?.displayName ?? 'Walk-in customer'}</small></span>
-              <span><strong>{money(Number(recentSale.total))}</strong><small>{new Date(recentSale.createdAt).toLocaleDateString()}</small></span>
-            </button>
-          ))}
-          {!recentSales.length && <p className="pos-empty">No completed sales yet.</p>}
+        <div className="pos-recent-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Receipt</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th className="is-right">Total</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {recentSales.map((recentSale) => (
+                <tr key={recentSale.id}>
+                  <td><strong>{recentSale.receiptNumber}</strong></td>
+                  <td>{new Date(recentSale.createdAt).toLocaleDateString()}</td>
+                  <td>{recentSale.customer?.displayName ?? 'Walk-in customer'}</td>
+                  <td className="is-right"><strong>{money(Number(recentSale.total))}</strong></td>
+                  <td className="is-right">
+                    <button type="button" className="button button--secondary button--small" onClick={() => setSale(recentSale)}>
+                      <ReceiptText size={15} /> View receipt
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!recentSales.length && <tr><td className="pos-empty" colSpan={5}>No completed sales yet.</td></tr>}
+            </tbody>
+          </table>
         </div>
       </section>
       <section className="panel pos-cart">

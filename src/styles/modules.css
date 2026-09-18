@@ -383,7 +383,16 @@
 .pos-layout {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
+  grid-template-areas:
+    'catalog cart'
+    'recent recent';
   gap: 18px;
+}
+.pos-catalog {
+  grid-area: catalog;
+}
+.pos-cart {
+  grid-area: cart;
 }
 .pos-catalog,
 .pos-cart {
@@ -527,7 +536,8 @@
   font-size: 0.7rem;
 }
 .pos-recent-sales {
-  grid-column: 1 / -1;
+  grid-area: recent;
+  padding: 18px;
 }
 .pos-recent-sales header,
 .receipt-card__heading,
@@ -549,25 +559,28 @@
   color: #667085;
   font-size: 0.72rem;
 }
-.pos-recent-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 24px;
+.pos-recent-table {
   margin-top: 14px;
+  overflow-x: auto;
 }
-.pos-recent-list > button {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 0;
-  border: 0;
+.pos-recent-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+.pos-recent-table th,
+.pos-recent-table td {
+  padding: 10px 12px;
   border-bottom: 1px solid #edf0f4;
-  background: transparent;
-  color: #172033;
   text-align: left;
-  cursor: pointer;
+  white-space: nowrap;
 }
-.pos-recent-list > button > span:last-child {
+.pos-recent-table th {
+  color: #68758b;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+}
+.pos-recent-table .is-right {
   text-align: right;
 }
 .receipt-card {
@@ -627,11 +640,14 @@
 @media (max-width: 850px) {
   .pos-layout {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      'catalog'
+      'cart'
+      'recent';
   }
   .pos-products {
     grid-template-columns: repeat(2, 1fr);
   }
-  .pos-recent-list,
   .pos-history-filters {
     grid-template-columns: 1fr;
   }
