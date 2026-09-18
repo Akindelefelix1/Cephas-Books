@@ -60,6 +60,9 @@ export function App() {
   const [identity, setIdentity] = useState({
     firstName: '',
     lastName: '',
+    email: '',
+    createdAt: '',
+    isActive: true,
     companyName: '',
     role: '',
     baseCurrency: 'NGN',
@@ -74,6 +77,9 @@ export function App() {
       setIdentity({
         firstName: '',
         lastName: '',
+        email: '',
+        createdAt: '',
+        isActive: true,
         companyName: '',
         role: '',
         baseCurrency: 'NGN',
@@ -103,6 +109,9 @@ export function App() {
         setIdentity({
           firstName: profile.firstName ?? '',
           lastName: profile.lastName ?? '',
+          email: profile.email,
+          createdAt: profile.createdAt,
+          isActive: profile.isActive,
           companyName: profile.organization.name,
           role: profile.role,
           baseCurrency: profile.organization.baseCurrency,
@@ -225,6 +234,7 @@ export function App() {
     if (active === 'profile')
       return (
         <ProfilePage
+          profile={identity}
           onLogout={() => {
             setLogoutError('');
             setLogoutConfirmation({

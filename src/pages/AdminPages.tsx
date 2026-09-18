@@ -28,6 +28,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { confirmAction } from '@/utils/actions';
+import { authApi } from '@/services/auth';
 
 export function UsersPage() {
   const [modal, setModal] = useState(false);
@@ -1052,12 +1053,54 @@ export function NotificationsPage() {
   );
 }
 
-export function ProfilePage({ onLogout }: { onLogout: () => void }) {
-  const [saved, setSaved] = useState(false);
-  const saveProfile = () => {
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1800);
+export function ProfilePage({
+  profile,
+  onLogout,
+}: {
+  profile: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    companyName: string;
+    role: string;
+    createdAt: string;
+    isActive: boolean;
+    baseCurrency: string;
   };
+  onLogout: () => void;
+}) {
+  const [firstName, setFirstName] = useState(profile.firstName);
+  const [lastName, setLastName] = useState(profile.lastName);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const saveProfile = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await authApi.updateProfile({ firstName, lastName });
+      setFirstName(updated.firstName ?? '');
+      setLastName(updated.lastName ?? '');
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to save profile changes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+  const displayName = [firstName, lastName].filter(Boolean).join(' ') || profile.email;
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+  const memberSince = profile.createdAt
+    ? new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(
+        new Date(profile.createdAt),
+      )
+    : 'Not available';
 
   return (
     <>
@@ -1067,10 +1110,10 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
       />
       <div className="profile-page">
         <aside className="panel profile-summary">
-          <div className="profile-avatar-large">TA</div>
-          <h2>Tobi Adeyemi</h2>
-          <p>Finance Manager</p>
-          <span>Acme Holdings</span>
+          <div className="profile-avatar-large">{initials || '?'}</div>
+          <h2>{displayName}</h2>
+          <p>{profile.role || 'Role not assigned'}</p>
+          <span>{profile.companyName || 'Organisation not available'}</span>
           <label className="button button--secondary">
             <UserRound size={16} /> Change photo
             <input
@@ -1085,16 +1128,16 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
           <dl>
             <div>
               <dt>Member since</dt>
-              <dd>March 2024</dd>
+              <dd>{memberSince}</dd>
             </div>
             <div>
               <dt>Last sign-in</dt>
-              <dd>Today, 09:42</dd>
+              <dd>Not available</dd>
             </div>
             <div>
               <dt>Account status</dt>
               <dd>
-                <Badge>Active</Badge>
+                <Badge>{profile.isActive ? 'Active' : 'Inactive'}</Badge>
               </dd>
             </div>
           </dl>
@@ -1111,27 +1154,27 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
             <div className="form-grid">
               <label>
                 First name
-                <input defaultValue="Tobi" />
+                <input value={firstName} onChange={(event) => setFirstName(event.target.value)} />
               </label>
               <label>
                 Last name
-                <input defaultValue="Adeyemi" />
+                <input value={lastName} onChange={(event) => setLastName(event.target.value)} />
               </label>
               <label>
                 Work email
-                <input type="email" defaultValue="tobi@acme.ng" />
+                <input type="email" value={profile.email} readOnly />
               </label>
               <label>
                 Phone number
-                <input type="tel" defaultValue="+234 801 234 5678" />
+                <input type="tel" value="Not provided" readOnly />
               </label>
               <label>
                 Job title
-                <input defaultValue="Finance Manager" />
+                <input value={profile.role || 'Not assigned'} readOnly />
               </label>
               <label>
                 Department
-                <input defaultValue="Finance & Operations" />
+                <input value="Not provided" readOnly />
               </label>
             </div>
             <div className="profile-section__actions">
@@ -1140,8 +1183,9 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
                   <Check size={15} /> Changes saved
                 </span>
               )}
-              <button className="button" onClick={saveProfile}>
-                Save changes
+              {error && <span className="form-error">{error}</span>}
+              <button className="button" onClick={() => void saveProfile()} disabled={saving}>
+                {saving ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </section>
@@ -1156,11 +1200,11 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
             <div className="form-grid">
               <label>
                 Company
-                <input value="Acme Holdings" readOnly />
+                <input value={profile.companyName} readOnly />
               </label>
               <label>
                 Role
-                <input value="Finance Manager" readOnly />
+                <input value={profile.role || 'Not assigned'} readOnly />
               </label>
               <label>
                 Language
@@ -1177,7 +1221,7 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
               <label>
                 Currency
                 <select defaultValue="NGN">
-                  <option>NGN — Nigerian Naira</option>
+                  <option>{profile.baseCurrency}</option>
                 </select>
               </label>
               <label>

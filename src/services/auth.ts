@@ -31,6 +31,8 @@ export interface CurrentUserProfile {
   firstName: string | null;
   lastName: string | null;
   email: string;
+  createdAt: string;
+  isActive: boolean;
   role: string;
   organization: {
     name: string;
@@ -108,6 +110,11 @@ export const authApi = {
   refresh: (refreshToken: string) => post<AuthTokens>('/auth/refresh', { refreshToken }),
   logout: (refreshToken: string) => post<void>('/auth/logout', { refreshToken }),
   me: () => authorizedRequest<CurrentUserProfile>('/auth/me'),
+  updateProfile: (data: { firstName?: string; lastName?: string }) =>
+    authorizedRequest<CurrentUserProfile>('/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 };
 
 const TOKEN_KEY = 'cephas:auth';
