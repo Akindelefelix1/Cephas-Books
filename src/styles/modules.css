@@ -615,7 +615,11 @@
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1.4fr;
   gap: 12px;
+  padding: 18px;
   margin-bottom: 16px;
+}
+.pos-history-table {
+  padding: 18px;
 }
 .pos-history-filters label {
   display: flex;
