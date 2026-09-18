@@ -526,12 +526,114 @@
 .pos-receipt p {
   font-size: 0.7rem;
 }
+.pos-recent-sales {
+  grid-column: 1 / -1;
+}
+.pos-recent-sales header,
+.receipt-card__heading,
+.receipt-card__row,
+.receipt-card__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pos-recent-sales header h2 {
+  margin: 0;
+}
+.pos-recent-sales header small,
+.pos-recent-list small,
+.receipt-card__heading small,
+.receipt-card__row small {
+  display: block;
+  color: #667085;
+  font-size: 0.72rem;
+}
+.pos-recent-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+  margin-top: 14px;
+}
+.pos-recent-list > button {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid #edf0f4;
+  background: transparent;
+  color: #172033;
+  text-align: left;
+  cursor: pointer;
+}
+.pos-recent-list > button > span:last-child {
+  text-align: right;
+}
+.receipt-card {
+  min-width: min(100%, 360px);
+}
+.receipt-card__heading {
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed #dce2ec;
+}
+.receipt-card__row {
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0f4;
+}
+.receipt-card__total {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 2px solid #172033;
+  font-size: 1.05rem;
+}
+.receipt-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+.receipt-card__actions .button {
+  flex: 1;
+  justify-content: center;
+}
+.pos-history-filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.4fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.pos-history-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #667085;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.pos-history-filters label:first-child {
+  flex-direction: row;
+  align-items: center;
+  align-self: end;
+  border: 1px solid #dce2ec;
+  border-radius: 8px;
+  padding: 0 10px;
+}
+.pos-history-filters label:first-child input {
+  border: 0;
+  padding-left: 0;
+}
 @media (max-width: 850px) {
   .pos-layout {
     grid-template-columns: 1fr;
   }
   .pos-products {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .pos-recent-list,
+  .pos-history-filters {
+    grid-template-columns: 1fr;
   }
 }
 .pos-cart-lines {

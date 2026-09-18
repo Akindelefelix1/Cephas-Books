@@ -802,7 +802,7 @@ function SecuritySettings() {
     [
       LockKeyhole,
       'Strong password policy',
-      'Minimum 12 characters and breached-password checks',
+      'Minimum 8 characters and breached-password checks',
       true,
     ],
     [KeyRound, 'Session controls', 'Sign out after 30 minutes of inactivity', true],

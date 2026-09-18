@@ -335,16 +335,16 @@ export function AuthPage({
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                        minLength={mode === 'register' ? 12 : undefined}
+                        minLength={mode === 'register' ? 8 : undefined}
                         maxLength={128}
                         pattern={
                           mode === 'register'
-                            ? '(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{12,128}'
+                            ? '(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,128}'
                             : undefined
                         }
                         title={
                           mode === 'register'
-                            ? 'Use at least 12 characters with uppercase, lowercase, and a number.'
+                            ? 'Use at least 8 characters with uppercase, lowercase, and a number.'
                             : undefined
                         }
                         required
@@ -371,7 +371,7 @@ export function AuthPage({
                         value={confirmPassword}
                         onChange={(event) => setConfirmPassword(event.target.value)}
                         autoComplete="new-password"
-                        minLength={12}
+                        minLength={8}
                         maxLength={128}
                         required
                       />

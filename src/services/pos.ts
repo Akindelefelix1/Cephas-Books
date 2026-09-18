@@ -6,6 +6,9 @@ export interface PosSale {
   paidAmount: string;
   changeAmount: string;
   createdAt: string;
+  subtotal?: string;
+  taxTotal?: string;
+  customer?: { id: string; displayName: string } | null;
   items: Array<{ description: string; quantity: string; lineTotal: string }>;
   payments: Array<{ method: string; amount: string; reference?: string }>;
 }
@@ -22,7 +25,12 @@ export interface PosShift {
   register: PosRegister;
 }
 export const posApi = {
-  sales: () => authorizedRequest<PosSale[]>('/pos/sales'),
+  sales: (filters: Record<string, string> = {}) => {
+    const query = new URLSearchParams(filters).toString();
+    return authorizedRequest<{ data: PosSale[]; meta: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/pos/sales${query ? `?${query}` : ''}`,
+    );
+  },
   registers: () => authorizedRequest<PosRegister[]>('/pos/registers'),
   currentShift: () => authorizedRequest<PosShift | null>('/pos/shifts/current'),
   createRegister: (data: object) =>

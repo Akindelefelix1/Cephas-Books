@@ -6,6 +6,8 @@ import {
   Plus,
   Search,
   ShoppingCart,
+  Download,
+  Printer,
   Trash2,
   UserPlus,
 } from 'lucide-react';
@@ -24,7 +26,14 @@ const paymentLabel = (method: string) =>
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'CREDIT';
 type PaymentInput = { method: PaymentMethod; amount: string };
 type Line = Product & { quantity: number };
-export function PosPage({ role }: { role: string }) {
+const printReceipt = (sale: PosSale, download = false) => {
+  const receipt = window.open('', '_blank', 'width=420,height=720');
+  if (!receipt) return;
+  const title = download ? `Download ${sale.receiptNumber} as PDF` : `Print ${sale.receiptNumber}`;
+  receipt.document.write(`<!doctype html><html><head><title>${title}</title><style>body{font:14px Arial,sans-serif;color:#172033;max-width:360px;margin:32px auto}h1{font-size:20px;margin:0 0 4px}p{margin:4px 0;color:#667085}.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb}.total{font-size:18px;font-weight:700;border-top:2px solid #172033;margin-top:10px;padding-top:10px}.center{text-align:center}.muted{color:#667085}@media print{body{margin:0 auto}}</style></head><body><div class="center"><h1>Cephas Books</h1><p>Sales receipt</p><p>${sale.receiptNumber} · ${new Date(sale.createdAt).toLocaleString()}</p></div>${sale.items.map((item) => `<div class="row"><span>${item.description} x ${item.quantity}</span><strong>${money(Number(item.lineTotal))}</strong></div>`).join('')}<div class="row total"><span>Total</span><strong>${money(Number(sale.total))}</strong></div><div class="row"><span>Paid</span><strong>${money(Number(sale.paidAmount))}</strong></div><div class="row"><span>Change</span><strong>${money(Number(sale.changeAmount))}</strong></div><p class="center muted">Thank you for your business.</p><script>window.onload=()=>window.print()</script></body></html>`);
+  receipt.document.close();
+};
+export function PosPage({ role, onNavigate }: { role: string; onNavigate: (id: string) => void }) {
   const [products, setProducts] = useState<Product[]>([]),
     [customers, setCustomers] = useState<Customer[]>([]),
     [registers, setRegisters] = useState<PosRegister[]>([]),
@@ -40,7 +49,8 @@ export function PosPage({ role }: { role: string }) {
     [setup, setSetup] = useState<'REGISTER' | 'SHIFT' | 'CUSTOMER' | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
-    [sale, setSale] = useState<PosSale | null>(null);
+    [sale, setSale] = useState<PosSale | null>(null),
+    [recentSales, setRecentSales] = useState<PosSale[]>([]);
   useEffect(() => {
     void Promise.all([
       operationsApi.products({ status: 'active' }),
@@ -48,14 +58,16 @@ export function PosPage({ role }: { role: string }) {
       posApi.registers(),
       operationsApi.warehouses({ status: 'active' }),
       posApi.currentShift(),
+      posApi.sales({ limit: '10' }),
     ])
-      .then(([p, c, r, w, s]) => {
+      .then(([p, c, r, w, s, recent]) => {
         setProducts(p.filter((x) => x.isActive));
         setCustomers(c.data.filter((x) => x.isActive));
         setRegisters(r);
         setWarehouses(w);
         setShift(s);
         setRegisterId(s?.registerId || r[0]?.id || '');
+        setRecentSales(recent.data);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load POS data'));
   }, []);
@@ -171,6 +183,7 @@ export function PosPage({ role }: { role: string }) {
         payments: settledPayments,
       });
       setSale(s);
+      setRecentSales((current) => [s, ...current.filter((item) => item.id !== s.id)].slice(0, 10));
       setCart([]);
       setPayments([{ method: 'CASH', amount: '' }]);
       setSplitMode(false);
@@ -270,6 +283,26 @@ export function PosPage({ role }: { role: string }) {
             ))}
           </div>
         )}
+      </section>
+      <section className="panel pos-recent-sales">
+        <header>
+          <div>
+            <h2>Recent sales</h2>
+            <small>Latest 10 completed POS transactions</small>
+          </div>
+          <button type="button" onClick={() => onNavigate('pos-history')}>
+            View history
+          </button>
+        </header>
+        <div className="pos-recent-list">
+          {recentSales.map((recentSale) => (
+            <button type="button" key={recentSale.id} onClick={() => setSale(recentSale)}>
+              <span><strong>{recentSale.receiptNumber}</strong><small>{recentSale.customer?.displayName ?? 'Walk-in customer'}</small></span>
+              <span><strong>{money(Number(recentSale.total))}</strong><small>{new Date(recentSale.createdAt).toLocaleDateString()}</small></span>
+            </button>
+          ))}
+          {!recentSales.length && <p className="pos-empty">No completed sales yet.</p>}
+        </div>
       </section>
       <section className="panel pos-cart">
         <header>
@@ -458,15 +491,14 @@ export function PosPage({ role }: { role: string }) {
           Pay {money(total)}
         </button>
         {sale && (
-          <div className="pos-receipt">
-            <strong>Sale completed: {sale.receiptNumber}</strong>
-            {sale.payments.map((payment) => (
-              <small key={`${payment.method}-${payment.reference ?? 'cash'}`}>
-                {paymentLabel(payment.method)}{' '}
-                {payment.reference && `reference: ${payment.reference}`}
-              </small>
-            ))}
-          </div>
+          <Modal open={true} onClose={() => setSale(null)} title="Sale completed" footer={null}>
+            <div className="receipt-card">
+              <div className="receipt-card__heading"><strong>Cephas Books</strong><small>{sale.receiptNumber}</small><small>{new Date(sale.createdAt).toLocaleString()}</small></div>
+              {sale.items.map((item) => <div className="receipt-card__row" key={`${item.description}-${item.quantity}`}><span>{item.description}<small>{item.quantity} item(s)</small></span><strong>{money(Number(item.lineTotal))}</strong></div>)}
+              <div className="receipt-card__total"><span>Total</span><strong>{money(Number(sale.total))}</strong></div>
+              <div className="receipt-card__actions"><button className="button button--secondary" onClick={() => printReceipt(sale)}><Printer size={16} /> Print</button><button className="button" onClick={() => printReceipt(sale, true)}><Download size={16} /> Download PDF</button></div>
+            </div>
+          </Modal>
         )}
       </section>
       <Modal

@@ -19,6 +19,7 @@ import { SimpleFeaturePage } from '@/pages/SpecialPages';
 import { BankingPage } from '@/pages/BankingPage';
 import { SalesIncomePage } from '@/pages/SalesIncomePage';
 import { PosPage } from '@/pages/PosPage';
+import { PosHistoryPage } from '@/pages/PosHistoryPage';
 import { PurchasesSpendingPage } from '@/pages/PurchasesSpendingPage';
 import { AccountingFinancePage } from '@/pages/AccountingFinancePage';
 import { InventoryOperationsPage } from '@/pages/InventoryOperationsPage';
@@ -33,6 +34,7 @@ import { ProfilePage } from '@/pages/AdminPages';
 import { OrganizationSettingsPage } from '@/pages/OrganizationSettingsPage';
 import type { OrganizationView } from '@/services/organization';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import type { View } from '@/types/app';
 import type { MarketingView } from '@/types/app';
 import {
@@ -49,6 +51,9 @@ export function App() {
   const [view, setView] = useState<View>(() => (hasAuthTokens() ? 'app' : 'landing'));
   const [active, setActive] = useState('dashboard');
   const [quick, setQuick] = useState(false);
+  const [logoutConfirmation, setLogoutConfirmation] = useState<Confirmation | null>(null);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const [onboardingComplete, setOnboardingComplete] = useState(
     () => localStorage.getItem('cephas:onboarding-complete') === 'true',
   );
@@ -143,7 +148,8 @@ export function App() {
           companyName={identity.companyName}
         />
       );
-    if (active === 'pos') return <PosPage role={identity.role} />;
+    if (active === 'pos') return <PosPage role={identity.role} onNavigate={navigate} />;
+    if (active === 'pos-history') return <PosHistoryPage />;
     if (
       ['customers', 'quotations', 'invoices', 'payments', 'credit-notes', 'receivables'].includes(
         active,
@@ -220,7 +226,24 @@ export function App() {
       return (
         <ProfilePage
           onLogout={() => {
-            void logoutSession().finally(() => setView('landing'));
+            setLogoutError('');
+            setLogoutConfirmation({
+              title: 'Log out of Cephas Books?',
+              message: 'Your current session will be ended on this device.',
+              confirmLabel: 'Log out',
+              onConfirm: () => {
+                setLogoutBusy(true);
+                void logoutSession()
+                  .then(() => {
+                    setLogoutConfirmation(null);
+                    setView('landing');
+                  })
+                  .catch((caught) =>
+                    setLogoutError(caught instanceof Error ? caught.message : 'Unable to log out.'),
+                  )
+                  .finally(() => setLogoutBusy(false));
+              },
+            });
           }}
         />
       );
@@ -260,6 +283,12 @@ export function App() {
           setQuick(false);
           navigate(id);
         }}
+      />
+      <ConfirmModal
+        confirmation={logoutConfirmation}
+        busy={logoutBusy}
+        error={logoutError}
+        onClose={() => setLogoutConfirmation(null)}
       />
     </AppShell>
   );
