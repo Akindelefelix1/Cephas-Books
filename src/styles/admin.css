@@ -464,6 +464,75 @@
 .settings-api-panel .data-table-wrap {
   margin-top: 18px;
 }
+.team-access-table {
+  border: 1px solid #e5e9f0;
+  border-radius: 11px;
+}
+.team-access-table .data-table {
+  min-width: 980px;
+  table-layout: fixed;
+}
+.team-access-table th:nth-child(1) {
+  width: 17%;
+}
+.team-access-table th:nth-child(2) {
+  width: 21%;
+}
+.team-access-table th:nth-child(3) {
+  width: 20%;
+}
+.team-access-table th:nth-child(4) {
+  width: 18%;
+}
+.team-access-table th:nth-child(5) {
+  width: 10%;
+}
+.team-access-table th:nth-child(6) {
+  width: 9%;
+}
+.team-access-table th:nth-child(7) {
+  width: 5%;
+}
+.team-access-table th,
+.team-access-table td {
+  padding-inline: 16px;
+}
+.team-access-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.team-access-table td:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.team-access-table td:last-child {
+  text-align: right;
+}
+.team-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.team-user-cell i {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: #eaf0ff;
+  color: #1d4ed8;
+  display: grid;
+  place-items: center;
+  font-size: 0.57rem;
+  font-style: normal;
+  font-weight: 800;
+}
+.team-user-cell strong {
+  overflow: hidden;
+  color: #253047;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .settings-api-panel select {
   min-width: 125px;
 }

@@ -830,8 +830,8 @@ function UsersSection({
             </div>
           )}
         </header>
-        <div className="data-table-wrap">
-          <table>
+        <div className="data-table-wrap team-access-table">
+          <table className="data-table">
             <thead>
               <tr>
                 <th>User</th>
@@ -847,19 +847,13 @@ function UsersSection({
               {members.map((member) => (
                 <tr key={member.id}>
                   <td>
-                    {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
-                      'Invited user'}
-                  </td>
-                  <td>
-                    {canManage && member.role !== 'OWNER' && (
-                      <button
-                        className="row-action"
-                        aria-label={`Edit ${member.user.email}`}
-                        onClick={() => setEditingMember(member)}
-                      >
-                        <MoreHorizontal />
-                      </button>
-                    )}
+                    <span className="team-user-cell">
+                      <i>{(member.user.firstName?.[0] || member.user.email[0]).toUpperCase()}</i>
+                      <strong>
+                        {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
+                          'Invited user'}
+                      </strong>
+                    </span>
                   </td>
                   <td>{member.user.email}</td>
                   <td>
@@ -917,6 +911,17 @@ function UsersSection({
                     >
                       <i />
                     </button>
+                  </td>
+                  <td>
+                    {canManage && member.role !== 'OWNER' && (
+                      <button
+                        className="row-action"
+                        aria-label={`Edit ${member.user.email}`}
+                        onClick={() => setEditingMember(member)}
+                      >
+                        <MoreHorizontal />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
