@@ -1,6 +1,7 @@
 import { useState, type PropsWithChildren } from 'react';
 import {
   Bell,
+  Building2,
   ChevronDown,
   ChevronRight,
   Command,
@@ -105,9 +106,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
           Quick create<kbd>C</kbd>
         </button>
         <nav className="app-nav">
-          <p className="nav-label">Workspace</p>
           {navGroup(primaryNavigation)}
-          <p className="nav-label">Manage</p>
           {navGroup(secondaryNavigation)}
         </nav>
         <div className="sidebar-theme-toggle">
@@ -151,10 +150,19 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
           <div className="topbar__right">
             <button
               className="icon-button notification-button"
+              title="Notifications"
               onClick={() => navigate('notifications')}
             >
               <Bell size={19} />
               <i />
+            </button>
+            <button
+              className="icon-button topbar-settings-button"
+              title="Organisation settings"
+              aria-label="Open organisation settings"
+              onClick={() => navigate('settings')}
+            >
+              <Building2 size={19} />
             </button>
             <button
               className="profile"

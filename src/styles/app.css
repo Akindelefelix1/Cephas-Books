@@ -74,7 +74,7 @@
   align-items: center;
   gap: 11px;
   padding: 0 11px;
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   text-align: left;
   transition: color 150ms ease, background 150ms ease, transform 150ms ease;
 }
@@ -107,7 +107,7 @@
   color: var(--sidebar-muted);
   padding: 8px 12px;
   text-align: left;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
 }
 .subnav button.active {
   color: var(--sidebar-strong);
@@ -240,6 +240,13 @@
 }
 .notification-button {
   position: relative;
+}
+.topbar-settings-button {
+  color: #526078;
+}
+.topbar-settings-button:hover {
+  color: #2445bf;
+  background: #f1f4f9;
 }
 .notification-button i {
   position: absolute;
