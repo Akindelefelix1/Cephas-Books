@@ -27,6 +27,7 @@ import {
   type OrganizationView,
 } from '@/services/organization';
 import { confirmAction } from '@/utils/actions';
+import { setDefaultCurrency } from '@/utils/currency';
 
 type Branch = {
   id: string;
@@ -68,6 +69,16 @@ const securityControls = [
   ['loginAlerts', 'New-device and unusual login alerts'],
   ['ipAllowlist', 'Administrator IP allowlist'],
 ];
+const currencyCatalogue = [
+  ['NGN', 'Nigerian naira', '₦'], ['USD', 'US dollar', '$'], ['EUR', 'Euro', '€'],
+  ['GBP', 'British pound', '£'], ['GHS', 'Ghanaian cedi', '₵'], ['KES', 'Kenyan shilling', 'KSh'],
+  ['ZAR', 'South African rand', 'R'], ['CAD', 'Canadian dollar', 'C$'],
+  ['AUD', 'Australian dollar', 'A$'], ['JPY', 'Japanese yen', '¥'],
+  ['CNY', 'Chinese yuan', 'CN¥'], ['INR', 'Indian rupee', '₹'], ['AED', 'UAE dirham', 'د.إ'],
+  ['SAR', 'Saudi riyal', '﷼'], ['CHF', 'Swiss franc', 'CHF'], ['SEK', 'Swedish krona', 'kr'],
+  ['NOK', 'Norwegian krone', 'kr'], ['DKK', 'Danish krone', 'kr'],
+  ['NZD', 'New Zealand dollar', 'NZ$'], ['SGD', 'Singapore dollar', 'S$'],
+] as const;
 
 const objectValue = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -241,14 +252,16 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
             </label>
             <label>
               Base currency
-              <input
-                name="baseCurrency"
+              <select
                 defaultValue={admin.organization.baseCurrency}
-                required
-                minLength={3}
-                maxLength={3}
-                disabled={!canManage}
-              />
+                disabled
+              >
+                {currencies.filter((item) => item.active).map((item) => (
+                  <option value={item.code} key={item.code}>{item.code} — {item.name}</option>
+                ))}
+              </select>
+              <input type="hidden" name="baseCurrency" value={admin.organization.baseCurrency} />
+              <small>Change the default from Currency management.</small>
             </label>
             <label>
               Last updated
@@ -510,6 +523,30 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
                     ? 'Active'
                     : 'Inactive'}
               </Badge>
+              {canManage && item.active && item.code !== admin.organization.baseCurrency && (
+                <button
+                  className="button button--secondary button--small"
+                  disabled={busy}
+                  onClick={() => void run(
+                    () => organizationApi.updateSection('currencies', {
+                      defaultCurrency: item.code,
+                      items: currencies.map((currency) => ({
+                        ...currency,
+                        rate:
+                          currency.code === item.code
+                            ? '1'
+                            : String(Number(currency.rate) / Number(item.rate)),
+                      })),
+                    }).then((result) => {
+                      setDefaultCurrency(item.code);
+                      return result;
+                    }),
+                    `${item.code} is now the default currency`,
+                  )}
+                >
+                  {busy ? 'Updating…' : 'Set default'}
+                </button>
+              )}
               {canManage && item.code !== admin.organization.baseCurrency && (
                 <button
                   className="row-action"
@@ -720,22 +757,28 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
               editingLocationId === null ? 'Branch added' : 'Branch updated',
             );
           if (kind === 'currency')
-            void saveSection(
-              'currencies',
-              {
-                items: [
-                  ...currencies.filter((_, index) => index !== editingIndex),
-                  {
-                    code: String(form.get('code')).toUpperCase(),
-                    name: String(form.get('name')),
-                    symbol: String(form.get('symbol')),
-                    rate: String(form.get('rate')),
-                    active: String(form.get('active')) !== 'false',
-                  },
-                ],
-              },
-              editingIndex === null ? 'Currency added' : 'Currency updated',
-            );
+            {
+              const code = String(form.get('code')).toUpperCase();
+              const catalogueItem = currencyCatalogue.find(([itemCode]) => itemCode === code);
+              if (!catalogueItem) return;
+              void saveSection(
+                'currencies',
+                {
+                  defaultCurrency: admin.organization.baseCurrency,
+                  items: [
+                    ...currencies.filter((_, index) => index !== editingIndex),
+                    {
+                      code,
+                      name: catalogueItem[1],
+                      symbol: catalogueItem[2],
+                      rate: code === admin.organization.baseCurrency ? '1' : String(form.get('rate')),
+                      active: code === admin.organization.baseCurrency || String(form.get('active')) !== 'false',
+                    },
+                  ],
+                },
+                editingIndex === null ? 'Currency added' : 'Currency updated',
+              );
+            }
           if (kind === 'invite')
             void run(
               () =>
@@ -1586,34 +1629,34 @@ function CreateDialog({
         {dialog === 'currency' && (
           <>
             <label>
-              Currency code
-              <input
-                name="code"
+              Currency
+              <select
+                name={editingCurrency ? undefined : 'code'}
                 defaultValue={editingCurrency?.code}
                 required
-                minLength={3}
-                maxLength={3}
                 autoFocus
-              />
-            </label>
-            <label>
-              Name
-              <input name="name" defaultValue={editingCurrency?.name} required />
-            </label>
-            <label>
-              Symbol
-              <input name="symbol" defaultValue={editingCurrency?.symbol} required />
+                disabled={Boolean(editingCurrency)}
+              >
+                <option value="">Select a currency</option>
+                {currencyCatalogue
+                  .filter(([code]) => editingCurrency?.code === code || !currencies.some((item) => item.code === code))
+                  .map(([code, name, symbol]) => (
+                    <option value={code} key={code}>{code} — {name} ({symbol})</option>
+                  ))}
+              </select>
+              {editingCurrency && <input type="hidden" name="code" value={editingCurrency.code} />}
             </label>
             <label>
               Exchange rate
               <input
                 name="rate"
-                defaultValue={editingCurrency?.rate}
+                defaultValue={editingCurrency?.rate ?? '1'}
                 required
                 type="number"
                 min="0.000001"
                 step="any"
               />
+              <small>Amount of this currency equal to one unit of the default currency.</small>
             </label>
             <label className="full">
               Status

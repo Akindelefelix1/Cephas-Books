@@ -31,6 +31,7 @@ import { InsightsAutomationPage } from '@/pages/InsightsAutomationPage';
 import { WorkflowRecordsPage } from '@/pages/WorkflowRecordsPage';
 import type { WorkflowView } from '@/services/workflow';
 import { ProfilePage } from '@/pages/AdminPages';
+import { setDefaultCurrency } from '@/utils/currency';
 import { OrganizationSettingsPage } from '@/pages/OrganizationSettingsPage';
 import type { OrganizationView } from '@/services/organization';
 import { Modal } from '@/components/ui/Modal';
@@ -103,6 +104,7 @@ export function App() {
     if (!hasAuthTokens() || (view !== 'app' && view !== 'onboarding')) return;
     Promise.all([onboardingApi.get(), authApi.me()])
       .then(([progress, profile]) => {
+        setDefaultCurrency(profile.organization.baseCurrency);
         const complete = Boolean(progress.onboardingCompletedAt);
         setOnboardingComplete(complete);
         localStorage.setItem('cephas:onboarding-complete', String(complete));

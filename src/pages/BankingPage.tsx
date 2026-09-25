@@ -12,6 +12,7 @@ import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiError } from '@/services/auth';
+import { getDefaultCurrency } from '@/utils/currency';
 import {
   bankingApi,
   type BankAccount,
@@ -733,7 +734,7 @@ function AccountModal({
         </label>
         <label>
           Currency
-          <input name="currency" value={account?.currency ?? 'NGN'} readOnly />
+          <input name="currency" value={account?.currency ?? getDefaultCurrency()} readOnly />
         </label>
         {!account && (
           <label className="full">

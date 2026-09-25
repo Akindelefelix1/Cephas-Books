@@ -14,9 +14,10 @@ import {
   type SalesSummary,
 } from '@/services/sales';
 import { confirmAction, downloadText } from '@/utils/actions';
+import { getDefaultCurrency } from '@/utils/currency';
 type View = 'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables';
 type Row = Customer | Quotation | Invoice | Payment | CreditNote;
-const cash = (v: string, c = 'NGN') =>
+const cash = (v: string, c = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: c }).format(Number(v));
 const day = (v: string) => new Date(v).toLocaleDateString('en-NG');
 export function SalesIncomePage({ view, role }: { view: View; role: string }) {
@@ -543,7 +544,7 @@ function CreateModal({
             submit({
               customerId: get('customerId'),
               ...(view === 'quotations' ? { number: get('number') } : {}),
-              currency: 'NGN',
+              currency: getDefaultCurrency(),
               issueDate: get('issueDate'),
               ...(view === 'quotations'
                 ? { expiryDate: get('dueDate') }

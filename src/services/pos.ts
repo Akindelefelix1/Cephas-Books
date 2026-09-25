@@ -2,6 +2,7 @@ import { authorizedRequest } from './auth';
 export interface PosSale {
   id: string;
   receiptNumber: string;
+  currency: string;
   total: string;
   paidAmount: string;
   changeAmount: string;

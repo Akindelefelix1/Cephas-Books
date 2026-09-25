@@ -13,7 +13,8 @@ import {
   type Supplier,
 } from '@/services/purchases';
 import { confirmAction, downloadText } from '@/utils/actions';
-const money = (v?: string, c = 'NGN') =>
+import { getDefaultCurrency } from '@/utils/currency';
+const money = (v?: string, c = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: c }).format(Number(v ?? 0));
 const date = (v?: string) => (v ? new Date(v).toLocaleDateString('en-NG') : '—');
 const titles: Record<PurchaseView, string> = {
@@ -598,7 +599,7 @@ function PurchaseModal({
               number: g('number'),
               requestedBy: g('requestedBy'),
               requiredDate: g('date'),
-              currency: 'NGN',
+              currency: getDefaultCurrency(),
               items: [
                 {
                   description: g('description'),
@@ -616,7 +617,7 @@ function PurchaseModal({
               number: g('number'),
               [view === 'purchase-orders' ? 'orderDate' : 'issueDate']: g('startDate'),
               [view === 'purchase-orders' ? 'deliveryDate' : 'dueDate']: g('date'),
-              currency: 'NGN',
+              currency: getDefaultCurrency(),
               items: [
                 {
                   description: g('description'),
@@ -637,7 +638,7 @@ function PurchaseModal({
               category: g('category'),
               amount: Number(g('amount')),
               taxAmount: Number(g('taxAmount')),
-              currency: 'NGN',
+              currency: getDefaultCurrency(),
               notes: optional('notes'),
             });
           else
