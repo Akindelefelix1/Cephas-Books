@@ -561,6 +561,9 @@ function PurchaseModal({
 }) {
   const line = ['purchase-requests', 'purchase-orders', 'bills'].includes(view),
     today = new Date().toISOString().slice(0, 10);
+  const [lineItems, setLineItems] = useState([{ name: '', description: '', quantity: '', unitPrice: '' }]);
+  const updateLine = (index: number, field: 'name' | 'description' | 'quantity' | 'unitPrice', value: string) =>
+    setLineItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
   return (
     <Modal
       open={open}
@@ -600,14 +603,7 @@ function PurchaseModal({
               requestedBy: g('requestedBy'),
               requiredDate: g('date'),
               currency: getDefaultCurrency(),
-              items: [
-                {
-                  description: g('description'),
-                  quantity: Number(g('quantity')),
-                  unitPrice: Number(g('unitPrice')),
-                  taxRate: Number(g('taxRate')),
-                },
-              ],
+              items: lineItems.map((item) => ({ ...item, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), taxRate: Number(g('taxRate')) })),
               notes: optional('notes'),
             });
           else if (view === 'purchase-orders' || view === 'bills')
@@ -618,14 +614,7 @@ function PurchaseModal({
               [view === 'purchase-orders' ? 'orderDate' : 'issueDate']: g('startDate'),
               [view === 'purchase-orders' ? 'deliveryDate' : 'dueDate']: g('date'),
               currency: getDefaultCurrency(),
-              items: [
-                {
-                  description: g('description'),
-                  quantity: Number(g('quantity')),
-                  unitPrice: Number(g('unitPrice')),
-                  taxRate: Number(g('taxRate')),
-                },
-              ],
+              items: lineItems.map((item) => ({ ...item, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), taxRate: Number(g('taxRate')) })),
               notes: optional('notes'),
             });
           else if (view === 'expenses')
@@ -807,23 +796,19 @@ function PurchaseModal({
               <input name="date" type="date" defaultValue={today} required />
             </label>
             {line && (
-              <>
-                <label className="full">
-                  Description
-                  <input name="description" required />
-                </label>
-                <label>
-                  Quantity
-                  <input name="quantity" type="number" min=".0001" step=".0001" required />
-                </label>
-                <label>
-                  Unit price
-                  <input name="unitPrice" type="number" min="0" step=".01" required />
-                </label>
-                <label>
-                  Tax %<input name="taxRate" type="number" min="0" step=".01" defaultValue="0" />
-                </label>
-              </>
+              <div className="invoice-line-editor full">
+                <div className="invoice-line-editor__heading"><span>Items</span><small>Add multiple items to this transaction.</small></div>
+                {lineItems.map((item, index) => (
+                  <div className="invoice-line-editor__row" key={index}>
+                    <label>Name<input required value={item.name} onChange={(event) => updateLine(index, 'name', event.target.value)} /></label>
+                    <label>Line description<input required value={item.description} onChange={(event) => updateLine(index, 'description', event.target.value)} /></label>
+                    <label>Quantity<input required type="number" min=".0001" step=".0001" value={item.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} /></label>
+                    <label>Unit price<input required type="number" min="0" step=".01" value={item.unitPrice} onChange={(event) => updateLine(index, 'unitPrice', event.target.value)} /></label>
+                  </div>
+                ))}
+                <label className="full">Tax %<input name="taxRate" type="number" min="0" step=".01" defaultValue="0" /></label>
+                <button type="button" className="invoice-line-editor__add" onClick={() => setLineItems((items) => [...items, { name: '', description: '', quantity: '', unitPrice: '' }])}><Plus size={16} /> Add another item</button>
+              </div>
             )}
             {(view === 'expenses' || view === 'supplier-payments' || view === 'payables') && (
               <>

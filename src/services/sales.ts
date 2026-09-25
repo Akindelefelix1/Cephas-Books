@@ -11,6 +11,7 @@ export interface Customer {
   isActive: boolean;
 }
 export interface Line {
+  name: string;
   description: string;
   quantity: number;
   unitPrice: number;

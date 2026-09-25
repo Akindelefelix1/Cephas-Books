@@ -314,7 +314,7 @@
 }
 .invoice-line-editor__row {
   display: grid;
-  grid-template-columns: 2fr 0.7fr 0.9fr 32px;
+  grid-template-columns: 1.4fr 2fr 0.7fr 0.9fr 32px;
   gap: 9px;
   align-items: end;
   margin-top: 9px;

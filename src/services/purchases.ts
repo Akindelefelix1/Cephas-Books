@@ -43,6 +43,7 @@ export interface PurchaseRow {
   items?: Line[];
 }
 export interface Line {
+  name: string;
   description: string;
   quantity: number;
   unitPrice: number;

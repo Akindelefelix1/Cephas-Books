@@ -576,7 +576,7 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
   return <article className="invoice-paper" id="invoice-paper">
     <header><div><h1>INVOICE</h1><span>THANK YOU FOR YOUR BUSINESS</span></div><div className="invoice-paper__meta"><b>DATE</b><strong>{day(invoice.issueDate)}</strong><b>INVOICE NO.</b><strong>{invoice.number}</strong></div></header>
     <section className="invoice-paper__addresses"><div><b>FROM</b><strong>Cephas Books</strong><span>Professional accounting made simple</span></div><div><b>BILL TO</b><strong>{invoice.customer.displayName}</strong><span>{invoice.customer.companyName || invoice.customer.email || 'Valued customer'}</span></div></section>
-    <table><thead><tr><th>DESCRIPTION</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>{invoice.items?.map((item, index) => <tr key={index}><td>{item.description}</td><td>{item.quantity}</td><td>{cash(String(item.unitPrice), invoice.currency)}</td><td>{cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency)}</td></tr>)}</tbody></table>
+    <table><thead><tr><th>NAME</th><th>DESCRIPTION</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>{invoice.items?.map((item, index) => <tr key={index}><td>{item.name}</td><td>{item.description}</td><td>{item.quantity}</td><td>{cash(String(item.unitPrice), invoice.currency)}</td><td>{cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency)}</td></tr>)}</tbody></table>
     <footer><div><b>PAYMENT INFORMATION</b><p>Please remit payment by {day(invoice.dueDate)}.</p><em>Thank you!</em></div><div className="invoice-paper__totals"><span>SUBTOTAL <b>{cash(String(subtotal), invoice.currency)}</b></span><span>TAX <b>{cash(invoice.taxTotal, invoice.currency)}</b></span><strong>TOTAL DUE <b>{cash(invoice.total, invoice.currency)}</b></strong></div></footer>
   </article>;
 }
@@ -611,7 +611,7 @@ function CreateModal({
   submit: (d: Record<string, unknown>) => void;
 }) {
   const document = view === 'quotations' || view === 'invoices';
-  const [lineItems, setLineItems] = useState([{ description: '', quantity: '', unitPrice: '' }]);
+  const [lineItems, setLineItems] = useState([{ name: '', description: '', quantity: '', unitPrice: '' }]);
   const [invoiceNumber, setInvoiceNumber] = useState('Generating…');
   useEffect(() => {
     if (!open || view !== 'invoices') return;
@@ -620,7 +620,7 @@ function CreateModal({
       .then(({ number }) => setInvoiceNumber(number))
       .catch(() => setInvoiceNumber('Available after saving'));
   }, [open, view]);
-  const updateLine = (index: number, field: 'description' | 'quantity' | 'unitPrice', value: string) =>
+  const updateLine = (index: number, field: 'name' | 'description' | 'quantity' | 'unitPrice', value: string) =>
     setLineItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
   return (
     <Modal
@@ -676,7 +676,7 @@ function CreateModal({
                 : { dueDate: get('dueDate'), status: 'DRAFT' }),
               items: view === 'invoices'
                 ? lineItems.map((item) => ({ ...item, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), taxRate: Number(get('taxRate')) }))
-                : [{ description: get('description'), quantity: Number(get('quantity')), unitPrice: Number(get('unitPrice')), taxRate: Number(get('taxRate')) }],
+                : [{ name: get('name'), description: get('description'), quantity: Number(get('quantity')), unitPrice: Number(get('unitPrice')), taxRate: Number(get('taxRate')) }],
               notes: get('notes') || undefined,
             });
           else if (view === 'credit-notes')
@@ -760,16 +760,18 @@ function CreateModal({
                     <div className="invoice-line-editor__heading"><span>Invoice items</span><small>Only these fields change for each line.</small></div>
                     {lineItems.map((item, index) => (
                       <div className="invoice-line-editor__row" key={index}>
+                        <label>Name<input required value={item.name} onChange={(event) => updateLine(index, 'name', event.target.value)} /></label>
                         <label>Line description<input required value={item.description} onChange={(event) => updateLine(index, 'description', event.target.value)} /></label>
                         <label>Quantity<input required type="number" min=".0001" step=".0001" value={item.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} /></label>
                         <label>Unit price<input required type="number" min="0" step=".01" value={item.unitPrice} onChange={(event) => updateLine(index, 'unitPrice', event.target.value)} /></label>
                         <button type="button" className="icon-button" aria-label={`Remove item ${index + 1}`} disabled={lineItems.length === 1} onClick={() => setLineItems((items) => items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={16} /></button>
                       </div>
                     ))}
-                    <button type="button" className="invoice-line-editor__add" onClick={() => setLineItems((items) => [...items, { description: '', quantity: '', unitPrice: '' }])}><Plus size={16} /> Add another item</button>
+                    <button type="button" className="invoice-line-editor__add" onClick={() => setLineItems((items) => [...items, { name: '', description: '', quantity: '', unitPrice: '' }])}><Plus size={16} /> Add another item</button>
                   </div>
                 ) : <>
-                  <label className="full">Line description<input name="description" required /></label>
+                  <label>Name<input name="name" required /></label>
+                  <label>Line description<input name="description" required /></label>
                   <label>Quantity<input name="quantity" type="number" min=".0001" step=".0001" required /></label>
                   <label>Unit price<input name="unitPrice" type="number" min="0" step=".01" required /></label>
                 </>}
