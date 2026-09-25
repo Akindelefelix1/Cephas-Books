@@ -131,7 +131,7 @@
   box-shadow: 8px 0 30px #0f172a0d;
 }
 .sidebar-theme-toggle {
-  margin: 0 16px 12px;
+  margin: 0 16px 16px;
   padding: 11px 12px;
   border: 1px solid var(--sidebar-border);
   border-radius: 12px;
@@ -185,41 +185,6 @@
 }
 .sidebar-theme-toggle button[aria-checked='true'] i {
   transform: translateX(16px);
-}
-.sidebar--light .organisation {
-  border-color: #e2e8f0;
-  color: #0f172a;
-}
-.sidebar--light .organisation small {
-  color: #64748b;
-}
-.organisation {
-  min-height: 66px;
-  padding: 12px 16px;
-  border: 0;
-  border-top: 1px solid #ffffff12;
-  background: none;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-  transition: background 150ms ease;
-}
-.organisation:hover {
-  background: var(--sidebar-hover);
-}
-.organisation > span:nth-child(2) {
-  flex: 1;
-}
-.organisation strong,
-.organisation small {
-  display: block;
-  font-size: 0.69rem;
-}
-.organisation small {
-  color: #8392ae;
-  margin-top: 3px;
 }
 .workspace {
   margin-left: 248px;

@@ -128,16 +128,6 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
             <i />
           </button>
         </div>
-        <button className="organisation" onClick={() => navigate('settings')}>
-          <span className="avatar avatar--square">{companyInitials}</span>
-          <span>
-            <strong>{companyName}</strong>
-            <small>
-              {identity.countryCode} · {identity.baseCurrency}
-            </small>
-          </span>
-          <ChevronDown size={16} />
-        </button>
       </aside>
       {mobileOpen && (
         <button
