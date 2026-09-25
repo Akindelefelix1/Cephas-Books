@@ -17,6 +17,7 @@ export interface BankAccount {
 }
 export interface BankTransaction {
   id: string;
+  name: string;
   transactionDate: string;
   description: string;
   reference?: string;
@@ -92,6 +93,7 @@ export const bankingApi = {
   createTransaction: (data: {
     bankAccountId: string;
     transactionDate: string;
+    name: string;
     description: string;
     reference?: string;
     type: TransactionType;
@@ -99,6 +101,17 @@ export const bankingApi = {
     notes?: string;
   }) =>
     authorizedRequest<BankTransaction>('/banking/transactions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  createTransactions: (data: {
+    bankAccountId: string;
+    transactionDate: string;
+    type: TransactionType;
+    notes?: string;
+    transactions: Array<{ name: string; description: string; reference?: string; amount: number }>;
+  }) =>
+    authorizedRequest<BankTransaction[]>('/banking/transactions/bulk', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

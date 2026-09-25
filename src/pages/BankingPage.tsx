@@ -444,7 +444,7 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
         error={error}
         onClose={() => setModal(null)}
         onSubmit={(data) =>
-          void submit(() => bankingApi.createTransaction(data), 'Transaction added')
+          void submit(() => bankingApi.createTransactions(data), 'Transactions added')
         }
       />
       <TransferModal
@@ -547,6 +547,7 @@ function ReversalHistory({ rows }: { rows: BankTransaction[] }) {
             <tr>
               <th>Reversed</th>
               <th>Original date</th>
+              <th>Name</th>
               <th>Account</th>
               <th>Description</th>
               <th>Reference</th>
@@ -567,6 +568,7 @@ function ReversalHistory({ rows }: { rows: BankTransaction[] }) {
                     {row.reversedAt ? new Date(row.reversedAt).toLocaleString('en-NG') : '—'}
                   </td>
                   <td>{date(row.transactionDate)}</td>
+                  <td>{row.name || '—'}</td>
                   <td>{row.bankAccount.name}</td>
                   <td>{row.description}</td>
                   <td>{row.reference || '—'}</td>
@@ -578,7 +580,7 @@ function ReversalHistory({ rows }: { rows: BankTransaction[] }) {
             })}
             {!rows.length && (
               <tr>
-                <td className="table-empty" colSpan={8}>
+                <td className="table-empty" colSpan={9}>
                   No transactions have been reversed.
                 </td>
               </tr>
@@ -663,6 +665,7 @@ function TransactionPanel({
           <thead>
             <tr>
               <th>Date</th>
+              <th>Name</th>
               <th>Account</th>
               <th>Description</th>
               <th>Reference</th>
@@ -676,6 +679,7 @@ function TransactionPanel({
             {rows.map((row) => (
               <tr key={row.id}>
                 <td className="is-primary">{date(row.transactionDate)}</td>
+                <td>{row.name || '—'}</td>
                 <td>{row.bankAccount.name}</td>
                 <td>{row.description}</td>
                 <td>{row.reference || '—'}</td>
@@ -706,7 +710,7 @@ function TransactionPanel({
             ))}
             {!rows.length && (
               <tr>
-                <td className="table-empty" colSpan={canManage ? 8 : 7}>
+                <td className="table-empty" colSpan={canManage ? 9 : 8}>
                   {reconciliation
                     ? 'Everything is reconciled.'
                     : 'No transactions match these filters.'}
@@ -840,7 +844,7 @@ function AccountModal({
   );
 }
 
-type TransactionFormData = Parameters<typeof bankingApi.createTransaction>[0];
+type TransactionFormData = Parameters<typeof bankingApi.createTransactions>[0];
 function TransactionModal({
   open,
   accounts,
@@ -856,6 +860,9 @@ function TransactionModal({
   onClose: () => void;
   onSubmit: (data: TransactionFormData) => void;
 }) {
+  const [rows, setRows] = useState([{ name: '', description: '', reference: '', amount: '' }]);
+  const updateRow = (index: number, field: keyof (typeof rows)[number], value: string) =>
+    setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
   return (
     <Modal
       open={open}
@@ -882,11 +889,9 @@ function TransactionModal({
           onSubmit({
             bankAccountId: String(f.get('accountId')),
             transactionDate: String(f.get('date')),
-            description: String(f.get('description')).trim(),
-            reference: String(f.get('reference')).trim() || undefined,
             type: String(f.get('type')) as TransactionFormData['type'],
-            amount: Number(f.get('amount')),
             notes: String(f.get('notes')).trim() || undefined,
+            transactions: rows.map((row) => ({ ...row, reference: row.reference || undefined, amount: Number(row.amount) })),
           });
         }}
       >
@@ -919,18 +924,18 @@ function TransactionModal({
             defaultValue={new Date().toISOString().slice(0, 10)}
           />
         </label>
-        <label className="full">
-          Description
-          <input name="description" required maxLength={240} />
-        </label>
-        <label>
-          Reference
-          <input name="reference" maxLength={100} />
-        </label>
-        <label>
-          Amount
-          <input name="amount" type="number" min="0.01" step="0.01" required />
-        </label>
+        <div className="transaction-line-editor full">
+          <div className="invoice-line-editor__heading"><span>Transactions</span><small>Add multiple rows with the same account, type, date, and notes.</small></div>
+          {rows.map((row, index) => (
+            <div className="transaction-line-editor__row" key={index}>
+              <label>Name<input required maxLength={160} value={row.name} onChange={(event) => updateRow(index, 'name', event.target.value)} /></label>
+              <label>Description<input required maxLength={240} value={row.description} onChange={(event) => updateRow(index, 'description', event.target.value)} /></label>
+              <label>Reference<input maxLength={100} value={row.reference} onChange={(event) => updateRow(index, 'reference', event.target.value)} /></label>
+              <label>Amount<input type="number" min="0.01" step="0.01" required value={row.amount} onChange={(event) => updateRow(index, 'amount', event.target.value)} /></label>
+            </div>
+          ))}
+          <button type="button" className="invoice-line-editor__add" onClick={() => setRows((current) => [...current, { name: '', description: '', reference: '', amount: '' }])}>+ Add another transaction</button>
+        </div>
         <label className="full">
           Notes
           <textarea name="notes" maxLength={1000} />
