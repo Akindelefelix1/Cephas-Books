@@ -89,6 +89,8 @@ export const salesApi = {
     authorizedRequest<{ data: Customer[] }>(
       `/customers?limit=100&search=${encodeURIComponent(search)}`,
     ),
+  customerPurchaseHistory: (id: string) =>
+    authorizedRequest<Invoice[]>(`/customers/${id}/purchase-history`),
   createCustomer: (data: Partial<Customer>) =>
     authorizedRequest<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) }),
   updateCustomer: (id: string, data: Partial<Customer>) =>

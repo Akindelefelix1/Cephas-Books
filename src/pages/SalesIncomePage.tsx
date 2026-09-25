@@ -34,6 +34,8 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     [modal, setModal] = useState(false),
     [selected, setSelected] = useState<Customer | null>(null),
     [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null),
+    [historyInvoices, setHistoryInvoices] = useState<Invoice[]>([]),
+    [historyLoading, setHistoryLoading] = useState(false),
     [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const load = useCallback(async () => {
@@ -92,6 +94,16 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     window.addEventListener('cephas:quick-create', openQuickCreate);
     return () => window.removeEventListener('cephas:quick-create', openQuickCreate);
   }, [canEdit, view]);
+  useEffect(() => {
+    if (!historyCustomer) return;
+    void salesApi
+      .customerPurchaseHistory(historyCustomer.id)
+      .then(setHistoryInvoices)
+      .catch((caught) =>
+        setError(caught instanceof Error ? caught.message : 'Unable to load purchase history'),
+      )
+      .finally(() => setHistoryLoading(false));
+  }, [historyCustomer]);
   const run = async (fn: () => Promise<unknown>, message: string) => {
     setBusy(true);
     setError('');
@@ -238,7 +250,11 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                               }
                             },
                             (invoice) => setPreviewInvoice(invoice),
-                            (customer) => setHistoryCustomer(customer),
+                            (customer) => {
+                              setHistoryInvoices([]);
+                              setHistoryLoading(true);
+                              setHistoryCustomer(customer);
+                            },
                             canEdit,
                           )}
                         </div>
@@ -287,7 +303,8 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
       <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} />
       <CustomerHistoryModal
         customer={historyCustomer}
-        invoices={invoices}
+        invoices={historyInvoices}
+        loading={historyLoading}
         onClose={() => setHistoryCustomer(null)}
         onPreview={setPreviewInvoice}
       />
@@ -471,11 +488,13 @@ function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose
 function CustomerHistoryModal({
   customer,
   invoices,
+  loading,
   onClose,
   onPreview,
 }: {
   customer: Customer | null;
   invoices: Invoice[];
+  loading: boolean;
   onClose: () => void;
   onPreview: (invoice: Invoice) => void;
 }) {
@@ -499,6 +518,10 @@ function CustomerHistoryModal({
       footer={<button className="button button--secondary" onClick={onClose}>Close</button>}
     >
       <div className="customer-history">
+        {loading ? (
+          <LoadingState label="Loading purchase history…" />
+        ) : (
+          <>
         <div className="customer-history__summary">
           <div><span>Invoices</span><strong>{purchases.length}</strong></div>
           <div><span>Total purchases</span><strong>{cash(String(total))}</strong></div>
@@ -541,6 +564,8 @@ function CustomerHistoryModal({
             </tbody>
           </table>
         </div>
+          </>
+        )}
       </div>
     </Modal>
   );
