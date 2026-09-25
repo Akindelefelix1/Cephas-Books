@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { allNavigation, primaryNavigation, secondaryNavigation } from '@/data/navigation';
+import { Modal } from '@/components/ui/Modal';
 
 interface AppShellProps extends PropsWithChildren {
   active: string;
@@ -40,6 +41,8 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
   )?.id;
   const [expanded, setExpanded] = useState<string | null>(activeParent ?? null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsNavigation = secondaryNavigation.find((item) => item.id === 'organisation-group');
   const companyName = identity.companyName || 'Your company';
   const companyInitials = getInitials(companyName);
   const userName = [identity.firstName, identity.lastName].filter(Boolean).join(' ');
@@ -107,7 +110,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
         </button>
         <nav className="app-nav">
           {navGroup(primaryNavigation)}
-          {navGroup(secondaryNavigation)}
+          {navGroup(secondaryNavigation.filter((item) => item.id !== 'organisation-group'))}
         </nav>
         <div className="sidebar-theme-toggle">
           <span>
@@ -160,7 +163,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
               className="icon-button topbar-settings-button"
               title="Organisation settings"
               aria-label="Open organisation settings"
-              onClick={() => navigate('settings')}
+              onClick={() => setSettingsOpen(true)}
             >
               <Building2 size={19} />
             </button>
@@ -182,6 +185,34 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
           {children}
         </div>
       </section>
+      <Modal
+        open={settingsOpen}
+        title="Organisation settings"
+        subtitle="Choose an area to configure for your organisation."
+        onClose={() => setSettingsOpen(false)}
+        footer={
+          <button className="button button--secondary" onClick={() => setSettingsOpen(false)}>
+            Close
+          </button>
+        }
+      >
+        <div className="settings-shortcuts">
+          {settingsNavigation?.children?.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              className={active === item.id ? 'is-active' : ''}
+              onClick={() => {
+                setSettingsOpen(false);
+                navigate(item.id);
+              }}
+            >
+              {item.label}
+              <ChevronRight size={16} />
+            </button>
+          ))}
+        </div>
+      </Modal>
       {searchOpen && (
         <div className="command-backdrop" onMouseDown={() => setSearchOpen(false)}>
           <section className="command-palette" onMouseDown={(e) => e.stopPropagation()}>

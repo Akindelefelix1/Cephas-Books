@@ -74,7 +74,7 @@
   align-items: center;
   gap: 11px;
   padding: 0 11px;
-  font-size: 0.86rem;
+  font-size: 0.9rem;
   text-align: left;
   transition: color 150ms ease, background 150ms ease, transform 150ms ease;
 }
@@ -107,7 +107,7 @@
   color: var(--sidebar-muted);
   padding: 8px 12px;
   text-align: left;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 .subnav button.active {
   color: var(--sidebar-strong);
@@ -247,6 +247,34 @@
 .topbar-settings-button:hover {
   color: #2445bf;
   background: #f1f4f9;
+}
+.settings-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.settings-shortcuts button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 13px;
+  border: 1px solid #e1e6ef;
+  border-radius: 10px;
+  background: #fff;
+  color: #34425c;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.settings-shortcuts button:hover,
+.settings-shortcuts button.is-active {
+  border-color: #b9c6ff;
+  background: #eef2ff;
+  color: #2445bf;
 }
 .notification-button i {
   position: absolute;

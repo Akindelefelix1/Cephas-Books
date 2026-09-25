@@ -4,6 +4,7 @@ import {
   FolderKanban,
   Landmark,
   LayoutDashboard,
+  ReceiptText,
   Settings,
   ShoppingCart,
 } from 'lucide-react';
@@ -39,7 +40,7 @@ export const primaryNavigation: NavItem[] = [
   {
     id: 'spending-group',
     label: 'Purchases & spending',
-    icon: ShoppingCart,
+    icon: ReceiptText,
     children: [
       { id: 'suppliers', label: 'Suppliers' },
       { id: 'purchase-requests', label: 'Purchase requests' },
