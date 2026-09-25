@@ -159,7 +159,14 @@ export function App() {
           companyName={identity.companyName}
         />
       );
-    if (active === 'pos') return <PosPage role={identity.role} onNavigate={navigate} />;
+    if (active === 'pos')
+      return (
+        <PosPage
+          role={identity.role}
+          onNavigate={navigate}
+          salesperson={[identity.firstName, identity.lastName].filter(Boolean).join(' ') || identity.email}
+        />
+      );
     if (active === 'pos-history') return <PosHistoryPage />;
     if (
       ['customers', 'quotations', 'invoices', 'payments', 'credit-notes', 'receivables'].includes(

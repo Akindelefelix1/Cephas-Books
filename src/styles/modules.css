@@ -559,6 +559,17 @@
   color: #667085;
   font-size: 0.72rem;
 }
+.receipt-card__heading strong {
+  color: #172033;
+  font-size: 1.08rem;
+}
+.receipt-card__title {
+  color: #3154d8;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .pos-recent-table {
   margin-top: 14px;
   overflow-x: auto;
@@ -585,6 +596,7 @@
 }
 .receipt-card {
   min-width: min(100%, 360px);
+  padding: 6px 2px;
 }
 .receipt-card__heading {
   flex-direction: column;
