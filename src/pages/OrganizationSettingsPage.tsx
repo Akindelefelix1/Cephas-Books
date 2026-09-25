@@ -20,6 +20,7 @@ import {
   organizationApi,
   type AuditEntry,
   type OrganizationAdmin,
+  type CustomRole,
   type LocationActivity,
   type OrganizationMember,
   type OrganizationSection,
@@ -79,6 +80,7 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
   const canViewAdministration = canManage || role === 'AUDITOR';
   const [admin, setAdmin] = useState<OrganizationAdmin | null>(null);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -101,8 +103,14 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
     try {
       const base = await organizationApi.admin();
       setAdmin(base);
-      if ((view === 'users' || view === 'branches') && canViewAdministration)
-        setMembers(await organizationApi.users());
+      if ((view === 'users' || view === 'branches') && canViewAdministration) {
+        const [loadedMembers, loadedRoles] = await Promise.all([
+          organizationApi.users(),
+          organizationApi.roles(),
+        ]);
+        setMembers(loadedMembers);
+        setCustomRoles(loadedRoles);
+      }
       if (view === 'audit-logs' && canViewAdministration)
         setLogs(await organizationApi.auditLogs(auditSearch));
     } catch (caught) {
@@ -520,12 +528,20 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
       {view === 'users' && canViewAdministration && (
         <UsersSection
           members={members}
+          customRoles={customRoles}
           canManage={canManage}
           busy={busy}
           onInvite={() => setDialog('invite')}
           onUpdate={(id, data) =>
             void run(() => organizationApi.updateUser(id, data), 'User access updated')
           }
+          onSaveRole={(id, data) =>
+            void run(
+              () => (id ? organizationApi.updateRole(id, data) : organizationApi.createRole(data)),
+              id ? 'Role updated' : 'Role created',
+            )
+          }
+          onDeleteRole={(id) => void run(() => organizationApi.deleteRole(id), 'Role deleted')}
         />
       )}
       {view === 'audit-logs' && !canViewAdministration && <AccessDenied />}
@@ -633,6 +649,7 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
         busy={busy}
         currencies={currencies}
         members={members}
+        customRoles={customRoles}
         states={states}
         regions={regions}
         editingState={states.find((item) => item.id === editingLocationId)}
@@ -722,7 +739,12 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
               () =>
                 organizationApi.inviteUser({
                   email: String(form.get('email')),
-                  role: String(form.get('role')),
+                  role: String(form.get('role') || 'MEMBER'),
+                  customRoleId: String(form.get('customRoleId') || '') || undefined,
+                  firstName: String(form.get('firstName') || ''),
+                  lastName: String(form.get('lastName') || ''),
+                  phone: String(form.get('phone') || ''),
+                  address: String(form.get('address') || ''),
                 }),
               'Existing user added to the organisation',
             );
@@ -744,17 +766,36 @@ function Empty({ text }: { text: string }) {
 
 function UsersSection({
   members,
+  customRoles,
   canManage,
   busy,
   onInvite,
   onUpdate,
+  onSaveRole,
+  onDeleteRole,
 }: {
   members: OrganizationMember[];
+  customRoles: CustomRole[];
   canManage: boolean;
   busy: boolean;
   onInvite: () => void;
-  onUpdate: (id: string, data: { role?: string; isActive?: boolean }) => void;
+  onUpdate: (
+    id: string,
+    data: {
+      role?: string;
+      customRoleId?: string;
+      isActive?: boolean;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      address?: string;
+    },
+  ) => void;
+  onSaveRole: (id: string | null, data: Omit<CustomRole, 'id' | '_count'>) => void;
+  onDeleteRole: (id: string) => void;
 }) {
+  const [roleDialog, setRoleDialog] = useState<CustomRole | 'new' | null>(null);
+  const [editingMember, setEditingMember] = useState<OrganizationMember | null>(null);
   return (
     <>
       <StatsGrid
@@ -779,9 +820,14 @@ function UsersSection({
             <p>Roles are enforced by the API on every protected action.</p>
           </div>
           {canManage && (
-            <button className="button" onClick={onInvite}>
-              <Users /> Add user
-            </button>
+            <div className="page-header__actions">
+              <button className="button button--secondary" onClick={() => setRoleDialog('new')}>
+                <ShieldCheck /> Create role
+              </button>
+              <button className="button" onClick={onInvite}>
+                <Users /> Add user
+              </button>
+            </div>
           )}
         </header>
         <div className="data-table-wrap">
@@ -790,9 +836,11 @@ function UsersSection({
               <tr>
                 <th>User</th>
                 <th>Email</th>
+                <th>Contact</th>
                 <th>Role</th>
                 <th>Status</th>
                 <th>Access</th>
+                <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -802,18 +850,58 @@ function UsersSection({
                     {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
                       'Invited user'}
                   </td>
+                  <td>
+                    {canManage && member.role !== 'OWNER' && (
+                      <button
+                        className="row-action"
+                        aria-label={`Edit ${member.user.email}`}
+                        onClick={() => setEditingMember(member)}
+                      >
+                        <MoreHorizontal />
+                      </button>
+                    )}
+                  </td>
                   <td>{member.user.email}</td>
                   <td>
+                    <span className="user-contact">
+                      <b>{member.user.phone || 'No phone'}</b>
+                      <small>{member.user.address || 'No address provided'}</small>
+                    </span>
+                  </td>
+                  <td>
                     <select
-                      value={member.role}
+                      value={
+                        member.customRoleId
+                          ? `custom:${member.customRoleId}`
+                          : `system:${member.role}`
+                      }
                       disabled={!canManage || busy || member.role === 'OWNER'}
-                      onChange={(event) => onUpdate(member.id, { role: event.target.value })}
+                      onChange={(event) => {
+                        const [kind, value] = event.target.value.split(':');
+                        onUpdate(
+                          member.id,
+                          kind === 'custom' ? { customRoleId: value } : { role: value },
+                        );
+                      }}
                     >
-                      {roles
-                        .filter((item) => item !== 'OWNER' || member.role === 'OWNER')
-                        .map((item) => (
-                          <option key={item}>{item}</option>
-                        ))}
+                      <optgroup label="System roles">
+                        {roles
+                          .filter((item) => item !== 'OWNER' || member.role === 'OWNER')
+                          .map((item) => (
+                            <option value={`system:${item}`} key={item}>
+                              {item}
+                            </option>
+                          ))}
+                      </optgroup>
+                      {!!customRoles.length && (
+                        <optgroup label="Custom roles">
+                          {customRoles.map((item) => (
+                            <option value={`custom:${item.id}`} key={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   </td>
                   <td>
@@ -836,7 +924,251 @@ function UsersSection({
           </table>
         </div>
       </section>
+      <section className="panel settings-api-panel custom-roles-panel">
+        <header className="settings-heading">
+          <div>
+            <h2>Custom roles</h2>
+            <p>Create reusable permission sets with a secure system-role ceiling.</p>
+          </div>
+        </header>
+        <div className="custom-role-grid">
+          {customRoles.map((item) => (
+            <button key={item.id} onClick={() => canManage && setRoleDialog(item)}>
+              <span>
+                <strong>{item.name}</strong>
+                <small>{item.description || 'No description'}</small>
+              </span>
+              <Badge>{item.baseRole}</Badge>
+              <small>
+                {item.permissions.length} permissions · {item._count?.memberships || 0} users
+              </small>
+            </button>
+          ))}
+          {!customRoles.length && (
+            <p>
+              No custom roles yet. Create roles such as Cashier, Branch Manager, or Senior
+              Accountant.
+            </p>
+          )}
+        </div>
+      </section>
+      {roleDialog && (
+        <RoleDialog
+          role={roleDialog === 'new' ? undefined : roleDialog}
+          busy={busy}
+          onClose={() => setRoleDialog(null)}
+          onSubmit={(data) => {
+            onSaveRole(roleDialog === 'new' ? null : roleDialog.id, data);
+            setRoleDialog(null);
+          }}
+          onDelete={
+            roleDialog === 'new'
+              ? undefined
+              : () => {
+                  onDeleteRole(roleDialog.id);
+                  setRoleDialog(null);
+                }
+          }
+        />
+      )}
+      {editingMember && (
+        <UserDetailsDialog
+          member={editingMember}
+          busy={busy}
+          onClose={() => setEditingMember(null)}
+          onSubmit={(data) => {
+            onUpdate(editingMember.id, data);
+            setEditingMember(null);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function UserDetailsDialog({
+  member,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  member: OrganizationMember;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (data: { firstName: string; lastName: string; phone: string; address: string }) => void;
+}) {
+  return (
+    <Modal
+      open
+      title="Edit user details"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="button button--secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="button" form="user-details-form" disabled={busy}>
+            Save details
+          </button>
+        </>
+      }
+    >
+      <form
+        id="user-details-form"
+        className="form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          onSubmit({
+            firstName: String(form.get('firstName') || ''),
+            lastName: String(form.get('lastName') || ''),
+            phone: String(form.get('phone') || ''),
+            address: String(form.get('address') || ''),
+          });
+        }}
+      >
+        <label>
+          First name
+          <input name="firstName" defaultValue={member.user.firstName} required autoFocus />
+        </label>
+        <label>
+          Last name
+          <input name="lastName" defaultValue={member.user.lastName} required />
+        </label>
+        <label className="full">
+          Email
+          <input value={member.user.email} readOnly />
+          <small>Email is tied to the user’s verified Cephas Books account.</small>
+        </label>
+        <label>
+          Phone number
+          <input name="phone" type="tel" defaultValue={member.user.phone} />
+        </label>
+        <label>
+          Address
+          <input name="address" defaultValue={member.user.address} />
+        </label>
+      </form>
+    </Modal>
+  );
+}
+
+const rolePermissions = [
+  ['dashboard.view', 'View dashboard'],
+  ['banking.view', 'View banking'],
+  ['banking.manage', 'Manage banking'],
+  ['sales.view', 'View sales'],
+  ['sales.manage', 'Manage sales'],
+  ['purchases.view', 'View purchases'],
+  ['purchases.manage', 'Manage purchases'],
+  ['accounting.view', 'View accounting'],
+  ['accounting.manage', 'Manage accounting'],
+  ['inventory.view', 'View inventory'],
+  ['inventory.manage', 'Manage inventory'],
+  ['reports.view', 'View reports'],
+  ['reports.export', 'Export reports'],
+  ['approvals.review', 'Review approvals'],
+  ['users.view', 'View users'],
+  ['users.manage', 'Manage users'],
+  ['settings.manage', 'Manage settings'],
+] as const;
+
+function RoleDialog({
+  role,
+  busy,
+  onClose,
+  onSubmit,
+  onDelete,
+}: {
+  role?: CustomRole;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (data: Omit<CustomRole, 'id' | '_count'>) => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <Modal
+      open
+      title={role ? 'Edit role' : 'Create role'}
+      onClose={onClose}
+      footer={
+        <>
+          {onDelete && (
+            <button
+              className="button button--danger modal-delete-action"
+              onClick={onDelete}
+              disabled={busy || Boolean(role?._count?.memberships)}
+            >
+              Delete role
+            </button>
+          )}
+          <button className="button button--secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="button" form="custom-role-form" disabled={busy}>
+            Save role
+          </button>
+        </>
+      }
+    >
+      <form
+        id="custom-role-form"
+        className="form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          onSubmit({
+            name: String(form.get('name')),
+            description: String(form.get('description') || ''),
+            baseRole: String(form.get('baseRole')),
+            permissions: form.getAll('permissions').map(String),
+          });
+        }}
+      >
+        <label>
+          Name
+          <input
+            name="name"
+            defaultValue={role?.name}
+            placeholder="e.g. Cashier"
+            required
+            autoFocus
+          />
+        </label>
+        <label>
+          Access ceiling
+          <select name="baseRole" defaultValue={role?.baseRole || 'MEMBER'}>
+            {roles
+              .filter((item) => item !== 'OWNER')
+              .map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+          </select>
+        </label>
+        <label className="full">
+          Description
+          <input
+            name="description"
+            defaultValue={role?.description}
+            placeholder="What this role is responsible for"
+          />
+        </label>
+        <fieldset className="permission-picker full">
+          <legend>Permissions</legend>
+          {rolePermissions.map(([value, label]) => (
+            <label key={value}>
+              <input
+                type="checkbox"
+                name="permissions"
+                value={value}
+                defaultChecked={role?.permissions.includes(value)}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </fieldset>
+      </form>
+    </Modal>
   );
 }
 
@@ -1070,6 +1402,7 @@ function CreateDialog({
   busy,
   currencies,
   members,
+  customRoles,
   states,
   regions,
   editingState,
@@ -1084,6 +1417,7 @@ function CreateDialog({
   busy: boolean;
   currencies: Currency[];
   members: OrganizationMember[];
+  customRoles: CustomRole[];
   states: LocationState[];
   regions: Region[];
   editingState?: LocationState;
@@ -1286,13 +1620,29 @@ function CreateDialog({
         )}
         {dialog === 'invite' && (
           <>
-            <label className="full">
-              Cephas Books account email
-              <input name="email" type="email" required autoFocus />
-              <small>The user must already have a verified Cephas Books account.</small>
+            <label>
+              First name
+              <input name="firstName" required autoFocus />
+            </label>
+            <label>
+              Last name
+              <input name="lastName" required />
             </label>
             <label className="full">
-              Role
+              Cephas Books account email
+              <input name="email" type="email" required />
+              <small>The user must already have a verified Cephas Books account.</small>
+            </label>
+            <label>
+              Phone number
+              <input name="phone" type="tel" placeholder="e.g. +234…" />
+            </label>
+            <label>
+              Address
+              <input name="address" placeholder="Home or contact address" />
+            </label>
+            <label className="full">
+              System role
               <select name="role" defaultValue="MEMBER">
                 {roles
                   .filter((item) => item !== 'OWNER')
@@ -1301,6 +1651,22 @@ function CreateDialog({
                   ))}
               </select>
             </label>
+            {!!customRoles.length && (
+              <label className="full">
+                Custom role{' '}
+                <small>
+                  Optional; overrides the system role with its configured access ceiling.
+                </small>
+                <select name="customRoleId" defaultValue="">
+                  <option value="">No custom role</option>
+                  {customRoles.map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.name} · {item.baseRole}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </>
         )}
       </form>

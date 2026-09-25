@@ -20,15 +20,28 @@ export interface OrganizationAdmin {
 export interface OrganizationMember {
   id: string;
   role: string;
+  customRoleId?: string;
+  customRole?: CustomRole;
   createdAt: string;
   user: {
     id: string;
     email: string;
     firstName?: string;
     lastName?: string;
+    phone?: string;
+    address?: string;
     isActive: boolean;
     verifiedAt?: string;
   };
+}
+
+export interface CustomRole {
+  id: string;
+  name: string;
+  description?: string;
+  baseRole: string;
+  permissions: string[];
+  _count?: { memberships: number };
 }
 
 export interface AuditEntry {
@@ -76,10 +89,34 @@ export const organizationApi = {
       { data },
     ),
   users: () => request<OrganizationMember[]>('/organizations/current/users'),
-  inviteUser: (data: { email: string; role: string }) =>
-    request<OrganizationMember>('/organizations/current/users', 'POST', data),
-  updateUser: (id: string, data: { role?: string; isActive?: boolean }) =>
-    request<OrganizationMember>(`/organizations/current/users/${id}`, 'PATCH', data),
+  inviteUser: (data: {
+    email: string;
+    role: string;
+    customRoleId?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    address?: string;
+  }) => request<OrganizationMember>('/organizations/current/users', 'POST', data),
+  updateUser: (
+    id: string,
+    data: {
+      role?: string;
+      customRoleId?: string;
+      isActive?: boolean;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      address?: string;
+    },
+  ) => request<OrganizationMember>(`/organizations/current/users/${id}`, 'PATCH', data),
+  roles: () => request<CustomRole[]>('/organizations/current/roles'),
+  createRole: (data: Omit<CustomRole, 'id' | '_count'>) =>
+    request<CustomRole>('/organizations/current/roles', 'POST', data),
+  updateRole: (id: string, data: Omit<CustomRole, 'id' | '_count'>) =>
+    request<CustomRole>(`/organizations/current/roles/${id}`, 'PATCH', data),
+  deleteRole: (id: string) =>
+    request<{ deleted: true }>(`/organizations/current/roles/${id}`, 'DELETE'),
   auditLogs: (search = '') =>
     request<AuditEntry[]>(
       `/organizations/current/audit-logs?${new URLSearchParams(search ? { search } : {})}`,
