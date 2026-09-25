@@ -1708,6 +1708,41 @@
   padding: 5px 9px;
   text-transform: capitalize;
 }
+.customer-history {
+  display: grid;
+  gap: 18px;
+}
+.customer-history__summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.customer-history__summary > div {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid #e4e8f0;
+  border-radius: 10px;
+  background: #f8faff;
+}
+.customer-history__summary span {
+  color: #7b8497;
+  font-size: 0.62rem;
+}
+.customer-history__summary strong {
+  color: #172033;
+  font-size: 0.92rem;
+}
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.field-label small {
+  color: #8a94a8;
+  font-size: 0.6rem;
+  font-weight: 500;
+}
 .inline-actions {
   display: flex;
   gap: 7px;

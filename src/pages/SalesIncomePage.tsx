@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Download, Eye, Plus, Send, Trash2 } from 'lucide-react';
+import { Download, Eye, History, MapPin, Plus, Send, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
@@ -33,6 +33,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     [error, setError] = useState(''),
     [modal, setModal] = useState(false),
     [selected, setSelected] = useState<Customer | null>(null),
+    [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null),
     [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const load = useCallback(async () => {
@@ -204,7 +205,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                   {columns(view).map((x) => (
                     <th key={x}>{x}</th>
                   ))}
-                  {canEdit && <th>Actions</th>}
+                  {(canEdit || view === 'customers') && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -213,7 +214,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                     {values(view, r).map((x, j) => (
                       <td key={j}>{x}</td>
                     ))}
-                    {canEdit && (
+                    {(canEdit || view === 'customers') && (
                       <td>
                         <div className="inline-actions">
                           {actions(
@@ -237,6 +238,8 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                               }
                             },
                             (invoice) => setPreviewInvoice(invoice),
+                            (customer) => setHistoryCustomer(customer),
+                            canEdit,
                           )}
                         </div>
                       </td>
@@ -245,7 +248,10 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                 ))}
                 {!rows.length && (
                   <tr>
-                    <td className="table-empty" colSpan={columns(view).length + (canEdit ? 1 : 0)}>
+                    <td
+                      className="table-empty"
+                      colSpan={columns(view).length + (canEdit || view === 'customers' ? 1 : 0)}
+                    >
                       No records found.
                     </td>
                   </tr>
@@ -279,12 +285,18 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         onClose={() => setConfirmation(null)}
       />
       <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} />
+      <CustomerHistoryModal
+        customer={historyCustomer}
+        invoices={invoices}
+        onClose={() => setHistoryCustomer(null)}
+        onPreview={setPreviewInvoice}
+      />
     </>
   );
 }
 function columns(v: View) {
   return v === 'customers'
-    ? ['Name', 'Email', 'Phone', 'Status']
+    ? ['Name', 'Email', 'Phone', 'Address', 'Status']
     : v === 'quotations'
       ? ['Number', 'Customer', 'Total', 'Expiry', 'Status']
       : v === 'invoices'
@@ -298,7 +310,13 @@ function columns(v: View) {
 function values(v: View, r: Row): string[] {
   if (v === 'customers') {
     const x = r as Customer;
-    return [x.displayName, x.email || '—', x.phone || '—', x.isActive ? 'Active' : 'Archived'];
+    return [
+      x.displayName,
+      x.email || '—',
+      x.phone || '—',
+      x.billingAddress || '—',
+      x.isActive ? 'Active' : 'Archived',
+    ];
   }
   if (v === 'quotations') {
     const x = r as Quotation;
@@ -358,6 +376,8 @@ function actions(
   run: (f: () => Promise<unknown>, m: string) => void,
   edit: () => void,
   preview: (invoice: Invoice) => void,
+  history: (customer: Customer) => void,
+  canEdit: boolean,
 ) {
   if (v === 'invoices') {
     const invoice = r as Invoice;
@@ -372,13 +392,14 @@ function actions(
   if (v === 'customers')
     return (
       <>
-        <button onClick={edit}>Edit</button>
-        {(r as Customer).isActive && (
+        <button onClick={() => history(r as Customer)}><History size={15} /> History</button>
+        {canEdit && <button onClick={edit}>Edit</button>}
+        {canEdit && (r as Customer).isActive && (
           <button onClick={() => run(() => salesApi.archiveCustomer(r.id), 'Customer archived')}>
             Archive
           </button>
         )}
-        {!(r as Customer).isActive && (
+        {canEdit && !(r as Customer).isActive && (
           <button
             onClick={() =>
               run(() => salesApi.updateCustomer(r.id, { isActive: true }), 'Customer restored')
@@ -447,6 +468,84 @@ function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose
     </Modal>
   );
 }
+function CustomerHistoryModal({
+  customer,
+  invoices,
+  onClose,
+  onPreview,
+}: {
+  customer: Customer | null;
+  invoices: Invoice[];
+  onClose: () => void;
+  onPreview: (invoice: Invoice) => void;
+}) {
+  if (!customer) return null;
+  const purchases = invoices
+    .filter((invoice) => invoice.customerId === customer.id || invoice.customer.id === customer.id)
+    .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+  const total = purchases.reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const outstanding = purchases.reduce(
+    (sum, invoice) =>
+      sum + Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount),
+    0,
+  );
+  return (
+    <Modal
+      open
+      wide
+      title={`${customer.displayName} purchase history`}
+      subtitle={customer.billingAddress || customer.email || 'Customer account history'}
+      onClose={onClose}
+      footer={<button className="button button--secondary" onClick={onClose}>Close</button>}
+    >
+      <div className="customer-history">
+        <div className="customer-history__summary">
+          <div><span>Invoices</span><strong>{purchases.length}</strong></div>
+          <div><span>Total purchases</span><strong>{cash(String(total))}</strong></div>
+          <div><span>Outstanding</span><strong>{cash(String(Math.max(0, outstanding)))}</strong></div>
+        </div>
+        <div className="data-table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th className="is-right">Total</th>
+                <th className="is-right">Paid</th>
+                <th className="is-right">Balance</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {purchases.map((invoice) => {
+                const balance =
+                  Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount);
+                return (
+                  <tr key={invoice.id}>
+                    <td className="is-primary">{invoice.number}</td>
+                    <td>{day(invoice.issueDate)}</td>
+                    <td><span className="banking-status">{invoice.status.replace('_', ' ')}</span></td>
+                    <td className="is-right">{cash(invoice.total, invoice.currency)}</td>
+                    <td className="is-right">{cash(invoice.paidAmount, invoice.currency)}</td>
+                    <td className="is-right">{cash(String(Math.max(0, balance)), invoice.currency)}</td>
+                    <td className="is-right">
+                      <button onClick={() => onPreview(invoice)}><Eye size={15} /> View</button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!purchases.length && (
+                <tr><td className="table-empty" colSpan={7}>No purchases recorded for this customer.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function InvoicePaper({ invoice }: { invoice: Invoice }) {
   const subtotal = invoice.items?.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0) ?? Number(invoice.subtotal);
   return <article className="invoice-paper" id="invoice-paper">
@@ -539,6 +638,7 @@ function CreateModal({
               email: get('email') || undefined,
               phone: get('phone') || undefined,
               companyName: get('companyName') || undefined,
+              billingAddress: get('billingAddress') || undefined,
             });
           else if (document)
             submit({
@@ -590,6 +690,15 @@ function CreateModal({
             <label>
               Phone
               <input name="phone" defaultValue={selected?.phone} />
+            </label>
+            <label className="full">
+              <span className="field-label"><MapPin size={14} /> Address <small>Optional</small></span>
+              <textarea
+                name="billingAddress"
+                rows={2}
+                placeholder="Street, city, state"
+                defaultValue={selected?.billingAddress}
+              />
             </label>
           </>
         ) : (
