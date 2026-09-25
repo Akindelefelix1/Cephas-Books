@@ -5,8 +5,9 @@ export interface Confirmation {
   title: string;
   message: string;
   confirmLabel: string;
-  onConfirm: () => void;
+  onConfirm: (value?: string) => void;
   requireText?: string;
+  input?: { label: string; placeholder?: string; maxLength?: number };
 }
 
 export function ConfirmModal({
@@ -35,8 +36,12 @@ export function ConfirmModal({
           </button>
           <button
             className="button button--danger"
-            disabled={busy || Boolean(required && typed !== required)}
-            onClick={confirmation?.onConfirm}
+            disabled={
+              busy ||
+              Boolean(required && typed !== required) ||
+              Boolean(confirmation?.input && !typed.trim())
+            }
+            onClick={() => confirmation?.onConfirm(typed.trim())}
           >
             {busy ? 'Working…' : confirmation?.confirmLabel}
           </button>
@@ -51,6 +56,18 @@ export function ConfirmModal({
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
             autoComplete="off"
+          />
+        </label>
+      )}
+      {confirmation?.input && (
+        <label className="full">
+          {confirmation.input.label}
+          <textarea
+            autoFocus
+            value={typed}
+            placeholder={confirmation.input.placeholder}
+            maxLength={confirmation.input.maxLength ?? 500}
+            onChange={(event) => setTyped(event.target.value)}
           />
         </label>
       )}

@@ -119,6 +119,23 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
     id: string;
   } | null>(null);
   const [auditSearch, setAuditSearch] = useState('');
+  const [currencyMenu, setCurrencyMenu] = useState<string | null>(null);
+
+  useEffect(() => {
+    const closeCurrencyMenu = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && !target.closest('.currency-actions')) setCurrencyMenu(null);
+    };
+    const closeCurrencyMenuWithKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCurrencyMenu(null);
+    };
+    document.addEventListener('pointerdown', closeCurrencyMenu);
+    document.addEventListener('keydown', closeCurrencyMenuWithKeyboard);
+    return () => {
+      document.removeEventListener('pointerdown', closeCurrencyMenu);
+      document.removeEventListener('keydown', closeCurrencyMenuWithKeyboard);
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -537,57 +554,68 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
                     : 'Inactive'}
               </Badge>
               {canManage && (
-                <details className="currency-actions">
-                  <summary className="row-action" aria-label={`Actions for ${item.code}`}>
+                <div className={`currency-actions ${currencyMenu === item.code ? 'is-open' : ''}`}>
+                  <button
+                    type="button"
+                    className="row-action"
+                    aria-label={`Actions for ${item.code}`}
+                    aria-haspopup="menu"
+                    aria-expanded={currencyMenu === item.code}
+                    onClick={() =>
+                      setCurrencyMenu((current) => (current === item.code ? null : item.code))
+                    }
+                  >
                     <MoreHorizontal />
-                  </summary>
-                  <div className="currency-actions__menu" role="menu">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={(event) => {
-                        event.currentTarget.closest('details')?.removeAttribute('open');
-                        setEditingIndex(currencies.indexOf(item));
-                        setDialog('currency');
-                      }}
-                    >
-                      Edit currency
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      disabled={
-                        busy || !item.active || item.code === admin.organization.baseCurrency
-                      }
-                      onClick={(event) => {
-                        event.currentTarget.closest('details')?.removeAttribute('open');
-                        void run(
-                          () =>
-                            organizationApi
-                              .updateSection('currencies', {
-                                defaultCurrency: item.code,
-                                items: currencies.map((currency) => ({
-                                  ...currency,
-                                  rate:
-                                    currency.code === item.code
-                                      ? '1'
-                                      : String(Number(currency.rate) / Number(item.rate)),
-                                })),
-                              })
-                              .then((result) => {
-                                setDefaultCurrency(item.code);
-                                return result;
-                              }),
-                          `${item.code} is now the default currency`,
-                        );
-                      }}
-                    >
-                      {item.code === admin.organization.baseCurrency
-                        ? 'Current default'
-                        : 'Set as default'}
-                    </button>
-                  </div>
-                </details>
+                  </button>
+                  {currencyMenu === item.code && (
+                    <div className="currency-actions__menu" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setCurrencyMenu(null);
+                          setEditingIndex(currencies.indexOf(item));
+                          setDialog('currency');
+                        }}
+                      >
+                        Edit currency
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={
+                          busy || !item.active || item.code === admin.organization.baseCurrency
+                        }
+                        onClick={() => {
+                          setCurrencyMenu(null);
+                          void run(
+                            () =>
+                              organizationApi
+                                .updateSection('currencies', {
+                                  defaultCurrency: item.code,
+                                  items: currencies.map((currency) => ({
+                                    ...currency,
+                                    rate:
+                                      currency.code === item.code
+                                        ? '1'
+                                        : String(Number(currency.rate) / Number(item.rate)),
+                                  })),
+                                })
+                                .then((result) => {
+                                  setDefaultCurrency(item.code);
+                                  return result;
+                                }),
+                            `${item.code} is now the default currency`,
+                          );
+                        }}
+                      >
+                        {item.code === admin.organization.baseCurrency
+                          ? 'Current default'
+                          : 'Set as default'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ))}

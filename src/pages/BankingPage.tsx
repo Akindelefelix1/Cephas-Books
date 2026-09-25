@@ -38,6 +38,7 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [summary, setSummary] = useState<BankingSummary | null>(null);
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
+  const [reversals, setReversals] = useState<BankTransaction[]>([]);
   const [meta, setMeta] = useState({ page: 1, limit: 15, total: 0, pages: 1 });
   const [filters, setFilters] = useState<TransactionFilters>({
     page: 1,
@@ -59,21 +60,23 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
     setLoading(true);
     setError('');
     try {
-      const [nextAccounts, nextSummary, nextTransactions] = await Promise.all([
+      const [nextAccounts, nextSummary, nextTransactions, nextReversals] = await Promise.all([
         bankingApi.accounts(true),
         bankingApi.summary(),
         bankingApi.transactions(filters),
+        view === 'transactions' ? bankingApi.reversalHistory() : Promise.resolve([]),
       ]);
       setAccounts(nextAccounts);
       setSummary(nextSummary);
       setTransactions(nextTransactions.data);
       setMeta(nextTransactions.meta);
+      setReversals(nextReversals);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, view]);
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
@@ -356,17 +359,23 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
                 setConfirmation({
                   title: 'Reverse transaction?',
                   message:
-                    'The transaction will be marked reversed and the account balance recalculated.',
+                    'The transaction will be marked reversed and the account balance recalculated. Enter a reason for the permanent audit history.',
                   confirmLabel: 'Reverse transaction',
-                  onConfirm: () =>
+                  input: {
+                    label: 'Reason for reversal',
+                    placeholder: 'Explain why this transaction is being reversed',
+                    maxLength: 500,
+                  },
+                  onConfirm: (reason) =>
                     void submit(
-                      () => bankingApi.reverseTransaction(id),
+                      () => bankingApi.reverseTransaction(id, reason || ''),
                       'Transaction reversed',
                     ).then((ok) => ok && setConfirmation(null)),
                 });
               }}
             />
           )}
+          {view === 'transactions' && <ReversalHistory rows={reversals} />}
         </>
       )}
       <AccountModal
@@ -495,6 +504,65 @@ function Empty({ text, action, onClick }: { text: string; action?: string; onCli
         </button>
       )}
     </div>
+  );
+}
+
+function ReversalHistory({ rows }: { rows: BankTransaction[] }) {
+  return (
+    <section className="panel register-panel reversal-history">
+      <header className="settings-heading">
+        <div>
+          <h2>Reversal history</h2>
+          <p>A permanent audit trail of reversed bank transactions.</p>
+        </div>
+        <span className="banking-status">{rows.length} reversed</span>
+      </header>
+      <div className="data-table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Reversed</th>
+              <th>Original date</th>
+              <th>Account</th>
+              <th>Description</th>
+              <th>Reference</th>
+              <th className="is-right">Amount</th>
+              <th>Reversed by</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const actor = row.reversedBy;
+              const actorName = actor
+                ? [actor.firstName, actor.lastName].filter(Boolean).join(' ') || actor.email
+                : 'System or unavailable user';
+              return (
+                <tr key={row.id}>
+                  <td className="is-primary">
+                    {row.reversedAt ? new Date(row.reversedAt).toLocaleString('en-NG') : '—'}
+                  </td>
+                  <td>{date(row.transactionDate)}</td>
+                  <td>{row.bankAccount.name}</td>
+                  <td>{row.description}</td>
+                  <td>{row.reference || '—'}</td>
+                  <td className="is-right">{money(row.amount, row.bankAccount.currency)}</td>
+                  <td>{actorName}</td>
+                  <td className="reversal-reason">{row.reversalReason || 'No reason recorded'}</td>
+                </tr>
+              );
+            })}
+            {!rows.length && (
+              <tr>
+                <td className="table-empty" colSpan={8}>
+                  No transactions have been reversed.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

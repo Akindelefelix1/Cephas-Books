@@ -25,6 +25,9 @@ export interface BankTransaction {
   balanceAfter: string;
   reconciliationStatus: ReconciliationStatus;
   notes?: string;
+  reversedAt?: string;
+  reversalReason?: string;
+  reversedBy?: { id: string; email: string; firstName?: string; lastName?: string };
   bankAccount: Pick<BankAccount, 'id' | 'name' | 'currency'>;
 }
 export interface BankingSummary {
@@ -114,10 +117,15 @@ export const bankingApi = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
-  reverseTransaction: (id: string) =>
-    authorizedRequest<{ reversed: true }>(`/banking/transactions/${id}/reverse`, {
-      method: 'POST',
-    }),
+  reverseTransaction: (id: string, reason: string) =>
+    authorizedRequest<{ reversed: true; reversedAt: string }>(
+      `/banking/transactions/${id}/reverse`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      },
+    ),
+  reversalHistory: () => authorizedRequest<BankTransaction[]>('/banking/transactions/reversals'),
   transfer: (data: {
     fromAccountId: string;
     toAccountId: string;

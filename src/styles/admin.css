@@ -1017,13 +1017,7 @@
   position: relative;
   flex: 0 0 auto;
 }
-.currency-actions > summary {
-  list-style: none;
-}
-.currency-actions > summary::-webkit-details-marker {
-  display: none;
-}
-.currency-actions[open] > summary {
+.currency-actions.is-open > .row-action {
   background: #f1f4f9;
   color: #172033;
 }
@@ -1059,6 +1053,18 @@
 .currency-actions__menu button:disabled {
   color: #9aa3b5;
   cursor: not-allowed;
+}
+.reversal-history {
+  margin-top: 18px;
+}
+.reversal-history .settings-heading {
+  margin-bottom: 14px;
+}
+.reversal-reason {
+  min-width: 180px;
+  max-width: 320px;
+  white-space: normal;
+  line-height: 1.45;
 }
 .location-levels {
   display: flex;
