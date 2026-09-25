@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   Bell,
   Building2,
@@ -29,6 +29,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { confirmAction } from '@/utils/actions';
 import { authApi } from '@/services/auth';
+import { organizationApi, type CustomRole } from '@/services/organization';
 
 export function UsersPage() {
   const [modal, setModal] = useState(false);
@@ -44,18 +45,15 @@ export function UsersPage() {
       ),
     ),
   );
-  const [roles, setRoles] = useState([
-    ['Owner', '1', 'Full access'],
-    ['Administrator', '2', 'System administration'],
-    ['Accountant', '6', 'Accounting & reports'],
-    ['Finance Manager', '3', 'Finance & approvals'],
-    ['Sales', '8', 'Customers & invoices'],
-    ['Procurement', '4', 'Suppliers & purchases'],
-    ['Inventory Manager', '4', 'Inventory operations'],
-    ['Auditor', '2', 'Read-only finance'],
-    ['Employee', '6', 'Expenses & workflows'],
-    ['Submitter', '5', 'Create and view own submissions'],
-  ]);
+  const [roles, setRoles] = useState<CustomRole[]>([]);
+  const [roleError, setRoleError] = useState('');
+  useEffect(() => {
+    void organizationApi.roles().then((items) => {
+      setRoles(items);
+      if (items[0]) setSelectedRole(items[0].name);
+    }).catch(() => setRoleError('Unable to load roles'));
+  }, []);
+  const selectedRoleData = roles.find((role) => role.name === selectedRole);
   const rows = [
     ['Tobi Adeyemi', 'tobi@acme.ng', 'Finance Manager', 'Lagos HQ', 'Active'],
     ['Ada Okafor', 'ada@acme.ng', 'Accountant', 'All branches', 'Active'],
@@ -110,17 +108,18 @@ export function UsersPage() {
               </button>
             </div>
           </header>
-          {roles.map((x) => (
+          {roleError && <p className="form-error">{roleError}</p>}
+            {roles.map((x) => (
             <button
-              className={selectedRole === x[0] ? 'active' : ''}
-              key={x[0]}
-              onClick={() => setSelectedRole(x[0])}
+              className={selectedRole === x.name ? 'active' : ''}
+              key={x.id}
+              onClick={() => setSelectedRole(x.name)}
             >
               <span>
-                <strong>{x[0]}</strong>
-                <small>{x[2]}</small>
+                <strong>{x.name}</strong>
+                <small>{x.description || x.baseRole}</small>
               </span>
-              <b>{x[1]}</b>
+              <b>{x._count?.memberships ?? 0}</b>
               <ChevronRight />
             </button>
           ))}
@@ -135,7 +134,15 @@ export function UsersPage() {
           <button
             className="button button--secondary"
             onClick={() => {
-              if (permissionEditing) confirmAction(`${selectedRole} permissions saved`);
+              if (permissionEditing && selectedRoleData)
+                void organizationApi.updateRole(selectedRoleData.id, {
+                  name: selectedRoleData.name,
+                  baseRole: selectedRoleData.baseRole,
+                  description: selectedRoleData.description,
+                  permissions: permissions.flatMap((row, rowIndex) =>
+                    row.flatMap((enabled, permissionIndex) => enabled ? [`${['dashboard', 'sales', 'purchases', 'expenses', 'banking', 'accounting', 'reports', 'tax'][rowIndex]}.${['view', 'create', 'edit', 'delete', 'approve', 'export'][permissionIndex]}`] : []),
+                  ),
+                }).then(() => confirmAction(`${selectedRole} permissions saved`));
               setPermissionEditing((editing) => !editing);
             }}
           >
@@ -242,13 +249,16 @@ export function UsersPage() {
             const form = new FormData(event.currentTarget);
             const name = String(form.get('baseRole') ?? '').trim();
             const description = String(form.get('description') ?? '').trim();
-            setRoles((items) =>
-              editingRole
-                ? items.map((item) => (item[0] === selectedRole ? [name, item[1], description] : item))
-                : [...items, [name, '0', description]],
-            );
-            setSelectedRole(name);
-            setRoleModal(false);
+            const data = { name, baseRole: name, description, permissions: [] };
+            void (editingRole && selectedRoleData
+              ? organizationApi.updateRole(selectedRoleData.id, data)
+              : organizationApi.createRole(data))
+              .then((role) => {
+                setRoles((items) => editingRole ? items.map((item) => item.id === role.id ? role : item) : [...items, role]);
+                setSelectedRole(role.name);
+                setRoleModal(false);
+              })
+              .catch(() => setRoleError('Unable to save role'));
           }}
         >
           <label className="full">
