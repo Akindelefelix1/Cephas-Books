@@ -133,8 +133,10 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
       setEditingIndex(null);
       confirmAction(message);
       await load();
+      return true;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to complete this action');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -257,7 +259,7 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
             <div className="settings-save">
               <span>Changes create an audit entry and notification.</span>
               <button className="button" disabled={busy}>
-                Save changes
+                {busy ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           )}
@@ -533,15 +535,15 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
           busy={busy}
           onInvite={() => setDialog('invite')}
           onUpdate={(id, data) =>
-            void run(() => organizationApi.updateUser(id, data), 'User access updated')
+            run(() => organizationApi.updateUser(id, data), 'User access updated')
           }
           onSaveRole={(id, data) =>
-            void run(
+            run(
               () => (id ? organizationApi.updateRole(id, data) : organizationApi.createRole(data)),
               id ? 'Role updated' : 'Role created',
             )
           }
-          onDeleteRole={(id) => void run(() => organizationApi.deleteRole(id), 'Role deleted')}
+          onDeleteRole={(id) => run(() => organizationApi.deleteRole(id), 'Role deleted')}
         />
       )}
       {view === 'audit-logs' && !canViewAdministration && <AccessDenied />}
@@ -636,7 +638,7 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
                     }
                   >
                     {connected && <Check />}
-                    {connected ? 'Connected' : 'Connect'}
+                    {busy ? 'Updating…' : connected ? 'Connected' : 'Connect'}
                   </button>
                 </article>
               );
@@ -746,7 +748,7 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
                   phone: String(form.get('phone') || ''),
                   address: String(form.get('address') || ''),
                 }),
-              'Existing user added to the organisation',
+              'Staff member onboarded and invitation email sent',
             );
         }}
       />
@@ -790,9 +792,9 @@ function UsersSection({
       phone?: string;
       address?: string;
     },
-  ) => void;
-  onSaveRole: (id: string | null, data: Omit<CustomRole, 'id' | '_count'>) => void;
-  onDeleteRole: (id: string) => void;
+  ) => Promise<boolean>;
+  onSaveRole: (id: string | null, data: Omit<CustomRole, 'id' | '_count'>) => Promise<boolean>;
+  onDeleteRole: (id: string) => Promise<boolean>;
 }) {
   const [roleDialog, setRoleDialog] = useState<CustomRole | 'new' | null>(null);
   const [editingMember, setEditingMember] = useState<OrganizationMember | null>(null);
@@ -803,8 +805,8 @@ function UsersSection({
           { label: 'Team members', value: String(members.length) },
           { label: 'Active users', value: String(members.filter((x) => x.user.isActive).length) },
           {
-            label: 'Pending access',
-            value: String(members.filter((x) => !x.user.verifiedAt).length),
+            label: 'Password setup pending',
+            value: String(members.filter((x) => x.user.mustChangePassword).length),
             tone: 'warning',
           },
           {
@@ -825,7 +827,7 @@ function UsersSection({
                 <ShieldCheck /> Create role
               </button>
               <button className="button" onClick={onInvite}>
-                <Users /> Add user
+                <Users /> Onboard staff
               </button>
             </div>
           )}
@@ -899,7 +901,7 @@ function UsersSection({
                     </select>
                   </td>
                   <td>
-                    <Badge>{member.user.verifiedAt ? 'Verified' : 'Pending'}</Badge>
+                    <Badge>{member.user.mustChangePassword ? 'Invited' : 'Active'}</Badge>
                   </td>
                   <td>
                     <button
@@ -963,15 +965,17 @@ function UsersSection({
           busy={busy}
           onClose={() => setRoleDialog(null)}
           onSubmit={(data) => {
-            onSaveRole(roleDialog === 'new' ? null : roleDialog.id, data);
-            setRoleDialog(null);
+            void onSaveRole(roleDialog === 'new' ? null : roleDialog.id, data).then(
+              (saved) => saved && setRoleDialog(null),
+            );
           }}
           onDelete={
             roleDialog === 'new'
               ? undefined
               : () => {
-                  onDeleteRole(roleDialog.id);
-                  setRoleDialog(null);
+                  void onDeleteRole(roleDialog.id).then(
+                    (deleted) => deleted && setRoleDialog(null),
+                  );
                 }
           }
         />
@@ -982,8 +986,9 @@ function UsersSection({
           busy={busy}
           onClose={() => setEditingMember(null)}
           onSubmit={(data) => {
-            onUpdate(editingMember.id, data);
-            setEditingMember(null);
+            void onUpdate(editingMember.id, data).then(
+              (updated) => updated && setEditingMember(null),
+            );
           }}
         />
       )}
@@ -1012,8 +1017,8 @@ function UserDetailsDialog({
           <button className="button button--secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="button" form="user-details-form" disabled={busy}>
-            Save details
+          <button className="button" form="user-details-form" disabled={busy} aria-busy={busy}>
+            {busy ? 'Saving…' : 'Save details'}
           </button>
         </>
       }
@@ -1043,7 +1048,7 @@ function UserDetailsDialog({
         <label className="full">
           Email
           <input value={member.user.email} readOnly />
-          <small>Email is tied to the user’s verified Cephas Books account.</small>
+          <small>This is the staff member’s sign-in email.</small>
         </label>
         <label>
           Phone number
@@ -1104,14 +1109,14 @@ function RoleDialog({
               onClick={onDelete}
               disabled={busy || Boolean(role?._count?.memberships)}
             >
-              Delete role
+              {busy ? 'Working…' : 'Delete role'}
             </button>
           )}
           <button className="button button--secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="button" form="custom-role-form" disabled={busy}>
-            Save role
+          <button className="button" form="custom-role-form" disabled={busy} aria-busy={busy}>
+            {busy ? 'Saving…' : 'Save role'}
           </button>
         </>
       }
@@ -1141,7 +1146,7 @@ function RoleDialog({
           />
         </label>
         <label>
-          Access ceiling
+          Maximum system access
           <select name="baseRole" defaultValue={role?.baseRole || 'MEMBER'}>
             {roles
               .filter((item) => item !== 'OWNER')
@@ -1149,6 +1154,7 @@ function RoleDialog({
                 <option key={item}>{item}</option>
               ))}
           </select>
+          <small>Permissions selected below cannot exceed this security boundary.</small>
         </label>
         <label className="full">
           Description
@@ -1455,15 +1461,15 @@ function CreateDialog({
                 ? editingCurrency
                   ? 'Edit currency'
                   : 'Add currency'
-                : 'Add existing user'
+                : 'Onboard staff member'
       }
       footer={
         <>
           <button className="button button--secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="button" form="organization-dialog" disabled={busy}>
-            {busy ? 'Saving…' : 'Save'}
+          <button className="button" form="organization-dialog" disabled={busy} aria-busy={busy}>
+            {busy ? 'Working…' : dialog === 'invite' ? 'Send invitation' : 'Save'}
           </button>
         </>
       }
@@ -1634,9 +1640,9 @@ function CreateDialog({
               <input name="lastName" required />
             </label>
             <label className="full">
-              Cephas Books account email
+              Work email
               <input name="email" type="email" required />
-              <small>The user must already have a verified Cephas Books account.</small>
+              <small>We’ll create their staff account and email a temporary password.</small>
             </label>
             <label>
               Phone number
@@ -1647,7 +1653,7 @@ function CreateDialog({
               <input name="address" placeholder="Home or contact address" />
             </label>
             <label className="full">
-              System role
+              Base access
               <select name="role" defaultValue="MEMBER">
                 {roles
                   .filter((item) => item !== 'OWNER')
@@ -1660,7 +1666,7 @@ function CreateDialog({
               <label className="full">
                 Custom role{' '}
                 <small>
-                  Optional; overrides the system role with its configured access ceiling.
+                  Optional; applies an organisation-defined access profile.
                 </small>
                 <select name="customRoleId" defaultValue="">
                   <option value="">No custom role</option>

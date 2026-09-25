@@ -32,6 +32,7 @@ export interface OrganizationMember {
     address?: string;
     isActive: boolean;
     verifiedAt?: string;
+    mustChangePassword?: boolean;
   };
 }
 

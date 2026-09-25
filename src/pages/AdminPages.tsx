@@ -1074,6 +1074,9 @@ export function ProfilePage({
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
   const saveProfile = async () => {
     setSaving(true);
     setError('');
@@ -1250,7 +1253,10 @@ export function ProfilePage({
               </span>
               <button
                 className="button button--secondary"
-                onClick={() => confirmAction('Password change instructions sent to your email')}
+                onClick={() => {
+                  setPasswordError('');
+                  setPasswordOpen(true);
+                }}
               >
                 Change password
               </button>
@@ -1293,6 +1299,69 @@ export function ProfilePage({
           </section>
         </div>
       </div>
+      <Modal
+        open={passwordOpen}
+        title="Change password"
+        onClose={() => !passwordBusy && setPasswordOpen(false)}
+        footer={
+          <>
+            <button
+              className="button button--secondary"
+              type="button"
+              disabled={passwordBusy}
+              onClick={() => setPasswordOpen(false)}
+            >
+              Cancel
+            </button>
+            <button className="button" form="change-password-form" disabled={passwordBusy} aria-busy={passwordBusy}>
+              {passwordBusy ? 'Changing…' : 'Change password'}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="change-password-form"
+          className="form-grid"
+          onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            if (passwordBusy) return;
+            const form = new FormData(event.currentTarget);
+            const currentPassword = String(form.get('currentPassword') || '');
+            const newPassword = String(form.get('newPassword') || '');
+            const confirmation = String(form.get('confirmation') || '');
+            if (newPassword !== confirmation) {
+              setPasswordError('New passwords do not match.');
+              return;
+            }
+            setPasswordBusy(true);
+            setPasswordError('');
+            void authApi
+              .changePassword(currentPassword, newPassword)
+              .then(() => {
+                setPasswordOpen(false);
+                confirmAction('Password changed successfully');
+              })
+              .catch((caught) =>
+                setPasswordError(caught instanceof Error ? caught.message : 'Unable to change password.'),
+              )
+              .finally(() => setPasswordBusy(false));
+          }}
+        >
+          <label className="full">
+            Current password
+            <input name="currentPassword" type="password" autoComplete="current-password" required autoFocus />
+          </label>
+          <label className="full">
+            New password
+            <input name="newPassword" type="password" autoComplete="new-password" minLength={8} required />
+          </label>
+          <label className="full">
+            Confirm new password
+            <input name="confirmation" type="password" autoComplete="new-password" minLength={8} required />
+          </label>
+          {passwordError && <p className="form-error full" role="alert">{passwordError}</p>}
+        </form>
+      </Modal>
     </>
   );
 }
