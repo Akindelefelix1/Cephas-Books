@@ -1117,6 +1117,56 @@
   display: flex;
   justify-content: space-between;
 }
+.bank-card__actions {
+  position: relative;
+}
+.bank-card__actions > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.bank-card__actions > summary::-webkit-details-marker {
+  display: none;
+}
+.bank-card__actions[open] > summary {
+  background: #f1f4f9;
+  color: #172033;
+}
+.bank-card__menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 7px);
+  right: 0;
+  width: 180px;
+  padding: 6px;
+  border: 1px solid #e1e6ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgb(21 32 56 / 16%);
+}
+.bank-card__menu button {
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #25314a;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.bank-card__menu button:hover {
+  background: #f3f6fb;
+  color: #1738d1;
+}
+.bank-card__menu button.is-danger {
+  color: #b42318;
+}
+.bank-card__menu button.is-danger:hover {
+  background: #fff1f2;
+  color: #b42318;
+}
 .bank-logo {
   width: 36px;
   height: 36px;

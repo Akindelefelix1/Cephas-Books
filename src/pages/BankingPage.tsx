@@ -260,17 +260,68 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
                       <span className={`bank-logo bank-logo--${i % 3}`}>
                         {account.name.slice(0, 2)}
                       </span>
-                      {canManage && account.isActive && (
-                        <button
-                          className="icon-button"
-                          aria-label={`Edit ${account.name}`}
-                          onClick={() => {
-                            setSelected(account);
-                            setModal('edit');
-                          }}
-                        >
-                          <MoreHorizontal />
-                        </button>
+                      {canManage && (
+                        <details className="bank-card__actions">
+                          <summary className="icon-button" aria-label={`Actions for ${account.name}`}>
+                            <MoreHorizontal />
+                          </summary>
+                          <div className="bank-card__menu" role="menu">
+                            {account.isActive ? (
+                              <button
+                                role="menuitem"
+                                onClick={(event) => {
+                                  event.currentTarget.closest('details')?.removeAttribute('open');
+                                  setSelected(account);
+                                  setModal('edit');
+                                }}
+                              >
+                                Edit account
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  role="menuitem"
+                                  onClick={(event) => {
+                                    event.currentTarget.closest('details')?.removeAttribute('open');
+                                    setConfirmation({
+                                      title: 'Restore bank account?',
+                                      message: `${account.name} will become available for transactions and payments again.`,
+                                      confirmLabel: 'Restore account',
+                                      onConfirm: () =>
+                                        void submit(
+                                          () => bankingApi.updateAccount(account.id, { isActive: true }),
+                                          'Bank account restored',
+                                        ).then((ok) => ok && setConfirmation(null)),
+                                    });
+                                  }}
+                                >
+                                  Restore
+                                </button>
+                                <button
+                                  className="is-danger"
+                                  role="menuitem"
+                                  onClick={(event) => {
+                                    event.currentTarget.closest('details')?.removeAttribute('open');
+                                    setConfirmation({
+                                      title: 'Permanently delete bank account?',
+                                      message:
+                                        'This cannot be undone. Accounts with any financial history are protected and cannot be deleted.',
+                                      confirmLabel: 'Delete permanently',
+                                      requireText: 'DELETE',
+                                      onConfirm: () =>
+                                        void submit(
+                                          () => bankingApi.deleteAccount(account.id),
+                                          'Bank account permanently deleted',
+                                        ).then((ok) => ok && setConfirmation(null)),
+                                    });
+                                  }}
+                                >
+                                  Delete permanently
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </details>
                       )}
                     </header>
                     <p>
@@ -290,44 +341,6 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
                           ? `${account._count.transactions} to reconcile`
                           : 'Up to date'}
                     </span>
-                    {canManage && !account.isActive && (
-                      <div className="inline-actions">
-                        <button
-                          onClick={() =>
-                            setConfirmation({
-                              title: 'Restore bank account?',
-                              message: `${account.name} will become available for transactions and payments again.`,
-                              confirmLabel: 'Restore account',
-                              onConfirm: () =>
-                                void submit(
-                                  () => bankingApi.updateAccount(account.id, { isActive: true }),
-                                  'Bank account restored',
-                                ).then((ok) => ok && setConfirmation(null)),
-                            })
-                          }
-                        >
-                          Restore
-                        </button>
-                        <button
-                          onClick={() =>
-                            setConfirmation({
-                              title: 'Permanently delete bank account?',
-                              message:
-                                'This cannot be undone. Accounts with any financial history are protected and cannot be deleted.',
-                              confirmLabel: 'Delete permanently',
-                              requireText: 'DELETE',
-                              onConfirm: () =>
-                                void submit(
-                                  () => bankingApi.deleteAccount(account.id),
-                                  'Bank account permanently deleted',
-                                ).then((ok) => ok && setConfirmation(null)),
-                            })
-                          }
-                        >
-                          Delete permanently
-                        </button>
-                      </div>
-                    )}
                   </article>
                 ))}
               </div>
