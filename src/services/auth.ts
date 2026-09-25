@@ -178,9 +178,27 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
     throw new ApiError('Your session has expired. Please sign in again.', 401);
   }
 
+  const activeBranchId = localStorage.getItem('cephas:active-branch');
+  const branchScopedCreate =
+    init.method === 'POST' &&
+    /^\/(customers|invoices|sales\/(quotations|payments|credit-notes)|pos\/sales|banking\/transactions|purchases\/(suppliers|requests|orders|bills|payments|expenses))$/.test(
+      path,
+    );
+  let requestBody = init.body;
+  if (activeBranchId && branchScopedCreate && typeof init.body === 'string') {
+    try {
+      requestBody = JSON.stringify({
+        ...(JSON.parse(init.body) as object),
+        branchId: activeBranchId,
+      });
+    } catch {
+      requestBody = init.body;
+    }
+  }
   const send = (accessToken: string) =>
     fetch(`${API_BASE_URL}/v1${path}`, {
       ...init,
+      body: requestBody,
       headers: {
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
         Authorization: `Bearer ${accessToken}`,

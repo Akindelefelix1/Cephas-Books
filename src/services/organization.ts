@@ -42,6 +42,23 @@ export interface AuditEntry {
   actor?: { email: string; firstName?: string; lastName?: string };
 }
 
+export interface LocationActivity {
+  kind: string;
+  branchIds: string[];
+  total: number;
+  data: Array<{
+    id: string;
+    label?: string;
+    description?: string;
+    displayName?: string;
+    recordType?: string;
+    amount?: string;
+    status?: string;
+    type?: string;
+    date?: string;
+  }>;
+}
+
 const request = <T>(path: string, method = 'GET', body?: object) =>
   authorizedRequest<T>(path, {
     method,
@@ -66,5 +83,9 @@ export const organizationApi = {
   auditLogs: (search = '') =>
     request<AuditEntry[]>(
       `/organizations/current/audit-logs?${new URLSearchParams(search ? { search } : {})}`,
+    ),
+  locationActivity: (type: 'state' | 'region' | 'branch', id: string, kind: string) =>
+    request<LocationActivity>(
+      `/organizations/current/locations/${type}/${id}/activity?${new URLSearchParams({ kind })}`,
     ),
 };

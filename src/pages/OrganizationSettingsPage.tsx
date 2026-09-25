@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Building2, Check, Database, MoreHorizontal, Plus, ShieldCheck, Users } from 'lucide-react';
+import {
+  Building2,
+  Check,
+  ChevronRight,
+  Database,
+  Map,
+  MapPin,
+  MoreHorizontal,
+  Plus,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Modal } from '@/components/ui/Modal';
@@ -9,13 +20,23 @@ import {
   organizationApi,
   type AuditEntry,
   type OrganizationAdmin,
+  type LocationActivity,
   type OrganizationMember,
   type OrganizationSection,
   type OrganizationView,
 } from '@/services/organization';
 import { confirmAction } from '@/utils/actions';
 
-type Branch = { name: string; address: string; status: string };
+type Branch = {
+  id: string;
+  regionId: string;
+  name: string;
+  address: string;
+  status: string;
+  managerIds: string[];
+};
+type Region = { id: string; stateId: string; name: string; managerIds: string[] };
+type LocationState = { id: string; name: string; managerIds: string[] };
 type Currency = { code: string; name: string; symbol: string; rate: string; active: boolean };
 type Integration = { id: string; connected: boolean };
 type Security = Record<string, boolean>;
@@ -62,8 +83,16 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [dialog, setDialog] = useState<'branch' | 'currency' | 'invite' | null>(null);
+  const [dialog, setDialog] = useState<
+    'state' | 'region' | 'branch' | 'currency' | 'invite' | null
+  >(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
+  const [parentLocationId, setParentLocationId] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{
+    type: 'state' | 'region' | 'branch';
+    id: string;
+  } | null>(null);
   const [auditSearch, setAuditSearch] = useState('');
 
   const load = useCallback(async () => {
@@ -72,7 +101,8 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
     try {
       const base = await organizationApi.admin();
       setAdmin(base);
-      if (view === 'users' && canViewAdministration) setMembers(await organizationApi.users());
+      if ((view === 'users' || view === 'branches') && canViewAdministration)
+        setMembers(await organizationApi.users());
       if (view === 'audit-logs' && canViewAdministration)
         setLogs(await organizationApi.auditLogs(auditSearch));
     } catch (caught) {
@@ -116,7 +146,17 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
       </div>
     );
 
-  const branches = arrayValue<Branch>(objectValue(admin.settings.branches).items);
+  const structure = objectValue(admin.settings.branches);
+  const states = arrayValue<LocationState>(structure.states);
+  const regions = arrayValue<Region>(structure.regions);
+  const storedBranches = arrayValue<Branch | Omit<Branch, 'id' | 'regionId' | 'managerIds'>>(
+    structure.items,
+  );
+  const branches = storedBranches.filter(
+    (item): item is Branch =>
+      typeof (item as Branch).id === 'string' && typeof (item as Branch).regionId === 'string',
+  );
+  const legacyBranches = storedBranches.filter((item) => !('id' in item) || !('regionId' in item));
   const storedCurrencies = arrayValue<Currency>(objectValue(admin.settings.currencies).items);
   const currencies = storedCurrencies.length
     ? storedCurrencies
@@ -219,48 +259,207 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
         <section className="panel settings-api-panel">
           <header className="settings-heading">
             <div>
-              <h2>Operating locations</h2>
-              <p>{branches.length} branches and centres configured.</p>
+              <h2>Centres and branches</h2>
+              <p>State → Region → Branch hierarchy with scoped management access.</p>
             </div>
             {canManage && (
               <button
                 className="button"
                 onClick={() => {
-                  setEditingIndex(null);
-                  setDialog('branch');
+                  setEditingLocationId(null);
+                  setDialog('state');
                 }}
               >
-                <Plus /> Add branch
+                <Plus /> Create state
               </button>
             )}
           </header>
-          {branches.length ? (
-            branches.map((branch) => (
-              <div className="branch-row" key={branch.name}>
-                <span>
-                  <Building2 />
-                </span>
-                <div>
-                  <strong>{branch.name}</strong>
-                  <small>{branch.address}</small>
-                </div>
-                <Badge>{branch.status}</Badge>
-                {canManage && (
-                  <button
-                    className="row-action"
-                    aria-label={`Edit ${branch.name}`}
-                    onClick={() => {
-                      setEditingIndex(branches.indexOf(branch));
-                      setDialog('branch');
-                    }}
-                  >
-                    <MoreHorizontal />
-                  </button>
-                )}
+          <div className="location-levels" aria-label="Organisation levels">
+            <span>
+              <b>1</b> States <small>{states.length}</small>
+            </span>
+            <ChevronRight />
+            <span>
+              <b>2</b> Regions <small>{regions.length}</small>
+            </span>
+            <ChevronRight />
+            <span>
+              <b>3</b> Branches <small>{branches.length}</small>
+            </span>
+          </div>
+          {legacyBranches.length > 0 && (
+            <div className="banking-alert location-migration-alert" role="status">
+              <span>
+                <strong>{legacyBranches.length} legacy branch records need a location.</strong>
+                Create a state and region, then recreate these branches in the hierarchy. Their
+                original details remain preserved until migration is complete.
+              </span>
+              <div>
+                {legacyBranches.map((branch) => (
+                  <small key={branch.name}>
+                    {branch.name} · {branch.address}
+                  </small>
+                ))}
               </div>
-            ))
+            </div>
+          )}
+          {states.length ? (
+            <div className="location-layout">
+              <div className="location-tree">
+                {states.map((state) => {
+                  const stateRegions = regions.filter((region) => region.stateId === state.id);
+                  return (
+                    <article className="location-state" key={state.id}>
+                      <div
+                        className={`location-node location-node--state ${selectedLocation?.type === 'state' && selectedLocation.id === state.id ? 'selected' : ''}`}
+                      >
+                        <button
+                          className="location-node__main"
+                          onClick={() => setSelectedLocation({ type: 'state', id: state.id })}
+                        >
+                          <span>
+                            <Map />
+                          </span>
+                          <div>
+                            <strong>{state.name}</strong>
+                            <small>
+                              {stateRegions.length} region{stateRegions.length === 1 ? '' : 's'} ·{' '}
+                              {
+                                branches.filter((branch) =>
+                                  stateRegions.some((region) => region.id === branch.regionId),
+                                ).length
+                              }{' '}
+                              branches
+                            </small>
+                          </div>
+                        </button>
+                        {canManage && (
+                          <div className="location-actions">
+                            <button
+                              onClick={() => {
+                                setParentLocationId(state.id);
+                                setEditingLocationId(null);
+                                setDialog('region');
+                              }}
+                            >
+                              <Plus /> Region
+                            </button>
+                            <button
+                              aria-label={`Edit ${state.name}`}
+                              onClick={() => {
+                                setEditingLocationId(state.id);
+                                setDialog('state');
+                              }}
+                            >
+                              <MoreHorizontal />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="location-children">
+                        {stateRegions.map((region) => {
+                          const regionBranches = branches.filter(
+                            (branch) => branch.regionId === region.id,
+                          );
+                          return (
+                            <div className="location-region" key={region.id}>
+                              <div
+                                className={`location-node location-node--region ${selectedLocation?.type === 'region' && selectedLocation.id === region.id ? 'selected' : ''}`}
+                              >
+                                <button
+                                  className="location-node__main"
+                                  onClick={() =>
+                                    setSelectedLocation({ type: 'region', id: region.id })
+                                  }
+                                >
+                                  <span>
+                                    <MapPin />
+                                  </span>
+                                  <div>
+                                    <strong>{region.name}</strong>
+                                    <small>
+                                      {regionBranches.length} branch
+                                      {regionBranches.length === 1 ? '' : 'es'}
+                                    </small>
+                                  </div>
+                                </button>
+                                {canManage && (
+                                  <div className="location-actions">
+                                    <button
+                                      onClick={() => {
+                                        setParentLocationId(region.id);
+                                        setEditingLocationId(null);
+                                        setDialog('branch');
+                                      }}
+                                    >
+                                      <Plus /> Branch
+                                    </button>
+                                    <button
+                                      aria-label={`Edit ${region.name}`}
+                                      onClick={() => {
+                                        setEditingLocationId(region.id);
+                                        setDialog('region');
+                                      }}
+                                    >
+                                      <MoreHorizontal />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="location-children location-children--branches">
+                                {regionBranches.map((branch) => (
+                                  <div
+                                    className={`location-node location-node--branch ${selectedLocation?.type === 'branch' && selectedLocation.id === branch.id ? 'selected' : ''}`}
+                                    key={branch.id}
+                                  >
+                                    <button
+                                      className="location-node__main"
+                                      onClick={() =>
+                                        setSelectedLocation({ type: 'branch', id: branch.id })
+                                      }
+                                    >
+                                      <span>
+                                        <Building2 />
+                                      </span>
+                                      <div>
+                                        <strong>{branch.name}</strong>
+                                        <small>{branch.address}</small>
+                                      </div>
+                                      <Badge>{branch.status}</Badge>
+                                    </button>
+                                    {canManage && (
+                                      <button
+                                        className="row-action"
+                                        aria-label={`Edit ${branch.name}`}
+                                        onClick={() => {
+                                          setEditingLocationId(branch.id);
+                                          setDialog('branch');
+                                        }}
+                                      >
+                                        <MoreHorizontal />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <LocationDetails
+                selected={selectedLocation}
+                states={states}
+                regions={regions}
+                branches={branches}
+                members={members}
+              />
+            </div>
           ) : (
-            <Empty text="No branches have been added yet." />
+            <Empty text="No states have been added yet." />
           )}
         </section>
       )}
@@ -433,27 +632,73 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
         dialog={dialog}
         busy={busy}
         currencies={currencies}
-        editingBranch={editingIndex === null ? undefined : branches[editingIndex]}
+        members={members}
+        states={states}
+        regions={regions}
+        editingState={states.find((item) => item.id === editingLocationId)}
+        editingRegion={regions.find((item) => item.id === editingLocationId)}
+        editingBranch={branches.find((item) => item.id === editingLocationId)}
+        parentLocationId={parentLocationId}
         editingCurrency={editingIndex === null ? undefined : currencies[editingIndex]}
         onClose={() => {
           setDialog(null);
           setEditingIndex(null);
+          setEditingLocationId(null);
+          setParentLocationId(null);
         }}
         onSubmit={(kind, form) => {
+          const managerIds = form.getAll('managerIds').map(String);
+          const id = editingLocationId || crypto.randomUUID();
+          if (kind === 'state')
+            void saveSection(
+              'branches',
+              {
+                states: [
+                  ...states.filter((item) => item.id !== editingLocationId),
+                  { id, name: String(form.get('name')), managerIds },
+                ],
+                regions,
+                items: branches,
+              },
+              editingLocationId ? 'State updated' : 'State created',
+            );
+          if (kind === 'region')
+            void saveSection(
+              'branches',
+              {
+                states,
+                regions: [
+                  ...regions.filter((item) => item.id !== editingLocationId),
+                  {
+                    id,
+                    stateId: String(form.get('stateId')),
+                    name: String(form.get('name')),
+                    managerIds,
+                  },
+                ],
+                items: branches,
+              },
+              editingLocationId ? 'Region updated' : 'Region created',
+            );
           if (kind === 'branch')
             void saveSection(
               'branches',
               {
+                states,
+                regions,
                 items: [
-                  ...branches.filter((_, index) => index !== editingIndex),
+                  ...branches.filter((item) => item.id !== editingLocationId),
                   {
+                    id,
+                    regionId: String(form.get('regionId')),
                     name: String(form.get('name')),
                     address: String(form.get('address')),
                     status: String(form.get('status') || 'Active'),
+                    managerIds,
                   },
                 ],
               },
-              editingIndex === null ? 'Branch added' : 'Branch updated',
+              editingLocationId === null ? 'Branch added' : 'Branch updated',
             );
           if (kind === 'currency')
             void saveSection(
@@ -603,6 +848,171 @@ function AccessDenied() {
   );
 }
 
+function LocationDetails({
+  selected,
+  states,
+  regions,
+  branches,
+  members,
+}: {
+  selected: { type: 'state' | 'region' | 'branch'; id: string } | null;
+  states: LocationState[];
+  regions: Region[];
+  branches: Branch[];
+  members: OrganizationMember[];
+}) {
+  const [activity, setActivity] = useState<LocationActivity | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
+  const [activeBranchId, setActiveBranchId] = useState(() =>
+    localStorage.getItem('cephas:active-branch'),
+  );
+  const loadActivity = async (kind: string) => {
+    if (!selected) return;
+    setActivityLoading(true);
+    setActivityError('');
+    try {
+      setActivity(await organizationApi.locationActivity(selected.type, selected.id, kind));
+    } catch (caught) {
+      setActivityError(
+        caught instanceof Error ? caught.message : 'Unable to load location activity',
+      );
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+  if (!selected)
+    return (
+      <aside className="location-details">
+        <MapPin />
+        <strong>Select a location</strong>
+        <p>
+          Choose a state, region, or branch to inspect its structure, managers, and scoped business
+          activity.
+        </p>
+      </aside>
+    );
+  const location =
+    selected.type === 'state'
+      ? states.find((item) => item.id === selected.id)
+      : selected.type === 'region'
+        ? regions.find((item) => item.id === selected.id)
+        : branches.find((item) => item.id === selected.id);
+  if (!location) return null;
+  const regionIds =
+    selected.type === 'state'
+      ? regions.filter((item) => item.stateId === selected.id).map((item) => item.id)
+      : selected.type === 'region'
+        ? [selected.id]
+        : [];
+  const scopedBranches =
+    selected.type === 'branch'
+      ? branches.filter((item) => item.id === selected.id)
+      : branches.filter((item) => regionIds.includes(item.regionId));
+  const managers = (location.managerIds || [])
+    .map((id) => members.find((member) => member.id === id))
+    .filter(Boolean) as OrganizationMember[];
+  return (
+    <aside className="location-details location-details--active">
+      <span className="location-details__level">
+        Level {selected.type === 'state' ? '1' : selected.type === 'region' ? '2' : '3'} ·{' '}
+        {selected.type}
+      </span>
+      <h3>{location.name}</h3>
+      {selected.type === 'branch' && (
+        <button
+          className={`active-branch-button ${activeBranchId === selected.id ? 'active' : ''}`}
+          onClick={() => {
+            if (activeBranchId === selected.id) {
+              localStorage.removeItem('cephas:active-branch');
+              setActiveBranchId(null);
+            } else {
+              localStorage.setItem('cephas:active-branch', selected.id);
+              setActiveBranchId(selected.id);
+            }
+          }}
+        >
+          <Check /> {activeBranchId === selected.id ? 'Active branch' : 'Use for new records'}
+        </button>
+      )}
+      <div className="location-details__stats">
+        <span>
+          <b>{scopedBranches.length}</b>
+          <small>Branches</small>
+        </span>
+        <span>
+          <b>{managers.length}</b>
+          <small>Managers</small>
+        </span>
+      </div>
+      <h4>Assigned managers</h4>
+      {managers.length ? (
+        managers.map((manager) => (
+          <div className="location-manager" key={manager.id}>
+            <span>{(manager.user.firstName?.[0] || manager.user.email[0]).toUpperCase()}</span>
+            <div>
+              <strong>
+                {[manager.user.firstName, manager.user.lastName].filter(Boolean).join(' ') ||
+                  manager.user.email}
+              </strong>
+              <small>{manager.role.replaceAll('_', ' ')}</small>
+            </div>
+          </div>
+        ))
+      ) : (
+        <p>No manager assigned. You can add one now or later.</p>
+      )}
+      <h4>Scoped activity</h4>
+      <div className="location-scope-grid">
+        {['Transactions', 'Sales', 'Customers', 'Purchases', 'Invoices'].map((label) => (
+          <button key={label} onClick={() => void loadActivity(label.toLowerCase())}>
+            <span>{label}</span>
+            <ChevronRight />
+          </button>
+        ))}
+      </div>
+      <small className="location-scope-note">
+        {scopedBranches.length} branch{scopedBranches.length === 1 ? '' : 'es'} in this scope.
+        Unassigned organisation records are never shown as branch data.
+      </small>
+      {activityLoading && <p className="location-activity-message">Loading scoped activity…</p>}
+      {activityError && (
+        <p className="location-activity-message location-activity-message--error">
+          {activityError}
+        </p>
+      )}
+      {activity && !activityLoading && (
+        <div className="location-activity">
+          <header>
+            <strong>{activity.kind}</strong>
+            <small>
+              {activity.total} record{activity.total === 1 ? '' : 's'}
+            </small>
+          </header>
+          {activity.data.length ? (
+            activity.data.map((row) => (
+              <div className="location-activity__row" key={row.id}>
+                <span>
+                  <strong>
+                    {row.label || row.displayName || row.description || row.recordType || 'Record'}
+                  </strong>
+                  <small>
+                    {row.recordType || row.type || row.status || 'Active'}
+                    {row.date ? ` · ${new Date(row.date).toLocaleDateString()}` : ''}
+                  </small>
+                </span>
+                {row.amount && <b>{Number(row.amount).toLocaleString()}</b>}
+              </div>
+            ))
+          ) : (
+            <p className="location-activity-message">No assigned records in this scope yet.</p>
+          )}
+        </div>
+      )}
+    </aside>
+  );
+}
+
 function AuditSection({
   logs,
   search,
@@ -659,18 +1069,30 @@ function CreateDialog({
   dialog,
   busy,
   currencies,
+  members,
+  states,
+  regions,
+  editingState,
+  editingRegion,
   editingBranch,
   editingCurrency,
+  parentLocationId,
   onClose,
   onSubmit,
 }: {
-  dialog: 'branch' | 'currency' | 'invite' | null;
+  dialog: 'state' | 'region' | 'branch' | 'currency' | 'invite' | null;
   busy: boolean;
   currencies: Currency[];
+  members: OrganizationMember[];
+  states: LocationState[];
+  regions: Region[];
+  editingState?: LocationState;
+  editingRegion?: Region;
   editingBranch?: Branch;
   editingCurrency?: Currency;
+  parentLocationId: string | null;
   onClose: () => void;
-  onSubmit: (kind: 'branch' | 'currency' | 'invite', form: FormData) => void;
+  onSubmit: (kind: 'state' | 'region' | 'branch' | 'currency' | 'invite', form: FormData) => void;
 }) {
   if (!dialog) return null;
   return (
@@ -678,15 +1100,23 @@ function CreateDialog({
       open
       onClose={onClose}
       title={
-        dialog === 'branch'
-          ? editingBranch
-            ? 'Edit branch'
-            : 'Add branch'
-          : dialog === 'currency'
-            ? editingCurrency
-              ? 'Edit currency'
-              : 'Add currency'
-            : 'Add existing user'
+        dialog === 'state'
+          ? editingState
+            ? 'Edit state'
+            : 'Create state'
+          : dialog === 'region'
+            ? editingRegion
+              ? 'Edit region'
+              : 'Create region'
+            : dialog === 'branch'
+              ? editingBranch
+                ? 'Edit branch'
+                : 'Add branch'
+              : dialog === 'currency'
+                ? editingCurrency
+                  ? 'Edit currency'
+                  : 'Add currency'
+                : 'Add existing user'
       }
       footer={
         <>
@@ -707,6 +1137,53 @@ function CreateDialog({
           onSubmit(dialog, new FormData(event.currentTarget));
         }}
       >
+        {(dialog === 'state' || dialog === 'region' || dialog === 'branch') && (
+          <>
+            {dialog === 'region' && (
+              <label className="full">
+                State
+                <select
+                  name="stateId"
+                  defaultValue={editingRegion?.stateId || parentLocationId || ''}
+                  required
+                >
+                  {states.map((state) => (
+                    <option value={state.id} key={state.id}>
+                      {state.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {dialog === 'branch' && (
+              <label className="full">
+                Region
+                <select
+                  name="regionId"
+                  defaultValue={editingBranch?.regionId || parentLocationId || ''}
+                  required
+                >
+                  {regions.map((region) => (
+                    <option value={region.id} key={region.id}>
+                      {states.find((state) => state.id === region.stateId)?.name} / {region.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {dialog !== 'branch' && (
+              <label className="full">
+                {dialog === 'state' ? 'State' : 'Region'} name
+                <input
+                  name="name"
+                  defaultValue={dialog === 'state' ? editingState?.name : editingRegion?.name}
+                  required
+                  autoFocus
+                />
+              </label>
+            )}
+          </>
+        )}
         {dialog === 'branch' && (
           <>
             <label>
@@ -725,6 +1202,41 @@ function CreateDialog({
               </select>
             </label>
           </>
+        )}
+        {(dialog === 'state' || dialog === 'region' || dialog === 'branch') && (
+          <fieldset className="manager-picker full">
+            <legend>
+              Managers <small>Optional · assign now or later</small>
+            </legend>
+            {members
+              .filter((member) => member.user.isActive)
+              .map((member) => {
+                const selectedManagers =
+                  dialog === 'state'
+                    ? editingState?.managerIds
+                    : dialog === 'region'
+                      ? editingRegion?.managerIds
+                      : editingBranch?.managerIds;
+                return (
+                  <label key={member.id}>
+                    <input
+                      type="checkbox"
+                      name="managerIds"
+                      value={member.id}
+                      defaultChecked={selectedManagers?.includes(member.id)}
+                    />
+                    <span>
+                      <strong>
+                        {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
+                          member.user.email}
+                      </strong>
+                      <small>{member.role.replaceAll('_', ' ')}</small>
+                    </span>
+                  </label>
+                );
+              })}
+            {!members.length && <p>Add organisation users before assigning managers.</p>}
+          </fieldset>
         )}
         {dialog === 'currency' && (
           <>
