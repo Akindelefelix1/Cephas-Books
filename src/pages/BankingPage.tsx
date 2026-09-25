@@ -6,7 +6,7 @@ import {
   type FormEvent,
   type SetStateAction,
 } from 'react';
-import { Download, MoreHorizontal, Plus, Upload } from 'lucide-react';
+import { Archive, Download, Eye, EyeOff, MoreHorizontal, Plus, Upload } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
@@ -231,12 +231,23 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
           )}
           {view === 'banking' && (
             <>
-              <div className="banking-filters">
+              <div className="account-visibility">
+                <div className="account-visibility__label">
+                  <Archive size={16} aria-hidden="true" />
+                  <div>
+                    <strong>Account visibility</strong>
+                    <span>{showArchived ? 'Active and archived accounts' : 'Active accounts only'}</span>
+                  </div>
+                </div>
                 <button
-                  className={`filter-button ${showArchived ? 'active' : ''}`}
+                  type="button"
+                  className={`archive-toggle ${showArchived ? 'is-active' : ''}`}
+                  aria-pressed={showArchived}
                   onClick={() => setShowArchived((current) => !current)}
                 >
-                  {showArchived ? 'Hide archived accounts' : 'Show archived accounts'}
+                  {showArchived ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                  <span>{showArchived ? 'Hide archived' : 'Show archived'}</span>
+                  <b>{visibleAccounts.length}</b>
                 </button>
               </div>
               <div className="bank-accounts">
