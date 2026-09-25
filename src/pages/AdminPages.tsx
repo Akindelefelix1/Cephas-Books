@@ -1354,6 +1354,7 @@ export function ProfilePage({
           <label className="full">
             New password
             <input name="newPassword" type="password" autoComplete="new-password" minLength={8} required />
+            <small>Use 8–128 characters with uppercase, lowercase, and a number.</small>
           </label>
           <label className="full">
             Confirm new password
