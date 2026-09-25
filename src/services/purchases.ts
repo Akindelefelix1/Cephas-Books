@@ -14,6 +14,7 @@ export interface Supplier {
   email?: string;
   phone?: string;
   paymentTerms?: string;
+  bankDetails?: string;
   isActive: boolean;
 }
 export interface PurchaseRow {

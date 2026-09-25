@@ -787,6 +787,33 @@
   background: none;
   color: #1233cc;
 }
+.role-list__actions {
+  display: flex;
+  gap: 5px;
+}
+.role-list__actions button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #dce2ec;
+  border-radius: 7px;
+  background: #fff;
+  color: #526078;
+  cursor: pointer;
+}
+.role-list__actions button:hover {
+  border-color: #9eafe4;
+  color: #2445bf;
+}
+.form-hint {
+  display: block;
+  margin-top: 5px;
+  color: #667085;
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
 .role-list > button {
   width: 100%;
   border: 0;

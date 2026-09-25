@@ -279,6 +279,14 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     </>
   );
 }
+function supplierBankDetails(value?: string) {
+  if (!value) return {};
+  try {
+    return JSON.parse(value) as Record<string, string>;
+  } catch {
+    return { notes: value };
+  }
+}
 function action(v: PurchaseView) {
   return v === 'suppliers'
     ? 'Add supplier'
@@ -561,6 +569,7 @@ function PurchaseModal({
 }) {
   const line = ['purchase-requests', 'purchase-orders', 'bills'].includes(view),
     today = new Date().toISOString().slice(0, 10);
+  const bank = supplierBankDetails(selected?.bankDetails);
   const [lineItems, setLineItems] = useState([{ name: '', description: '', quantity: '', unitPrice: '' }]);
   const updateLine = (index: number, field: 'name' | 'description' | 'quantity' | 'unitPrice', value: string) =>
     setLineItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
@@ -595,7 +604,13 @@ function PurchaseModal({
               email: optional('email'),
               phone: optional('phone'),
               paymentTerms: optional('paymentTerms'),
-              bankDetails: optional('bankDetails'),
+              bankDetails: JSON.stringify({
+                bankName: optional('bankName'),
+                accountName: optional('accountName'),
+                accountNumber: optional('accountNumber'),
+                branchName: optional('branchName'),
+                notes: optional('bankNotes'),
+              }),
             });
           else if (view === 'purchase-requests')
             submit({
@@ -668,10 +683,31 @@ function PurchaseModal({
                 defaultValue={selected?.paymentTerms}
               />
             </label>
-            <label className="full">
-              Bank details
-              <textarea name="bankDetails" />
-            </label>
+            <fieldset className="form-fieldset full">
+              <legend>Bank details <small>Optional</small></legend>
+              <div className="form-grid form-grid--nested">
+                <label>
+                  Bank name
+                  <input name="bankName" defaultValue={bank.bankName} />
+                </label>
+                <label>
+                  Account name
+                  <input name="accountName" defaultValue={bank.accountName} />
+                </label>
+                <label>
+                  Account number
+                  <input name="accountNumber" inputMode="numeric" defaultValue={bank.accountNumber} />
+                </label>
+                <label>
+                  Branch
+                  <input name="branchName" defaultValue={bank.branchName} />
+                </label>
+                <label className="full">
+                  Additional notes
+                  <textarea name="bankNotes" rows={2} defaultValue={bank.notes} />
+                </label>
+              </div>
+            </fieldset>
           </>
         ) : (
           <>

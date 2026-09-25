@@ -33,6 +33,7 @@ import { authApi } from '@/services/auth';
 export function UsersPage() {
   const [modal, setModal] = useState(false);
   const [roleModal, setRoleModal] = useState(false);
+  const [editingRole, setEditingRole] = useState(false);
   const [selectedRole, setSelectedRole] = useState('Accountant');
   const [permissionEditing, setPermissionEditing] = useState(false);
   const [permissions, setPermissions] = useState(() =>
@@ -100,9 +101,14 @@ export function UsersPage() {
         <aside className="panel role-list">
           <header>
             <h2>Roles</h2>
-            <button aria-label="Add role" onClick={() => setRoleModal(true)}>
-              <Plus />
-            </button>
+            <div className="role-list__actions">
+              <button aria-label="Edit selected role" onClick={() => { setEditingRole(true); setRoleModal(true); }}>
+                <MoreHorizontal />
+              </button>
+              <button aria-label="Add role" onClick={() => { setEditingRole(false); setRoleModal(true); }}>
+                <Plus />
+              </button>
+            </div>
           </header>
           {roles.map((x) => (
             <button
@@ -216,14 +222,14 @@ export function UsersPage() {
       <Modal
         open={roleModal}
         onClose={() => setRoleModal(false)}
-        title="Create role"
+        title={editingRole ? `Edit ${selectedRole}` : 'Create role'}
         footer={
           <>
             <button className="button button--secondary" onClick={() => setRoleModal(false)}>
               Cancel
             </button>
             <button className="button" type="submit" form="role-form">
-              Create role
+              {editingRole ? 'Save role' : 'Create role'}
             </button>
           </>
         }
@@ -234,16 +240,28 @@ export function UsersPage() {
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
-            const name = String(form.get('name') ?? '').trim();
+            const name = String(form.get('baseRole') ?? '').trim();
             const description = String(form.get('description') ?? '').trim();
-            setRoles((items) => [...items, [name, '0', description]]);
+            setRoles((items) =>
+              editingRole
+                ? items.map((item) => (item[0] === selectedRole ? [name, item[1], description] : item))
+                : [...items, [name, '0', description]],
+            );
             setSelectedRole(name);
             setRoleModal(false);
           }}
         >
           <label className="full">
-            Role name
-            <input name="name" required autoFocus />
+            Maximum system access
+            <select name="baseRole" required defaultValue={editingRole ? selectedRole : 'MEMBER'} autoFocus>
+              <option value="OWNER">OWNER</option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="ACCOUNTANT">ACCOUNTANT</option>
+              <option value="MANAGER">MANAGER</option>
+              <option value="MEMBER">MEMBER</option>
+              <option value="AUDITOR">AUDITOR</option>
+            </select>
+            <small className="form-hint">Permissions selected below cannot exceed this security boundary.</small>
           </label>
           <label className="full">
             Description
