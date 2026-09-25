@@ -1,14 +1,14 @@
 import { useState, type PropsWithChildren } from 'react';
 import {
   Bell,
-  Check,
   ChevronDown,
   ChevronRight,
   Command,
   Menu,
+  Moon,
   Plus,
   Search,
-  Sparkles,
+  Sun,
   X,
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
@@ -110,33 +110,23 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
           <p className="nav-label">Manage</p>
           {navGroup(secondaryNavigation)}
         </nav>
-        <div className="sidebar-theme-picker">
-          <span>Background</span>
-          <div role="group" aria-label="Sidebar background colour">
-            {SIDEBAR_THEMES.map((theme) => (
-              <button
-                key={theme.id}
-                type="button"
-                className={sidebarTheme === theme.id ? 'active' : ''}
-                onClick={() => updateSidebarTheme(theme.id)}
-                aria-pressed={sidebarTheme === theme.id}
-                title={`${theme.label} sidebar`}
-              >
-                <i className={`theme-swatch theme-swatch--${theme.id}`} aria-hidden="true" />
-                <span>{theme.label}</span>
-                {sidebarTheme === theme.id && <Check size={12} aria-hidden="true" />}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="sidebar__plan">
+        <div className="sidebar-theme-toggle">
           <span>
-            <Sparkles size={15} /> Business plan
+            {sidebarTheme === 'light' ? <Sun size={17} /> : <Moon size={17} />}
+            <span>
+              <strong>Appearance</strong>
+              <small>{sidebarTheme === 'light' ? 'Light theme' : 'Dark theme'}</small>
+            </span>
           </span>
-          <div>
-            <i className="plan-usage" />
-          </div>
-          <small>7 of 10 seats used</small>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={sidebarTheme === 'dark'}
+            aria-label={`Switch to ${sidebarTheme === 'light' ? 'dark' : 'light'} theme`}
+            onClick={() => updateSidebarTheme(sidebarTheme === 'light' ? 'dark' : 'light')}
+          >
+            <i />
+          </button>
         </div>
         <button className="organisation" onClick={() => navigate('settings')}>
           <span className="avatar avatar--square">{companyInitials}</span>
@@ -235,13 +225,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
   );
 }
 
-type SidebarTheme = 'default' | 'light' | 'dark';
-
-const SIDEBAR_THEMES: { id: SidebarTheme; label: string }[] = [
-  { id: 'default', label: 'Default' },
-  { id: 'light', label: 'White' },
-  { id: 'dark', label: 'Dark' },
-];
+type SidebarTheme = 'light' | 'dark';
 
 const MOCK_SEARCH_RESULTS = [
   { type: 'Invoice', title: 'INV-00245', meta: 'Apex Retail Limited · ₦2,500,000', id: 'invoices' },
