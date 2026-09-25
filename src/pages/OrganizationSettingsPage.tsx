@@ -70,14 +70,26 @@ const securityControls = [
   ['ipAllowlist', 'Administrator IP allowlist'],
 ];
 const currencyCatalogue = [
-  ['NGN', 'Nigerian naira', '₦'], ['USD', 'US dollar', '$'], ['EUR', 'Euro', '€'],
-  ['GBP', 'British pound', '£'], ['GHS', 'Ghanaian cedi', '₵'], ['KES', 'Kenyan shilling', 'KSh'],
-  ['ZAR', 'South African rand', 'R'], ['CAD', 'Canadian dollar', 'C$'],
-  ['AUD', 'Australian dollar', 'A$'], ['JPY', 'Japanese yen', '¥'],
-  ['CNY', 'Chinese yuan', 'CN¥'], ['INR', 'Indian rupee', '₹'], ['AED', 'UAE dirham', 'د.إ'],
-  ['SAR', 'Saudi riyal', '﷼'], ['CHF', 'Swiss franc', 'CHF'], ['SEK', 'Swedish krona', 'kr'],
-  ['NOK', 'Norwegian krone', 'kr'], ['DKK', 'Danish krone', 'kr'],
-  ['NZD', 'New Zealand dollar', 'NZ$'], ['SGD', 'Singapore dollar', 'S$'],
+  ['NGN', 'Nigerian naira', '₦'],
+  ['USD', 'US dollar', '$'],
+  ['EUR', 'Euro', '€'],
+  ['GBP', 'British pound', '£'],
+  ['GHS', 'Ghanaian cedi', '₵'],
+  ['KES', 'Kenyan shilling', 'KSh'],
+  ['ZAR', 'South African rand', 'R'],
+  ['CAD', 'Canadian dollar', 'C$'],
+  ['AUD', 'Australian dollar', 'A$'],
+  ['JPY', 'Japanese yen', '¥'],
+  ['CNY', 'Chinese yuan', 'CN¥'],
+  ['INR', 'Indian rupee', '₹'],
+  ['AED', 'UAE dirham', 'د.إ'],
+  ['SAR', 'Saudi riyal', '﷼'],
+  ['CHF', 'Swiss franc', 'CHF'],
+  ['SEK', 'Swedish krona', 'kr'],
+  ['NOK', 'Norwegian krone', 'kr'],
+  ['DKK', 'Danish krone', 'kr'],
+  ['NZD', 'New Zealand dollar', 'NZ$'],
+  ['SGD', 'Singapore dollar', 'S$'],
 ] as const;
 
 const objectValue = (value: unknown): Record<string, unknown> =>
@@ -252,13 +264,14 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
             </label>
             <label>
               Base currency
-              <select
-                defaultValue={admin.organization.baseCurrency}
-                disabled
-              >
-                {currencies.filter((item) => item.active).map((item) => (
-                  <option value={item.code} key={item.code}>{item.code} — {item.name}</option>
-                ))}
+              <select defaultValue={admin.organization.baseCurrency} disabled>
+                {currencies
+                  .filter((item) => item.active)
+                  .map((item) => (
+                    <option value={item.code} key={item.code}>
+                      {item.code} — {item.name}
+                    </option>
+                  ))}
               </select>
               <input type="hidden" name="baseCurrency" value={admin.organization.baseCurrency} />
               <small>Change the default from Currency management.</small>
@@ -523,41 +536,58 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
                     ? 'Active'
                     : 'Inactive'}
               </Badge>
-              {canManage && item.active && item.code !== admin.organization.baseCurrency && (
-                <button
-                  className="button button--secondary button--small"
-                  disabled={busy}
-                  onClick={() => void run(
-                    () => organizationApi.updateSection('currencies', {
-                      defaultCurrency: item.code,
-                      items: currencies.map((currency) => ({
-                        ...currency,
-                        rate:
-                          currency.code === item.code
-                            ? '1'
-                            : String(Number(currency.rate) / Number(item.rate)),
-                      })),
-                    }).then((result) => {
-                      setDefaultCurrency(item.code);
-                      return result;
-                    }),
-                    `${item.code} is now the default currency`,
-                  )}
-                >
-                  {busy ? 'Updating…' : 'Set default'}
-                </button>
-              )}
-              {canManage && item.code !== admin.organization.baseCurrency && (
-                <button
-                  className="row-action"
-                  aria-label={`Edit ${item.code}`}
-                  onClick={() => {
-                    setEditingIndex(currencies.indexOf(item));
-                    setDialog('currency');
-                  }}
-                >
-                  <MoreHorizontal />
-                </button>
+              {canManage && (
+                <details className="currency-actions">
+                  <summary className="row-action" aria-label={`Actions for ${item.code}`}>
+                    <MoreHorizontal />
+                  </summary>
+                  <div className="currency-actions__menu" role="menu">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={(event) => {
+                        event.currentTarget.closest('details')?.removeAttribute('open');
+                        setEditingIndex(currencies.indexOf(item));
+                        setDialog('currency');
+                      }}
+                    >
+                      Edit currency
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={
+                        busy || !item.active || item.code === admin.organization.baseCurrency
+                      }
+                      onClick={(event) => {
+                        event.currentTarget.closest('details')?.removeAttribute('open');
+                        void run(
+                          () =>
+                            organizationApi
+                              .updateSection('currencies', {
+                                defaultCurrency: item.code,
+                                items: currencies.map((currency) => ({
+                                  ...currency,
+                                  rate:
+                                    currency.code === item.code
+                                      ? '1'
+                                      : String(Number(currency.rate) / Number(item.rate)),
+                                })),
+                              })
+                              .then((result) => {
+                                setDefaultCurrency(item.code);
+                                return result;
+                              }),
+                          `${item.code} is now the default currency`,
+                        );
+                      }}
+                    >
+                      {item.code === admin.organization.baseCurrency
+                        ? 'Current default'
+                        : 'Set as default'}
+                    </button>
+                  </div>
+                </details>
               )}
             </div>
           ))}
@@ -756,29 +786,30 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
               },
               editingLocationId === null ? 'Branch added' : 'Branch updated',
             );
-          if (kind === 'currency')
-            {
-              const code = String(form.get('code')).toUpperCase();
-              const catalogueItem = currencyCatalogue.find(([itemCode]) => itemCode === code);
-              if (!catalogueItem) return;
-              void saveSection(
-                'currencies',
-                {
-                  defaultCurrency: admin.organization.baseCurrency,
-                  items: [
-                    ...currencies.filter((_, index) => index !== editingIndex),
-                    {
-                      code,
-                      name: catalogueItem[1],
-                      symbol: catalogueItem[2],
-                      rate: code === admin.organization.baseCurrency ? '1' : String(form.get('rate')),
-                      active: code === admin.organization.baseCurrency || String(form.get('active')) !== 'false',
-                    },
-                  ],
-                },
-                editingIndex === null ? 'Currency added' : 'Currency updated',
-              );
-            }
+          if (kind === 'currency') {
+            const code = String(form.get('code')).toUpperCase();
+            const catalogueItem = currencyCatalogue.find(([itemCode]) => itemCode === code);
+            if (!catalogueItem) return;
+            void saveSection(
+              'currencies',
+              {
+                defaultCurrency: admin.organization.baseCurrency,
+                items: [
+                  ...currencies.filter((_, index) => index !== editingIndex),
+                  {
+                    code,
+                    name: catalogueItem[1],
+                    symbol: catalogueItem[2],
+                    rate: code === admin.organization.baseCurrency ? '1' : String(form.get('rate')),
+                    active:
+                      code === admin.organization.baseCurrency ||
+                      String(form.get('active')) !== 'false',
+                  },
+                ],
+              },
+              editingIndex === null ? 'Currency added' : 'Currency updated',
+            );
+          }
           if (kind === 'invite')
             void run(
               () =>
@@ -1639,9 +1670,15 @@ function CreateDialog({
               >
                 <option value="">Select a currency</option>
                 {currencyCatalogue
-                  .filter(([code]) => editingCurrency?.code === code || !currencies.some((item) => item.code === code))
+                  .filter(
+                    ([code]) =>
+                      editingCurrency?.code === code ||
+                      !currencies.some((item) => item.code === code),
+                  )
                   .map(([code, name, symbol]) => (
-                    <option value={code} key={code}>{code} — {name} ({symbol})</option>
+                    <option value={code} key={code}>
+                      {code} — {name} ({symbol})
+                    </option>
                   ))}
               </select>
               {editingCurrency && <input type="hidden" name="code" value={editingCurrency.code} />}
@@ -1650,7 +1687,7 @@ function CreateDialog({
               Exchange rate
               <input
                 name="rate"
-                defaultValue={editingCurrency?.rate ?? '1'}
+                defaultValue={editingCurrency?.rate ?? ''}
                 required
                 type="number"
                 min="0.000001"
@@ -1707,10 +1744,7 @@ function CreateDialog({
             </label>
             {!!customRoles.length && (
               <label className="full">
-                Custom role{' '}
-                <small>
-                  Optional; applies an organisation-defined access profile.
-                </small>
+                Custom role <small>Optional; applies an organisation-defined access profile.</small>
                 <select name="customRoleId" defaultValue="">
                   <option value="">No custom role</option>
                   {customRoles.map((item) => (

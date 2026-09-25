@@ -1013,6 +1013,53 @@
 .currency-row small {
   color: #8790a2;
 }
+.currency-actions {
+  position: relative;
+  flex: 0 0 auto;
+}
+.currency-actions > summary {
+  list-style: none;
+}
+.currency-actions > summary::-webkit-details-marker {
+  display: none;
+}
+.currency-actions[open] > summary {
+  background: #f1f4f9;
+  color: #172033;
+}
+.currency-actions__menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 164px;
+  padding: 6px;
+  border: 1px solid #e1e6ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgb(21 32 56 / 16%);
+}
+.currency-actions__menu button {
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: transparent;
+  color: #25314a;
+  text-align: left;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.currency-actions__menu button:hover:not(:disabled) {
+  background: #f3f6fb;
+  color: #1738d1;
+}
+.currency-actions__menu button:disabled {
+  color: #9aa3b5;
+  cursor: not-allowed;
+}
 .location-levels {
   display: flex;
   align-items: center;

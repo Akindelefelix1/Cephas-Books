@@ -32,7 +32,9 @@ const printReceipt = (sale: PosSale, download = false) => {
   const receipt = window.open('', '_blank', 'width=420,height=720');
   if (!receipt) return;
   const title = download ? `Download ${sale.receiptNumber} as PDF` : `Print ${sale.receiptNumber}`;
-  receipt.document.write(`<!doctype html><html><head><title>${title}</title><style>body{font:14px Arial,sans-serif;color:#172033;max-width:360px;margin:32px auto}h1{font-size:20px;margin:0 0 4px}p{margin:4px 0;color:#667085}.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb}.total{font-size:18px;font-weight:700;border-top:2px solid #172033;margin-top:10px;padding-top:10px}.center{text-align:center}.muted{color:#667085}@media print{body{margin:0 auto}}</style></head><body><div class="center"><h1>Cephas Books</h1><p>Sales receipt</p><p>${sale.receiptNumber} · ${new Date(sale.createdAt).toLocaleString()}</p></div>${sale.items.map((item) => `<div class="row"><span>${item.description} x ${item.quantity}</span><strong>${money(Number(item.lineTotal), sale.currency)}</strong></div>`).join('')}<div class="row total"><span>Total</span><strong>${money(Number(sale.total), sale.currency)}</strong></div><div class="row"><span>Paid</span><strong>${money(Number(sale.paidAmount), sale.currency)}</strong></div><div class="row"><span>Change</span><strong>${money(Number(sale.changeAmount), sale.currency)}</strong></div><p class="center muted">Thank you for your business.</p><script>window.onload=()=>window.print()</script></body></html>`);
+  receipt.document.write(
+    `<!doctype html><html><head><title>${title}</title><style>body{font:14px Arial,sans-serif;color:#172033;max-width:360px;margin:32px auto}h1{font-size:20px;margin:0 0 4px}p{margin:4px 0;color:#667085}.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb}.total{font-size:18px;font-weight:700;border-top:2px solid #172033;margin-top:10px;padding-top:10px}.center{text-align:center}.muted{color:#667085}@media print{body{margin:0 auto}}</style></head><body><div class="center"><h1>Cephas Books</h1><p>Sales receipt</p><p>${sale.receiptNumber} · ${new Date(sale.createdAt).toLocaleString()}</p></div>${sale.items.map((item) => `<div class="row"><span>${item.description} x ${item.quantity}</span><strong>${money(Number(item.lineTotal), sale.currency)}</strong></div>`).join('')}<div class="row total"><span>Total</span><strong>${money(Number(sale.total), sale.currency)}</strong></div><div class="row"><span>Paid</span><strong>${money(Number(sale.paidAmount), sale.currency)}</strong></div><div class="row"><span>Change</span><strong>${money(Number(sale.changeAmount), sale.currency)}</strong></div><p class="center muted">Thank you for your business.</p><script>window.onload=()=>window.print()</script></body></html>`,
+  );
   receipt.document.close();
 };
 export function PosPage({ role, onNavigate }: { role: string; onNavigate: (id: string) => void }) {
@@ -102,7 +104,9 @@ export function PosPage({ role, onNavigate }: { role: string; onNavigate: (id: s
   useEffect(() => {
     if (!splitMode)
       setPayments((current) =>
-        current.length === 1 ? [{ ...current[0], amount: total > 0 ? String(total) : '' }] : current,
+        current.length === 1
+          ? [{ ...current[0], amount: total > 0 ? String(total) : '' }]
+          : current,
       );
   }, [splitMode, total]);
   const available = (product: Product) =>
@@ -245,7 +249,9 @@ export function PosPage({ role, onNavigate }: { role: string; onNavigate: (id: s
               <tbody>
                 {visible.map((product) => (
                   <tr key={product.id}>
-                    <td><strong>{product.name}</strong></td>
+                    <td>
+                      <strong>{product.name}</strong>
+                    </td>
                     <td>{product.sku}</td>
                     <td>
                       {product.type === 'SERVICE'
@@ -308,18 +314,32 @@ export function PosPage({ role, onNavigate }: { role: string; onNavigate: (id: s
             <tbody>
               {recentSales.map((recentSale) => (
                 <tr key={recentSale.id}>
-                  <td><strong>{recentSale.receiptNumber}</strong></td>
+                  <td>
+                    <strong>{recentSale.receiptNumber}</strong>
+                  </td>
                   <td>{new Date(recentSale.createdAt).toLocaleDateString()}</td>
                   <td>{recentSale.customer?.displayName ?? 'Walk-in customer'}</td>
-                  <td className="is-right"><strong>{money(Number(recentSale.total))}</strong></td>
                   <td className="is-right">
-                    <button type="button" className="button button--secondary button--small" onClick={() => setSale(recentSale)}>
+                    <strong>{money(Number(recentSale.total))}</strong>
+                  </td>
+                  <td className="is-right">
+                    <button
+                      type="button"
+                      className="button button--secondary button--small"
+                      onClick={() => setSale(recentSale)}
+                    >
                       <ReceiptText size={15} /> View receipt
                     </button>
                   </td>
                 </tr>
               ))}
-              {!recentSales.length && <tr><td className="pos-empty" colSpan={5}>No completed sales yet.</td></tr>}
+              {!recentSales.length && (
+                <tr>
+                  <td className="pos-empty" colSpan={5}>
+                    No completed sales yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -513,10 +533,32 @@ export function PosPage({ role, onNavigate }: { role: string; onNavigate: (id: s
         {sale && (
           <Modal open={true} onClose={() => setSale(null)} title="Sale completed" footer={null}>
             <div className="receipt-card">
-              <div className="receipt-card__heading"><strong>Cephas Books</strong><small>{sale.receiptNumber}</small><small>{new Date(sale.createdAt).toLocaleString()}</small></div>
-              {sale.items.map((item) => <div className="receipt-card__row" key={`${item.description}-${item.quantity}`}><span>{item.description}<small>{item.quantity} item(s)</small></span><strong>{money(Number(item.lineTotal))}</strong></div>)}
-              <div className="receipt-card__total"><span>Total</span><strong>{money(Number(sale.total))}</strong></div>
-              <div className="receipt-card__actions"><button className="button button--secondary" onClick={() => printReceipt(sale)}><Printer size={16} /> Print</button><button className="button" onClick={() => printReceipt(sale, true)}><Download size={16} /> Download PDF</button></div>
+              <div className="receipt-card__heading">
+                <strong>Cephas Books</strong>
+                <small>{sale.receiptNumber}</small>
+                <small>{new Date(sale.createdAt).toLocaleString()}</small>
+              </div>
+              {sale.items.map((item) => (
+                <div className="receipt-card__row" key={`${item.description}-${item.quantity}`}>
+                  <span>
+                    {item.description}
+                    <small>{item.quantity} item(s)</small>
+                  </span>
+                  <strong>{money(Number(item.lineTotal))}</strong>
+                </div>
+              ))}
+              <div className="receipt-card__total">
+                <span>Total</span>
+                <strong>{money(Number(sale.total))}</strong>
+              </div>
+              <div className="receipt-card__actions">
+                <button className="button button--secondary" onClick={() => printReceipt(sale)}>
+                  <Printer size={16} /> Print
+                </button>
+                <button className="button" onClick={() => printReceipt(sale, true)}>
+                  <Download size={16} /> Download PDF
+                </button>
+              </div>
             </div>
           </Modal>
         )}

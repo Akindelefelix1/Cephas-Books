@@ -6,5 +6,7 @@ export function getDefaultCurrency(): string {
 
 export function setDefaultCurrency(currency: string): void {
   localStorage.setItem(KEY, currency.toUpperCase());
-  window.dispatchEvent(new CustomEvent('cephas:currency-changed', { detail: currency.toUpperCase() }));
+  window.dispatchEvent(
+    new CustomEvent('cephas:currency-changed', { detail: currency.toUpperCase() }),
+  );
 }
