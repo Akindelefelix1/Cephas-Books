@@ -155,9 +155,18 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
             <Download size={17} /> Export CSV
           </button>
           {canManage && view === 'banking' && (
-            <button className="button" onClick={() => setModal('account')}>
-              <Plus size={17} /> Add bank account
-            </button>
+            <>
+              <button
+                className="button button--secondary"
+                disabled={activeAccounts.length < 2}
+                onClick={() => setModal('transfer')}
+              >
+                Transfer funds
+              </button>
+              <button className="button" onClick={() => setModal('account')}>
+                <Plus size={17} /> Add bank account
+              </button>
+            </>
           )}
           {canManage && view === 'transactions' && (
             <>
@@ -668,7 +677,7 @@ function TransactionPanel({
               <th>Name</th>
               <th>Account</th>
               <th>Description</th>
-              <th>Reference</th>
+              <th>Reference / transfer ID</th>
               <th className="is-right">Money in</th>
               <th className="is-right">Money out</th>
               <th>Status</th>
@@ -679,10 +688,21 @@ function TransactionPanel({
             {rows.map((row) => (
               <tr key={row.id}>
                 <td className="is-primary">{date(row.transactionDate)}</td>
-                <td>{row.name || '—'}</td>
+                <td>{row.transferGroupId ? 'Account transfer' : row.name || '—'}</td>
                 <td>{row.bankAccount.name}</td>
                 <td>{row.description}</td>
-                <td>{row.reference || '—'}</td>
+                <td>
+                  {row.transferGroupId && (
+                    <span
+                      className="banking-transfer-id"
+                      title={`Transfer group ${row.transferGroupId}`}
+                    >
+                      TRF-{row.transferGroupId.replaceAll('-', '').slice(0, 10).toUpperCase()}
+                    </span>
+                  )}
+                  {row.reference && <small className="banking-transfer-reference">{row.reference}</small>}
+                  {!row.transferGroupId && !row.reference && '—'}
+                </td>
                 <td className="is-right">
                   {row.type === 'MONEY_IN' ? money(row.amount, row.bankAccount.currency) : '—'}
                 </td>
@@ -962,6 +982,14 @@ function TransferModal({
   onClose: () => void;
   onSubmit: (data: TransferFormData) => void;
 }) {
+  const [fromAccountId, setFromAccountId] = useState('');
+  const [toAccountId, setToAccountId] = useState('');
+  const sourceAccount = accounts.find((account) => account.id === fromAccountId);
+  const destinations = accounts.filter(
+    (account) =>
+      account.id !== fromAccountId &&
+      (!sourceAccount || account.currency === sourceAccount.currency),
+  );
   return (
     <Modal
       open={open}
@@ -973,7 +1001,12 @@ function TransferModal({
           <button className="button button--secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="button" disabled={busy} type="submit" form="transfer-form">
+          <button
+            className="button"
+            disabled={busy || !fromAccountId || !toAccountId}
+            type="submit"
+            form="transfer-form"
+          >
             {busy ? 'Transferring…' : 'Transfer funds'}
           </button>
         </>
@@ -1000,26 +1033,44 @@ function TransferModal({
       >
         <label>
           From account
-          <select name="fromAccountId" required defaultValue="">
+          <select
+            name="fromAccountId"
+            required
+            value={fromAccountId}
+            onChange={(event) => {
+              setFromAccountId(event.target.value);
+              setToAccountId('');
+            }}
+          >
             <option value="" disabled>
               Select account
             </option>
             {accounts.map((a) => (
               <option value={a.id} key={a.id}>
-                {a.name} ({a.currency})
+                {a.name} · {money(a.currentBalance, a.currency)}
               </option>
             ))}
           </select>
         </label>
         <label>
           To account
-          <select name="toAccountId" required defaultValue="">
+          <select
+            name="toAccountId"
+            required
+            disabled={!sourceAccount || !destinations.length}
+            value={toAccountId}
+            onChange={(event) => setToAccountId(event.target.value)}
+          >
             <option value="" disabled>
-              Select account
+              {sourceAccount
+                ? destinations.length
+                  ? 'Select destination account'
+                  : 'No other account in this currency'
+                : 'Select source account first'}
             </option>
-            {accounts.map((a) => (
+            {destinations.map((a) => (
               <option value={a.id} key={a.id}>
-                {a.name} ({a.currency})
+                {a.name} · {money(a.currentBalance, a.currency)}
               </option>
             ))}
           </select>

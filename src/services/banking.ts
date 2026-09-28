@@ -21,6 +21,7 @@ export interface BankTransaction {
   transactionDate: string;
   description: string;
   reference?: string;
+  transferGroupId?: string | null;
   type: TransactionType;
   amount: string;
   balanceAfter: string;

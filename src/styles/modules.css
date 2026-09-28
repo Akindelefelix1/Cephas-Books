@@ -609,28 +609,43 @@
   border-bottom: 1px solid #edf0f4;
 }
 .receipt-card__table-wrap {
-  margin: 14px -2px 0;
-  overflow-x: auto;
+  margin: 14px 0 0;
 }
 .receipt-card__table {
   width: 100%;
-  min-width: 540px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 .receipt-card__table th,
 .receipt-card__table td {
-  padding: 11px 8px;
+  padding: 10px 5px;
   border-bottom: 1px solid #edf0f4;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 .receipt-card__table th {
   color: #68758b;
-  font-size: 0.65rem;
+  font-size: 0.58rem;
   text-transform: uppercase;
+}
+.receipt-card__table th:nth-child(1) {
+  width: 32%;
+}
+.receipt-card__table th:nth-child(2) {
+  width: 15%;
+}
+.receipt-card__table th:nth-child(3) {
+  width: 25%;
+}
+.receipt-card__table th:nth-child(4) {
+  width: 28%;
 }
 .receipt-card__table .is-right {
   text-align: right;
+}
+.receipt-card__table td.is-right {
   white-space: nowrap;
 }
 .receipt-card__total {
@@ -2016,6 +2031,24 @@
   font-weight: 700;
   padding: 5px 9px;
   text-transform: capitalize;
+}
+.banking-transfer-id {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cbd5ff;
+  border-radius: 4px;
+  padding: 3px 6px;
+  color: #3154d8;
+  background: #f1f4ff;
+  font-size: 0.65rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.banking-transfer-reference {
+  display: block;
+  margin-top: 4px;
+  color: #7a8394;
+  font-size: 0.7rem;
 }
 .customer-history {
   display: grid;
