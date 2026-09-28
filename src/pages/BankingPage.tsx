@@ -948,6 +948,7 @@ function TransactionModal({
           <div className="invoice-line-editor__heading"><span>Transactions</span><small>Add multiple rows with the same account, type, date, and notes.</small></div>
           {rows.map((row, index) => (
             <div className="transaction-line-editor__row" key={index}>
+              <div className="transaction-line-editor__row-heading">Transaction {index + 1}</div>
               <label>Name<input required maxLength={160} value={row.name} onChange={(event) => updateRow(index, 'name', event.target.value)} /></label>
               <label>Description<input required maxLength={240} value={row.description} onChange={(event) => updateRow(index, 'description', event.target.value)} /></label>
               <label>Reference<input maxLength={100} value={row.reference} onChange={(event) => updateRow(index, 'reference', event.target.value)} /></label>

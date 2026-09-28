@@ -850,7 +850,7 @@
 }
 .permission-matrix {
   margin-top: 14px;
-  overflow: auto;
+  overflow: visible;
 }
 .permission-matrix header h2 {
   font-size: 0.85rem;
@@ -861,53 +861,63 @@
   color: #858e9f;
   margin: 0;
 }
-.permission-head,
-.permission-row {
-  min-width: 650px;
+.role-permission-grid {
   display: grid;
-  grid-template-columns: 1fr repeat(6, 70px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.role-permission-group {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 9px 4px;
-}
-.permission-head {
-  color: #858d9e;
-  font-size: 0.57rem;
-  text-transform: uppercase;
-}
-.permission-row {
-  border-top: 1px solid #e8ebf1;
-  font-size: 0.66rem;
-}
-.permission-row i,
-.permission-row > button {
-  width: 18px;
-  height: 18px;
-  border: 1px solid #d6dce5;
-  border-radius: 4px;
-  display: grid;
-  place-items: center;
-  margin: auto;
-  padding: 0;
+  gap: 7px 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #e1e6ee;
+  border-radius: 7px;
   background: #fff;
 }
-.permission-row i.checked,
-.permission-row > button.checked {
-  color: #fff;
-  background: #1233cc;
+.role-permission-group legend {
+  padding: 0 4px;
+  color: #475467;
+  font-size: 0.64rem;
+  font-weight: 750;
 }
-.permission-row > button:disabled {
-  cursor: default;
-  opacity: 1;
-}
-.permission-row > button:not(:disabled) {
+.role-permission-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #526078;
+  font-size: 0.63rem;
   cursor: pointer;
 }
-.permission-row > button {
-  width: 32px;
-  height: 32px;
+.role-permission-group input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #1233cc;
 }
-.permission-row svg {
-  width: 12px;
+.role-permission-group input:disabled {
+  cursor: default;
+}
+.role-permission-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #dce2ec;
+  border-radius: 8px;
+}
+.role-permission-picker > legend {
+  padding: 0 5px;
+  color: #344054;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+@media (max-width: 620px) {
+  .role-permission-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .settings-layout {
   display: grid;

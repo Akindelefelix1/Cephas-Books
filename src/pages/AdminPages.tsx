@@ -31,29 +31,96 @@ import { confirmAction } from '@/utils/actions';
 import { authApi } from '@/services/auth';
 import { organizationApi, type CustomRole } from '@/services/organization';
 
+const rolePermissionGroups = [
+  { module: 'Dashboard', permissions: [{ key: 'dashboard.view', label: 'View' }] },
+  {
+    module: 'Banking',
+    permissions: [
+      { key: 'banking.view', label: 'View' },
+      { key: 'banking.manage', label: 'Manage' },
+    ],
+  },
+  {
+    module: 'Sales',
+    permissions: [
+      { key: 'sales.view', label: 'View' },
+      { key: 'sales.manage', label: 'Manage' },
+    ],
+  },
+  {
+    module: 'Purchases',
+    permissions: [
+      { key: 'purchases.view', label: 'View' },
+      { key: 'purchases.manage', label: 'Manage' },
+    ],
+  },
+  {
+    module: 'Accounting',
+    permissions: [
+      { key: 'accounting.view', label: 'View' },
+      { key: 'accounting.manage', label: 'Manage' },
+    ],
+  },
+  {
+    module: 'Inventory',
+    permissions: [
+      { key: 'inventory.view', label: 'View' },
+      { key: 'inventory.manage', label: 'Manage' },
+    ],
+  },
+  {
+    module: 'Reports',
+    permissions: [
+      { key: 'reports.view', label: 'View' },
+      { key: 'reports.export', label: 'Export' },
+    ],
+  },
+  { module: 'Approvals', permissions: [{ key: 'approvals.review', label: 'Review' }] },
+  {
+    module: 'Users',
+    permissions: [
+      { key: 'users.view', label: 'View' },
+      { key: 'users.manage', label: 'Manage' },
+    ],
+  },
+  { module: 'Settings', permissions: [{ key: 'settings.manage', label: 'Manage' }] },
+];
+
 export function UsersPage() {
   const [modal, setModal] = useState(false);
   const [roleModal, setRoleModal] = useState(false);
   const [editingRole, setEditingRole] = useState(false);
   const [selectedRole, setSelectedRole] = useState('Accountant');
   const [permissionEditing, setPermissionEditing] = useState(false);
-  const [permissions, setPermissions] = useState(() =>
-    Array.from({ length: 8 }, (_, row) =>
-      Array.from(
-        { length: 6 },
-        (_, column) => (row < 5 && column < 3) || (row >= 4 && column !== 3),
-      ),
-    ),
-  );
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [roleName, setRoleName] = useState('');
+  const [roleBase, setRoleBase] = useState('MEMBER');
+  const [roleDescription, setRoleDescription] = useState('');
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [roleError, setRoleError] = useState('');
   useEffect(() => {
     void organizationApi.roles().then((items) => {
       setRoles(items);
-      if (items[0]) setSelectedRole(items[0].name);
+      if (items[0]) {
+        setSelectedRole(items[0].name);
+        setPermissions(items[0].permissions);
+      }
     }).catch(() => setRoleError('Unable to load roles'));
   }, []);
   const selectedRoleData = roles.find((role) => role.name === selectedRole);
+  const openRoleEditor = (editing: boolean) => {
+    setEditingRole(editing);
+    setRoleName(editing ? selectedRoleData?.name ?? '' : '');
+    setRoleBase(editing ? selectedRoleData?.baseRole ?? 'MEMBER' : 'MEMBER');
+    setRoleDescription(editing ? selectedRoleData?.description ?? '' : '');
+    setPermissions(editing ? selectedRoleData?.permissions ?? [] : []);
+    setRoleError('');
+    setRoleModal(true);
+  };
+  const togglePermission = (key: string) =>
+    setPermissions((current) =>
+      current.includes(key) ? current.filter((permission) => permission !== key) : [...current, key],
+    );
   const rows = [
     ['Tobi Adeyemi', 'tobi@acme.ng', 'Finance Manager', 'Lagos HQ', 'Active'],
     ['Ada Okafor', 'ada@acme.ng', 'Accountant', 'All branches', 'Active'],
@@ -100,10 +167,10 @@ export function UsersPage() {
           <header>
             <h2>Roles</h2>
             <div className="role-list__actions">
-              <button aria-label="Edit selected role" onClick={() => { setEditingRole(true); setRoleModal(true); }}>
+              <button aria-label="Edit selected role" onClick={() => openRoleEditor(true)}>
                 <MoreHorizontal />
               </button>
-              <button aria-label="Add role" onClick={() => { setEditingRole(false); setRoleModal(true); }}>
+              <button aria-label="Add role" onClick={() => openRoleEditor(false)}>
                 <Plus />
               </button>
             </div>
@@ -113,7 +180,11 @@ export function UsersPage() {
             <button
               className={selectedRole === x.name ? 'active' : ''}
               key={x.id}
-              onClick={() => setSelectedRole(x.name)}
+              onClick={() => {
+                setSelectedRole(x.name);
+                setPermissions(x.permissions);
+                setPermissionEditing(false);
+              }}
             >
               <span>
                 <strong>{x.name}</strong>
@@ -134,63 +205,50 @@ export function UsersPage() {
           <button
             className="button button--secondary"
             onClick={() => {
-              if (permissionEditing && selectedRoleData)
-                void organizationApi.updateRole(selectedRoleData.id, {
+              if (!permissionEditing) {
+                setPermissionEditing(true);
+                return;
+              }
+              if (!selectedRoleData) return;
+              void organizationApi
+                .updateRole(selectedRoleData.id, {
                   name: selectedRoleData.name,
                   baseRole: selectedRoleData.baseRole,
                   description: selectedRoleData.description,
-                  permissions: permissions.flatMap((row, rowIndex) =>
-                    row.flatMap((enabled, permissionIndex) => enabled ? [`${['dashboard', 'sales', 'purchases', 'expenses', 'banking', 'accounting', 'reports', 'tax'][rowIndex]}.${['view', 'create', 'edit', 'delete', 'approve', 'export'][permissionIndex]}`] : []),
-                  ),
-                }).then(() => confirmAction(`${selectedRole} permissions saved`));
-              setPermissionEditing((editing) => !editing);
+                  permissions,
+                })
+                .then((updatedRole) => {
+                  setRoles((items) =>
+                    items.map((item) => (item.id === updatedRole.id ? updatedRole : item)),
+                  );
+                  setPermissionEditing(false);
+                  confirmAction(`${selectedRole} permissions saved`);
+                })
+                .catch(() => setRoleError('Unable to save role permissions'));
             }}
           >
             {permissionEditing ? 'Save permissions' : 'Edit permissions'}
           </button>
         </header>
-        <div className="permission-head">
-          <span>Module</span>
-          {['View', 'Create', 'Edit', 'Delete', 'Approve', 'Export'].map((x) => (
-            <span key={x}>{x}</span>
+        {roleError && <p className="form-error">{roleError}</p>}
+        <div className="role-permission-grid">
+          {rolePermissionGroups.map((group) => (
+            <fieldset className="role-permission-group" key={group.module}>
+              <legend>{group.module}</legend>
+              {group.permissions.map((permission) => (
+                <label key={permission.key}>
+                  <input
+                    type="checkbox"
+                    checked={permissions.includes(permission.key)}
+                    disabled={!permissionEditing}
+                    onChange={() => togglePermission(permission.key)}
+                  />
+                  {permission.label}
+                </label>
+              ))}
+            </fieldset>
           ))}
         </div>
-        {[
-          'Dashboard',
-          'Sales',
-          'Purchases',
-          'Expenses',
-          'Banking',
-          'Accounting',
-          'Reports',
-          'Tax',
-        ].map((x, i) => (
-          <div className="permission-row" key={x}>
-            <strong>{x}</strong>
-            {[1, 2, 3, 4, 5, 6].map((n, permissionIndex) => (
-              <button
-                type="button"
-                className={permissions[i][permissionIndex] ? 'checked' : ''}
-                key={n}
-                disabled={!permissionEditing}
-                aria-label={`${permissions[i][permissionIndex] ? 'Disable' : 'Enable'} ${x} ${['view', 'create', 'edit', 'delete', 'approve', 'export'][permissionIndex]} permission`}
-                onClick={() =>
-                  setPermissions((current) =>
-                    current.map((row, rowIndex) =>
-                      rowIndex === i
-                        ? row.map((enabled, columnIndex) =>
-                            columnIndex === permissionIndex ? !enabled : enabled,
-                          )
-                        : row,
-                    ),
-                  )
-                }
-              >
-                {permissions[i][permissionIndex] && <Check />}
-              </button>
-            ))}
-          </div>
-        ))}
       </section>
       <Modal
         open={modal}
@@ -246,37 +304,85 @@ export function UsersPage() {
           className="form-grid"
           onSubmit={(event) => {
             event.preventDefault();
-            const form = new FormData(event.currentTarget);
-            const name = String(form.get('baseRole') ?? '').trim();
-            const description = String(form.get('description') ?? '').trim();
-            const data = { name, baseRole: name, description, permissions: [] };
+            const data = {
+              name: roleName.trim(),
+              baseRole: roleBase,
+              description: roleDescription.trim(),
+              permissions,
+            };
             void (editingRole && selectedRoleData
               ? organizationApi.updateRole(selectedRoleData.id, data)
               : organizationApi.createRole(data))
               .then((role) => {
                 setRoles((items) => editingRole ? items.map((item) => item.id === role.id ? role : item) : [...items, role]);
                 setSelectedRole(role.name);
+                setPermissions(role.permissions);
+                setPermissionEditing(false);
                 setRoleModal(false);
               })
-              .catch(() => setRoleError('Unable to save role'));
+              .catch(() => setRoleError('Unable to save role. Check that the name is unique and permissions are valid.'));
           }}
         >
-          <label className="full">
-            Maximum system access
-            <select name="baseRole" required defaultValue={editingRole ? selectedRole : 'MEMBER'} autoFocus>
-              <option value="OWNER">OWNER</option>
-              <option value="ADMIN">ADMIN</option>
-              <option value="ACCOUNTANT">ACCOUNTANT</option>
-              <option value="MANAGER">MANAGER</option>
+          <label>
+            Role name
+            <input
+              name="name"
+              required
+              maxLength={80}
+              placeholder="e.g. Cashier"
+              value={roleName}
+              onChange={(event) => setRoleName(event.target.value)}
+              autoFocus
+            />
+          </label>
+          <label>
+            Access level
+            <select
+              name="baseRole"
+              required
+              value={roleBase}
+              onChange={(event) => setRoleBase(event.target.value)}
+            >
               <option value="MEMBER">MEMBER</option>
               <option value="AUDITOR">AUDITOR</option>
+              <option value="ACCOUNTANT">ACCOUNTANT</option>
+              <option value="MANAGER">MANAGER</option>
+              <option value="ADMIN">ADMIN</option>
             </select>
-            <small className="form-hint">Permissions selected below cannot exceed this security boundary.</small>
+            <small className="form-hint">Sets the highest built-in access this profile can inherit.</small>
           </label>
           <label className="full">
             Description
-            <input name="description" required />
+            <input
+              name="description"
+              required
+              maxLength={240}
+              placeholder="What this role is responsible for"
+              value={roleDescription}
+              onChange={(event) => setRoleDescription(event.target.value)}
+            />
           </label>
+          <fieldset className="role-permission-picker full">
+            <legend>Permissions</legend>
+            <div className="role-permission-grid">
+              {rolePermissionGroups.map((group) => (
+                <fieldset className="role-permission-group" key={group.module}>
+                  <legend>{group.module}</legend>
+                  {group.permissions.map((permission) => (
+                    <label key={permission.key}>
+                      <input
+                        type="checkbox"
+                        checked={permissions.includes(permission.key)}
+                        onChange={() => togglePermission(permission.key)}
+                      />
+                      {permission.label}
+                    </label>
+                  ))}
+                </fieldset>
+              ))}
+            </div>
+          </fieldset>
+          {roleError && <p className="form-error full">{roleError}</p>}
         </form>
       </Modal>
     </>
