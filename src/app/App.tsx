@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
   FileText,
@@ -14,6 +15,7 @@ import { AppShell } from '@/layouts/AppShell';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ModulePage } from '@/pages/ModulePage';
 import { modules } from '@/data/modules';
+import { allNavigation } from '@/data/navigation';
 import { getFallbackModule } from '@/data/fallbackModules';
 import { SimpleFeaturePage } from '@/pages/SpecialPages';
 import { BankingPage } from '@/pages/BankingPage';
@@ -48,9 +50,34 @@ import {
 } from '@/services/auth';
 import { onboardingApi } from '@/services/onboarding';
 
+const marketingViews = ['platform', 'solutions', 'pricing', 'security', 'resources'] as const;
+const authViews = ['login', 'register', 'forgot', 'mfa'] as const;
+const appPageIds = new Set([
+  'profile',
+  ...Object.keys(modules),
+  ...allNavigation.flatMap((item) => item.children?.map((child) => child.id) ?? [item.id]),
+]);
+
+function resolvePage(pathname: string): { view: View | 'not-found'; active: string } {
+  const slug = decodeURIComponent(pathname.replace(/^\/+|\/+$/g, ''));
+  if (!slug) return { view: hasAuthTokens() ? 'app' : 'landing', active: 'dashboard' };
+  if ((marketingViews as readonly string[]).includes(slug))
+    return { view: slug as MarketingView, active: 'dashboard' };
+  if ((authViews as readonly string[]).includes(slug))
+    return { view: slug as View, active: 'dashboard' };
+  if (slug === 'onboarding') return { view: 'onboarding', active: 'dashboard' };
+  if (slug === 'app' || slug === 'dashboard') return { view: 'app', active: 'dashboard' };
+  if (appPageIds.has(slug)) return { view: 'app', active: slug };
+  return { view: 'not-found', active: 'dashboard' };
+}
+
 export function App() {
-  const [view, setView] = useState<View>(() => (hasAuthTokens() ? 'app' : 'landing'));
-  const [active, setActive] = useState('dashboard');
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  const { view, active } = resolvePage(location.pathname);
+  const setView = (nextView: View) =>
+    routerNavigate(nextView === 'landing' ? '/' : nextView === 'app' ? '/dashboard' : `/${nextView}`);
+  const navigate = (id: string) => routerNavigate(`/${id}`);
   const [quick, setQuick] = useState(false);
   const [logoutConfirmation, setLogoutConfirmation] = useState<Confirmation | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
@@ -71,7 +98,15 @@ export function App() {
   });
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [view]);
+  }, [location.pathname]);
+  useEffect(() => {
+    if (location.hash === '#main-content')
+      routerNavigate(`${location.pathname}${location.search}`, { replace: true });
+  }, [location.hash, location.pathname, location.search, routerNavigate]);
+  useEffect(() => {
+    if ((view === 'app' || view === 'onboarding') && !hasAuthTokens())
+      routerNavigate('/login', { replace: true });
+  }, [routerNavigate, view]);
   useEffect(() => {
     const handleExpiredSession = () => {
       clearAuthTokens();
@@ -86,9 +121,8 @@ export function App() {
         baseCurrency: 'NGN',
         countryCode: 'NG',
       });
-      setActive('dashboard');
       setQuick(false);
-      setView('login');
+      routerNavigate('/login', { replace: true });
     };
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === 'cephas:auth' && event.newValue === null) handleExpiredSession();
@@ -99,7 +133,7 @@ export function App() {
       window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [routerNavigate]);
   useEffect(() => {
     if (!hasAuthTokens() || (view !== 'app' && view !== 'onboarding')) return;
     Promise.all([onboardingApi.get(), authApi.me()])
@@ -121,14 +155,21 @@ export function App() {
         });
       })
       .catch((caught) => {
-        if (caught instanceof ApiError && caught.status === 401) setView('login');
+        if (caught instanceof ApiError && caught.status === 401)
+          routerNavigate('/login', { replace: true });
       });
-  }, [view]);
-  const navigate = (id: string) => {
-    setActive(id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [routerNavigate, view]);
   if (view === 'landing') return <LandingPage onView={setView} />;
+  if (view === 'not-found')
+    return (
+      <main className="route-not-found" id="main-content" role="main" tabIndex={-1}>
+        <p>404</p>
+        <h1>Page not found</h1>
+        <button className="button" onClick={() => setView('landing')}>
+          Return home
+        </button>
+      </main>
+    );
   if (['platform', 'solutions', 'pricing', 'security', 'resources'].includes(view))
     return <MarketingDetailPage page={view as MarketingView} onView={setView} />;
   if (view === 'login' || view === 'register' || view === 'forgot' || view === 'mfa')
@@ -139,11 +180,9 @@ export function App() {
         onComplete={() => {
           localStorage.setItem('cephas:onboarding-complete', 'true');
           setOnboardingComplete(true);
-          setActive('dashboard');
           setView('app');
         }}
         onSaveExit={() => {
-          setActive('dashboard');
           setView('app');
         }}
       />

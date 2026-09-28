@@ -9,6 +9,16 @@ npm install
 npm run dev
 ```
 
+## Render client-side routes
+
+Page URLs use browser paths such as `/invoices` and `/trial-balance`. In the Render static-site dashboard, add a rewrite rule so direct links and refreshes load the SPA:
+
+| Source | Destination | Action |
+| --- | --- | --- |
+| `/*` | `/index.html` | Rewrite |
+
+Add this rule after any specific redirects or rewrites.
+
 ## Project structure
 
 - `app` — app composition and configuration

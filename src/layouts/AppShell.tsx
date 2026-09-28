@@ -94,7 +94,14 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
     });
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('main-content')?.focus();
+        }}
+      >
         Skip to main content
       </a>
       <aside className={`sidebar sidebar--${sidebarTheme} ${mobileOpen ? 'is-open' : ''}`}>

@@ -11,6 +11,26 @@
   flex-direction: column;
   z-index: 40;
 }
+.route-not-found {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px;
+  background: #f6f8fc;
+  text-align: center;
+}
+.route-not-found p {
+  margin: 0;
+  color: #667085;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+.route-not-found h1 {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+}
 .sidebar__brand {
   height: 69px;
   padding: 0 20px;
