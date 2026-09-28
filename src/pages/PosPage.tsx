@@ -13,6 +13,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
+import { LoadingState } from '@/components/ui/LoadingState';
 import {
   INVENTORY_CHANGED_EVENT,
   operationsApi,
@@ -65,6 +66,7 @@ export function PosPage({
     [splitMode, setSplitMode] = useState(false),
     [setup, setSetup] = useState<'REGISTER' | 'SHIFT' | 'CUSTOMER' | null>(null),
     [error, setError] = useState(''),
+    [productsLoading, setProductsLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [sale, setSale] = useState<PosSale | null>(null),
     [recentSales, setRecentSales] = useState<PosSale[]>([]);
@@ -86,19 +88,34 @@ export function PosPage({
         setRegisterId(s?.registerId || r[0]?.id || '');
         setRecentSales(recent.data);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load POS data'));
+      .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load POS data'))
+      .finally(() => setProductsLoading(false));
   }, []);
   useEffect(() => {
     const register = registers.find((item) => item.id === registerId);
     if (!register) return;
-    void operationsApi
-      .products({ status: 'active', warehouseId: register.warehouseId })
-      .then((items) => setProducts(items.filter((item) => item.isActive)))
-      .catch((requestError) =>
-        setError(
-          requestError instanceof Error ? requestError.message : 'Unable to load available stock',
-        ),
-      );
+    let current = true;
+    const loadProducts = async () => {
+      setProductsLoading(true);
+      try {
+        const items = await operationsApi.products({
+          status: 'active',
+          warehouseId: register.warehouseId,
+        });
+        if (current) setProducts(items.filter((item) => item.isActive));
+      } catch (requestError) {
+        if (current)
+          setError(
+            requestError instanceof Error ? requestError.message : 'Unable to load available stock',
+          );
+      } finally {
+        if (current) setProductsLoading(false);
+      }
+    };
+    void loadProducts();
+    return () => {
+      current = false;
+    };
   }, [registerId, registers]);
   const visible = useMemo(
       () =>
@@ -188,6 +205,9 @@ export function PosPage({
       return setError('Only cash payments can exceed the amount due.');
     if (settledPayments.some((payment) => payment.method === 'CREDIT') && !customerId)
       return setError('Select a customer before using customer credit.');
+    const soldQuantities = new Map(
+      cart.filter((item) => item.type === 'PRODUCT').map((item) => [item.id, item.quantity]),
+    );
     setBusy(true);
     try {
       const s = await posApi.complete({
@@ -198,12 +218,35 @@ export function PosPage({
         payments: settledPayments,
       });
       setSale(s);
+      setProducts((current) =>
+        current.map((product) => {
+          const soldQuantity = soldQuantities.get(product.id);
+          return soldQuantity === undefined
+            ? product
+            : {
+                ...product,
+                stockQuantity: String(Math.max(0, Number(product.stockQuantity) - soldQuantity)),
+              };
+        }),
+      );
       window.dispatchEvent(new Event(INVENTORY_CHANGED_EVENT));
       setRecentSales((current) => [s, ...current.filter((item) => item.id !== s.id)].slice(0, 10));
       setCart([]);
       setPayments([{ method: 'CASH', amount: '' }]);
       setSplitMode(false);
       setCustomerId('');
+      const register = registers.find((item) => item.id === registerId);
+      if (register) {
+        try {
+          const refreshedProducts = await operationsApi.products({
+            status: 'active',
+            warehouseId: register.warehouseId,
+          });
+          setProducts(refreshedProducts.filter((item) => item.isActive));
+        } catch {
+          setError('Sale completed. Product availability will refresh on the next reload.');
+        }
+      }
     } catch (x) {
       setError(x instanceof Error ? x.message : 'Unable to complete sale');
     } finally {
@@ -212,7 +255,7 @@ export function PosPage({
   };
   return (
     <div className="pos-layout">
-      <section className="panel pos-catalog">
+      <section className="panel pos-catalog" aria-busy={productsLoading}>
         <label className="pos-search">
           <Search size={18} />
           <input
@@ -257,46 +300,54 @@ export function PosPage({
                 </tr>
               </thead>
               <tbody>
-                {visible.map((product) => (
-                  <tr key={product.id}>
-                    <td>
-                      <strong>{product.name}</strong>
-                    </td>
-                    <td>{product.sku}</td>
-                    <td>
-                      {product.type === 'SERVICE'
-                        ? '—'
-                        : `${quantity(product.stockQuantity)} ${product.unit}`}
-                    </td>
-                    <td>{money(Number(product.salePrice))}</td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => add(product)}
-                        disabled={!canAdd(product)}
-                      >
-                        Add
-                      </button>
+                {productsLoading ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <LoadingState compact label="Loading available products…" />
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  visible.map((product) => (
+                    <tr key={product.id}>
+                      <td>
+                        <strong>{product.name}</strong>
+                      </td>
+                      <td>{product.sku}</td>
+                      <td>{product.type === 'SERVICE' ? '—' : quantity(product.stockQuantity)}</td>
+                      <td>{money(Number(product.salePrice))}</td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => add(product)}
+                          disabled={!canAdd(product)}
+                        >
+                          Add
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         ) : (
           <div className="pos-products">
-            {visible.map((product) => (
-              <button key={product.id} onClick={() => add(product)} disabled={!canAdd(product)}>
-                <strong>{product.name}</strong>
-                <small>{product.sku}</small>
-                <small>
-                  {product.type === 'SERVICE'
-                    ? 'Service'
-                    : `${quantity(product.stockQuantity)} ${product.unit} available`}
-                </small>
-                <b>{money(Number(product.salePrice))}</b>
-              </button>
-            ))}
+            {productsLoading ? (
+              <LoadingState compact label="Loading available products…" />
+            ) : (
+              visible.map((product) => (
+                <button key={product.id} onClick={() => add(product)} disabled={!canAdd(product)}>
+                  <strong>{product.name}</strong>
+                  <small>{product.sku}</small>
+                  <small>
+                    {product.type === 'SERVICE'
+                      ? 'Service'
+                      : `${quantity(product.stockQuantity)} available`}
+                  </small>
+                  <b>{money(Number(product.salePrice))}</b>
+                </button>
+              ))
+            )}
           </div>
         )}
       </section>

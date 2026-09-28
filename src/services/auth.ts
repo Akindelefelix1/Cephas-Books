@@ -128,6 +128,35 @@ export const authApi = {
 const TOKEN_KEY = 'cephas:auth';
 export const AUTH_EXPIRED_EVENT = 'cephas:auth-expired';
 let refreshPromise: Promise<AuthTokens> | null = null;
+const responseCache = new Map<string, unknown>();
+const pendingRequests = new Map<string, Promise<unknown>>();
+let cacheGeneration = 0;
+let cacheIdentity = '';
+
+export function clearApiCache(): void {
+  cacheGeneration += 1;
+  responseCache.clear();
+  pendingRequests.clear();
+}
+
+function sessionIdentity(accessToken: string): string {
+  try {
+    const payload = accessToken.split('.')[1];
+    const normalized = payload.replaceAll('-', '+').replaceAll('_', '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const claims = JSON.parse(atob(padded)) as Record<string, unknown>;
+    const organization = claims.organizationId ?? claims.organization ?? claims.orgId ?? '';
+    return `${String(organization)}:${String(claims.sub ?? '')}`;
+  } catch {
+    return accessToken;
+  }
+}
+
+function synchronizeCacheIdentity(accessToken: string): void {
+  const identity = sessionIdentity(accessToken);
+  if (cacheIdentity && cacheIdentity !== identity) clearApiCache();
+  cacheIdentity = identity;
+}
 
 function expireSession(): void {
   clearAuthTokens();
@@ -144,6 +173,8 @@ export function saveAuthTokens(tokens: AuthTokens, remember: boolean): void {
 export function clearAuthTokens(): void {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+  cacheIdentity = '';
+  clearApiCache();
 }
 
 export async function logoutSession(): Promise<void> {
@@ -179,7 +210,7 @@ export function hasAuthTokens(): boolean {
   return getAuthTokens() !== null;
 }
 
-export async function authorizedRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function performAuthorizedRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   let tokens = getAuthTokens();
   if (!tokens) {
     expireSession();
@@ -244,4 +275,35 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
     throw new ApiError(message || 'Something went wrong. Please try again.', response.status);
   }
   return payload as T;
+}
+
+export async function authorizedRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? 'GET').toUpperCase();
+  const tokens = getAuthTokens();
+  if (tokens) synchronizeCacheIdentity(tokens.accessToken);
+
+  if (method !== 'GET') {
+    const payload = await performAuthorizedRequest<T>(path, init);
+    clearApiCache();
+    return payload;
+  }
+
+  const branchId = localStorage.getItem('cephas:active-branch') ?? '';
+  const key = `${cacheIdentity}:${branchId}:${path}`;
+  if (responseCache.has(key)) return responseCache.get(key) as T;
+
+  const pending = pendingRequests.get(key);
+  if (pending) return pending as Promise<T>;
+
+  const generation = cacheGeneration;
+  const request = performAuthorizedRequest<T>(path, init)
+    .then((payload) => {
+      if (generation === cacheGeneration) responseCache.set(key, payload);
+      return payload;
+    })
+    .finally(() => {
+      if (pendingRequests.get(key) === request) pendingRequests.delete(key);
+    });
+  pendingRequests.set(key, request);
+  return request;
 }

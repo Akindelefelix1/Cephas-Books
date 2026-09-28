@@ -231,7 +231,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
           stats={[
             { label: 'Inventory value', value: 'Loading…' },
             { label: 'Active items', value: 'Loading…' },
-            { label: 'Low / out of stock', value: 'Loading…' },
+            { label: 'Stock alerts', value: 'Loading…' },
             { label: view === 'projects' ? 'Active projects' : 'Warehouses', value: 'Loading…' },
           ]}
         />
@@ -245,8 +245,8 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
               },
               { label: 'Active items', value: String(summary.products) },
               {
-                label: 'Low / out of stock',
-                value: `${summary.lowStock} / ${summary.outOfStock}`,
+                label: 'Stock alerts',
+                value: `${summary.lowStock} low · ${summary.outOfStock} out`,
                 tone: summary.outOfStock ? 'danger' : 'warning',
               },
               {
@@ -443,7 +443,16 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
 }
 
 function columns(view: OperationsView) {
-  if (view === 'products') return ['SKU', 'Item', 'Type / category', 'Stock / value', 'Status'];
+  if (view === 'products')
+    return [
+      'SKU',
+      'Item',
+      'Type / category',
+      'Available units',
+      'Unit price',
+      'Total stock value',
+      'Status',
+    ];
   if (view === 'warehouses') return ['Code', 'Warehouse', 'Manager', 'Address', 'Status'];
   if (view === 'stock-movements')
     return ['Reference', 'Item', 'Warehouse', 'Date', 'Type / quantity'];
@@ -458,9 +467,9 @@ function values(view: OperationsView, row: Row, currency = 'NGN') {
       x.sku,
       x.name,
       `${x.type} · ${x.category || 'Uncategorised'}`,
-      x.type === 'SERVICE'
-        ? money(x.salePrice, currency)
-        : `${quantity(x.stockQuantity)} ${x.unit} available · ${money(x.stockValue, currency)}`,
+      x.type === 'SERVICE' ? 'Not stocked' : quantity(x.stockQuantity),
+      money(x.salePrice, currency),
+      x.type === 'SERVICE' ? '—' : money(x.stockValue, currency),
       x.isActive ? 'ACTIVE' : 'ARCHIVED',
     ];
   }
@@ -629,9 +638,15 @@ function ProductCards({
   return (
     <div className="inventory-card-grid">
       {products.map((product) => {
-        const low =
-          product.type === 'PRODUCT' &&
-          Number(product.stockQuantity) <= Number(product.reorderLevel);
+        const stockQuantity = Number(product.stockQuantity);
+        const stockState =
+          product.isActive && product.type === 'PRODUCT'
+            ? stockQuantity <= 0
+              ? 'out'
+              : stockQuantity <= Number(product.reorderLevel)
+                ? 'low'
+                : null
+            : null;
         return (
           <article
             key={product.id}
@@ -666,24 +681,29 @@ function ProductCards({
             </div>
             <div className="inventory-card__metrics">
               <span>
-                <small>{product.type === 'PRODUCT' ? 'Stock' : 'Price'}</small>
+                <small>Available units</small>
                 <strong>
-                  {product.type === 'PRODUCT'
-                    ? `${quantity(product.stockQuantity)} ${product.unit} available`
-                    : money(product.salePrice, currency)}
+                  {product.type === 'PRODUCT' ? quantity(product.stockQuantity) : 'Not stocked'}
                 </strong>
               </span>
               <span>
-                <small>{product.type === 'PRODUCT' ? 'Stock value' : 'Sale price'}</small>
+                <small>Unit price</small>
+                <strong>{money(product.salePrice, currency)}</strong>
+              </span>
+              <span>
+                <small>Total stock value</small>
                 <strong>
-                  {money(
-                    product.type === 'PRODUCT' ? product.stockValue : product.salePrice,
-                    currency,
-                  )}
+                  {product.type === 'PRODUCT' ? money(product.stockValue, currency) : '—'}
                 </strong>
               </span>
             </div>
-            {low && <div className="inventory-card__warning">Low or out of stock</div>}
+            {stockState && (
+              <div className={`inventory-card__warning is-${stockState}`}>
+                {stockState === 'out'
+                  ? 'Out of stock'
+                  : `Low stock - reorder at ${quantity(product.reorderLevel)} ${product.unit}`}
+              </div>
+            )}
             <div className="inventory-card__footer">
               <span>View product history</span>
               <Eye size={17} />

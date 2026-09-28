@@ -1116,7 +1116,7 @@
 }
 .inventory-card__metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 .inventory-card__metrics span {
@@ -1140,6 +1140,10 @@
   color: #a05a00;
   font-size: 0.66rem;
   font-weight: 700;
+}
+.inventory-card__warning.is-out {
+  background: #fff0f0;
+  color: #b42318;
 }
 .inventory-card__footer {
   gap: 8px;
