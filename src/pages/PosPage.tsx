@@ -6,14 +6,13 @@ import {
   Plus,
   Search,
   ShoppingCart,
-  Download,
-  Printer,
   ReceiptText,
   Trash2,
   UserPlus,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { SalesReceipt } from '@/components/ui/SalesReceipt';
 import {
   INVENTORY_CHANGED_EVENT,
   operationsApi,
@@ -34,15 +33,6 @@ const paymentLabel = (method: string) =>
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'CREDIT';
 type PaymentInput = { method: PaymentMethod; amount: string };
 type Line = Product & { quantity: number };
-const printReceipt = (sale: PosSale, salesperson: string, download = false) => {
-  const receipt = window.open('', '_blank', 'width=420,height=720');
-  if (!receipt) return;
-  const title = download ? `Download ${sale.receiptNumber} as PDF` : `Print ${sale.receiptNumber}`;
-  receipt.document.write(
-    `<!doctype html><html><head><title>${title}</title><style>body{font:14px Arial,sans-serif;color:#172033;max-width:380px;margin:32px auto}h1{font-size:23px;margin:0 0 4px}p{margin:5px 0;color:#667085}.meta{padding:12px 0;border-top:1px solid #dce2ec;border-bottom:1px solid #dce2ec}.row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e5e7eb}.total{font-size:18px;font-weight:700;border-top:2px solid #172033;margin-top:10px;padding-top:12px}.center{text-align:center}.muted{color:#667085}@media print{body{margin:0 auto}}</style></head><body><div class="center"><h1>Cephas Books</h1><p>Sales receipt</p><div class="meta"><p>${sale.receiptNumber} · ${new Date(sale.createdAt).toLocaleString()}</p><p>Salesperson: <strong>${salesperson}</strong></p></div></div>${sale.items.map((item) => `<div class="row"><span>${item.description} x ${item.quantity}</span><strong>${money(Number(item.lineTotal), sale.currency)}</strong></div>`).join('')}<div class="row total"><span>Total</span><strong>${money(Number(sale.total), sale.currency)}</strong></div><div class="row"><span>Paid</span><strong>${money(Number(sale.paidAmount), sale.currency)}</strong></div><div class="row"><span>Change</span><strong>${money(Number(sale.changeAmount), sale.currency)}</strong></div><p class="center muted">Thank you for your business.</p><script>window.onload=()=>window.print()</script></body></html>`,
-  );
-  receipt.document.close();
-};
 export function PosPage({
   role,
   onNavigate,
@@ -593,39 +583,17 @@ export function PosPage({
         </button>
         {sale && (
           <Modal open={true} onClose={() => setSale(null)} title="Sale completed" footer={null}>
-            <div className="receipt-card">
-              <div className="receipt-card__heading">
-                <strong>Cephas Books</strong>
-                <span className="receipt-card__title">Sales receipt</span>
-                <small>{sale.receiptNumber}</small>
-                <small>{new Date(sale.createdAt).toLocaleString()}</small>
-                <small>Salesperson: {salesperson}</small>
-              </div>
-              {sale.items.map((item) => (
-                <div className="receipt-card__row" key={`${item.description}-${item.quantity}`}>
-                  <span>
-                    {item.description}
-                    <small>{item.quantity} item(s)</small>
-                  </span>
-                  <strong>{money(Number(item.lineTotal))}</strong>
-                </div>
-              ))}
-              <div className="receipt-card__total">
-                <span>Total</span>
-                <strong>{money(Number(sale.total))}</strong>
-              </div>
-              <div className="receipt-card__actions">
-                <button
-                  className="button button--secondary"
-                  onClick={() => printReceipt(sale, salesperson)}
-                >
-                  <Printer size={16} /> Print
-                </button>
-                <button className="button" onClick={() => printReceipt(sale, salesperson, true)}>
-                  <Download size={16} /> Download PDF
-                </button>
-              </div>
-            </div>
+            <SalesReceipt
+              key={sale.id}
+              sale={sale}
+              salesperson={salesperson}
+              onSaleChange={(updatedSale) => {
+                setSale(updatedSale);
+                setRecentSales((current) =>
+                  current.map((recent) => (recent.id === updatedSale.id ? updatedSale : recent)),
+                );
+              }}
+            />
           </Modal>
         )}
       </section>

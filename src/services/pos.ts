@@ -9,8 +9,10 @@ export interface PosSale {
   createdAt: string;
   subtotal?: string;
   taxTotal?: string;
+  customerSignature?: string | null;
+  salesManagerSignature?: string | null;
   customer?: { id: string; displayName: string } | null;
-  items: Array<{ description: string; quantity: string; lineTotal: string }>;
+  items: Array<{ description: string; quantity: string; unitPrice: string; lineTotal: string }>;
   payments: Array<{ method: string; amount: string; reference?: string }>;
 }
 export interface PosRegister {
@@ -43,4 +45,12 @@ export const posApi = {
     authorizedRequest<PosShift>('/pos/shifts', { method: 'POST', body: JSON.stringify(data) }),
   complete: (data: object) =>
     authorizedRequest<PosSale>('/pos/sales', { method: 'POST', body: JSON.stringify(data) }),
+  updateReceiptSignatures: (
+    saleId: string,
+    data: { customerSignature: string | null; salesManagerSignature: string | null },
+  ) =>
+    authorizedRequest<PosSale>(`/pos/sales/${saleId}/receipt-signatures`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 };
