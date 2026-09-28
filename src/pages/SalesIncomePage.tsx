@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Download, Eye, History, MapPin, Plus, Send, Trash2 } from 'lucide-react';
+import { Download, Eye, History, LoaderCircle, MapPin, Plus, Send, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
@@ -301,7 +301,11 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         error={error}
         onClose={() => setConfirmation(null)}
       />
-      <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} />
+      <InvoicePreview
+        key={previewInvoice?.id || 'closed'}
+        invoice={previewInvoice}
+        onClose={() => setPreviewInvoice(null)}
+      />
       <CustomerHistoryModal
         customer={historyCustomer}
         invoices={historyInvoices}
@@ -489,34 +493,57 @@ async function create(v: View, d: Record<string, unknown>, selected: Customer | 
   return salesApi.createCredit(d);
 }
 function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose: () => void }) {
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   if (!invoice) return null;
+  const send = async () => {
+    if (sending) return;
+    setSending(true);
+    setSendError('');
+    try {
+      await salesApi.sendInvoice(invoice.id);
+      confirmAction('Invoice emailed to customer');
+    } catch (caught) {
+      setSendError(caught instanceof Error ? caught.message : 'Unable to send invoice email');
+    } finally {
+      setSending(false);
+    }
+  };
   return (
     <Modal
       open
       title={`Invoice ${invoice.number}`}
-      onClose={onClose}
+      onClose={() => {
+        if (!sending) onClose();
+      }}
       wide
       footer={
         <>
-          <button className="button button--secondary" onClick={onClose}>
+          <button className="button button--secondary" onClick={onClose} disabled={sending}>
             Close
           </button>
-          <button className="button button--secondary" onClick={() => printInvoice(invoice)}>
+          <button
+            className="button button--secondary"
+            onClick={() => printInvoice(invoice)}
+            disabled={sending}
+          >
             <Download size={16} /> Download PDF
           </button>
-          <button
-            className="button"
-            onClick={() =>
-              void salesApi
-                .sendInvoice(invoice.id)
-                .then(() => confirmAction('Invoice emailed to customer'))
-            }
-          >
-            <Send size={16} /> Send email
+          <button className="button" onClick={() => void send()} disabled={sending}>
+            {sending ? (
+              <>
+                <LoaderCircle className="spin" size={16} /> Sending…
+              </>
+            ) : (
+              <>
+                <Send size={16} /> Send email
+              </>
+            )}
           </button>
         </>
       }
     >
+      {sendError && <p className="form-error">{sendError}</p>}
       <InvoicePaper invoice={invoice} />
     </Modal>
   );

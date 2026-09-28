@@ -248,6 +248,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
         )}
       </section>
       <PurchaseModal
+        key={`${view}-${modal ? 'open' : 'closed'}-${selected?.id || 'new'}`}
         open={modal}
         view={view}
         selected={selected}
@@ -466,7 +467,6 @@ function rowActions(
               run(
                 () =>
                   purchasesApi.orderToBill(r.id, {
-                    number: `BILL-${Date.now()}`,
                     issueDate: issue.toISOString().slice(0, 10),
                     dueDate: due.toISOString().slice(0, 10),
                   }),
@@ -570,9 +570,17 @@ function PurchaseModal({
   const line = ['purchase-requests', 'purchase-orders', 'bills'].includes(view),
     today = new Date().toISOString().slice(0, 10);
   const bank = supplierBankDetails(selected?.bankDetails);
-  const [lineItems, setLineItems] = useState([{ name: '', description: '', quantity: '', unitPrice: '' }]);
-  const updateLine = (index: number, field: 'name' | 'description' | 'quantity' | 'unitPrice', value: string) =>
-    setLineItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  const [lineItems, setLineItems] = useState([
+    { name: '', description: '', quantity: '', unitPrice: '' },
+  ]);
+  const updateLine = (
+    index: number,
+    field: 'name' | 'description' | 'quantity' | 'unitPrice',
+    value: string,
+  ) =>
+    setLineItems((items) =>
+      items.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)),
+    );
   return (
     <Modal
       open={open}
@@ -618,7 +626,12 @@ function PurchaseModal({
               requestedBy: g('requestedBy'),
               requiredDate: g('date'),
               currency: getDefaultCurrency(),
-              items: lineItems.map((item) => ({ ...item, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), taxRate: Number(g('taxRate')) })),
+              items: lineItems.map((item) => ({
+                ...item,
+                quantity: Number(item.quantity),
+                unitPrice: Number(item.unitPrice),
+                taxRate: Number(g('taxRate')),
+              })),
               notes: optional('notes'),
             });
           else if (view === 'purchase-orders' || view === 'bills')
@@ -629,7 +642,12 @@ function PurchaseModal({
               [view === 'purchase-orders' ? 'orderDate' : 'issueDate']: g('startDate'),
               [view === 'purchase-orders' ? 'deliveryDate' : 'dueDate']: g('date'),
               currency: getDefaultCurrency(),
-              items: lineItems.map((item) => ({ ...item, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), taxRate: Number(g('taxRate')) })),
+              items: lineItems.map((item) => ({
+                ...item,
+                quantity: Number(item.quantity),
+                unitPrice: Number(item.unitPrice),
+                taxRate: Number(g('taxRate')),
+              })),
               notes: optional('notes'),
             });
           else if (view === 'expenses')
@@ -684,7 +702,9 @@ function PurchaseModal({
               />
             </label>
             <fieldset className="form-fieldset full">
-              <legend>Bank details <small>Optional</small></legend>
+              <legend>
+                Bank details <small>Optional</small>
+              </legend>
               <div className="form-grid form-grid--nested">
                 <label>
                   Bank name
@@ -696,7 +716,11 @@ function PurchaseModal({
                 </label>
                 <label>
                   Account number
-                  <input name="accountNumber" inputMode="numeric" defaultValue={bank.accountNumber} />
+                  <input
+                    name="accountNumber"
+                    inputMode="numeric"
+                    defaultValue={bank.accountNumber}
+                  />
                 </label>
                 <label>
                   Branch
@@ -833,17 +857,67 @@ function PurchaseModal({
             </label>
             {line && (
               <div className="invoice-line-editor full">
-                <div className="invoice-line-editor__heading"><span>Items</span><small>Add multiple items to this transaction.</small></div>
+                <div className="invoice-line-editor__heading">
+                  <span>Items</span>
+                  <small>Add multiple items to this transaction.</small>
+                </div>
                 {lineItems.map((item, index) => (
                   <div className="invoice-line-editor__row" key={index}>
-                    <label>Name<input required value={item.name} onChange={(event) => updateLine(index, 'name', event.target.value)} /></label>
-                    <label>Line description<input required value={item.description} onChange={(event) => updateLine(index, 'description', event.target.value)} /></label>
-                    <label>Quantity<input required type="number" min=".0001" step=".0001" value={item.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} /></label>
-                    <label>Unit price<input required type="number" min="0" step=".01" value={item.unitPrice} onChange={(event) => updateLine(index, 'unitPrice', event.target.value)} /></label>
+                    <label>
+                      Name
+                      <input
+                        required
+                        value={item.name}
+                        onChange={(event) => updateLine(index, 'name', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Line description
+                      <input
+                        required
+                        value={item.description}
+                        onChange={(event) => updateLine(index, 'description', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Quantity
+                      <input
+                        required
+                        type="number"
+                        min=".0001"
+                        step=".0001"
+                        value={item.quantity}
+                        onChange={(event) => updateLine(index, 'quantity', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Unit price
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        step=".01"
+                        value={item.unitPrice}
+                        onChange={(event) => updateLine(index, 'unitPrice', event.target.value)}
+                      />
+                    </label>
                   </div>
                 ))}
-                <label className="full">Tax %<input name="taxRate" type="number" min="0" step=".01" defaultValue="0" /></label>
-                <button type="button" className="invoice-line-editor__add" onClick={() => setLineItems((items) => [...items, { name: '', description: '', quantity: '', unitPrice: '' }])}><Plus size={16} /> Add another item</button>
+                <label className="full">
+                  Tax %<input name="taxRate" type="number" min="0" step=".01" defaultValue="0" />
+                </label>
+                <button
+                  type="button"
+                  className="invoice-line-editor__add"
+                  onClick={() =>
+                    setLineItems((items) => [
+                      ...items,
+                      { name: '', description: '', quantity: '', unitPrice: '' },
+                    ])
+                  }
+                >
+                  <Plus size={16} /> Add another item
+                </button>
               </div>
             )}
             {(view === 'expenses' || view === 'supplier-payments' || view === 'payables') && (

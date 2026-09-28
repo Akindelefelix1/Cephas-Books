@@ -37,7 +37,15 @@ const printReceipt = (sale: PosSale, salesperson: string, download = false) => {
   );
   receipt.document.close();
 };
-export function PosPage({ role, onNavigate, salesperson }: { role: string; onNavigate: (id: string) => void; salesperson: string }) {
+export function PosPage({
+  role,
+  onNavigate,
+  salesperson,
+}: {
+  role: string;
+  onNavigate: (id: string) => void;
+  salesperson: string;
+}) {
   const [products, setProducts] = useState<Product[]>([]),
     [customers, setCustomers] = useState<Customer[]>([]),
     [registers, setRegisters] = useState<PosRegister[]>([]),
@@ -98,17 +106,13 @@ export function PosPage({ role, onNavigate, salesperson }: { role: string; onNav
       0,
     ),
     total = subtotal + tax,
-    paid = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    paymentRows =
+      !splitMode && payments.length === 1
+        ? [{ ...payments[0], amount: total > 0 ? String(total) : '' }]
+        : payments,
+    paid = paymentRows.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
     change = Math.max(0, paid - total),
     remaining = Math.max(0, total - paid);
-  useEffect(() => {
-    if (!splitMode)
-      setPayments((current) =>
-        current.length === 1
-          ? [{ ...current[0], amount: total > 0 ? String(total) : '' }]
-          : current,
-      );
-  }, [splitMode, total]);
   const available = (product: Product) =>
     product.type === 'SERVICE' ? Infinity : Number(product.stockQuantity);
   const cartQuantity = (productId: string) =>
@@ -170,7 +174,7 @@ export function PosPage({ role, onNavigate, salesperson }: { role: string; onNav
     if (!registerId) return setError('Set up a register first.');
     if (!shift) return setError('Open a cashier shift first.');
     if (!cart.length) return setError('Add an item to the sale.');
-    const settledPayments = payments
+    const settledPayments = paymentRows
       .map((payment) => ({ ...payment, amount: Number(payment.amount || 0) }))
       .filter((payment) => payment.amount > 0);
     if (!settledPayments.length) return setError('Enter a payment amount.');
@@ -462,7 +466,7 @@ export function PosPage({ role, onNavigate, salesperson }: { role: string; onNav
               + Split payment
             </button>
           </div>
-          {payments.map((payment, index) => (
+          {paymentRows.map((payment, index) => (
             <div className="pos-payment__row" key={index}>
               <select
                 aria-label={`Payment method ${index + 1}`}
@@ -554,7 +558,10 @@ export function PosPage({ role, onNavigate, salesperson }: { role: string; onNav
                 <strong>{money(Number(sale.total))}</strong>
               </div>
               <div className="receipt-card__actions">
-                <button className="button button--secondary" onClick={() => printReceipt(sale, salesperson)}>
+                <button
+                  className="button button--secondary"
+                  onClick={() => printReceipt(sale, salesperson)}
+                >
                   <Printer size={16} /> Print
                 </button>
                 <button className="button" onClick={() => printReceipt(sale, salesperson, true)}>
