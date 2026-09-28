@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Download, Plus, Sparkles } from 'lucide-react';
+import {
+  Download,
+  Eye,
+  LayoutGrid,
+  List,
+  LoaderCircle,
+  Package,
+  Plus,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -9,6 +19,7 @@ import {
   type OperationsSummary,
   type OperationsView,
   type Product,
+  type ProductDetails,
   type ProductCategory,
   type Project,
   type ProjectPlan,
@@ -45,6 +56,11 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   const [error, setError] = useState('');
   const [modal, setModal] = useState(false);
   const [selected, setSelected] = useState<Row | null>(null);
+  const [display, setDisplay] = useState<'table' | 'cards'>('table');
+  const [detail, setDetail] = useState<ProductDetails | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState('');
 
   const load = useCallback(async () => {
     if (view === 'project-ai') {
@@ -97,6 +113,43 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       setBusy(false);
     }
   };
+  const openProduct = async (product: Product) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetail(null);
+    setError('');
+    try {
+      setDetail(await operationsApi.product(product.id));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to load product history');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+  const productAction = async (kind: 'status' | 'delete') => {
+    if (!detail) return;
+    if (
+      kind === 'delete' &&
+      !window.confirm(`Permanently delete ${detail.name}? This cannot be undone.`)
+    )
+      return;
+    setActionBusy(kind);
+    setError('');
+    try {
+      if (kind === 'delete') await operationsApi.deleteProduct(detail.id);
+      else await operationsApi.productStatus(detail.id, !detail.isActive);
+      confirmAction(
+        kind === 'delete' ? 'Item deleted' : detail.isActive ? 'Item archived' : 'Item restored',
+      );
+      setDetailOpen(false);
+      setDetail(null);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to update item');
+    } finally {
+      setActionBusy('');
+    }
+  };
   if (view === 'project-ai') return <ProjectAiPage canEdit={canEdit} />;
   const action = {
     products: 'New item',
@@ -137,31 +190,35 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
         </div>
       </div>
       {loading ? (
-        <StatsGrid stats={[
-          { label: 'Inventory value', value: 'Loading…' },
-          { label: 'Active items', value: 'Loading…' },
-          { label: 'Low / out of stock', value: 'Loading…' },
-          { label: view === 'projects' ? 'Active projects' : 'Warehouses', value: 'Loading…' },
-        ]} />
-      ) : summary && (
         <StatsGrid
           stats={[
-            {
-              label: 'Inventory value',
-              value: money(summary.inventoryValue, summary.baseCurrency),
-            },
-            { label: 'Active items', value: String(summary.products) },
-            {
-              label: 'Low / out of stock',
-              value: `${summary.lowStock} / ${summary.outOfStock}`,
-              tone: summary.outOfStock ? 'danger' : 'warning',
-            },
-            {
-              label: view === 'projects' ? 'Active projects' : 'Warehouses',
-              value: String(view === 'projects' ? summary.activeProjects : summary.warehouses),
-            },
+            { label: 'Inventory value', value: 'Loading…' },
+            { label: 'Active items', value: 'Loading…' },
+            { label: 'Low / out of stock', value: 'Loading…' },
+            { label: view === 'projects' ? 'Active projects' : 'Warehouses', value: 'Loading…' },
           ]}
         />
+      ) : (
+        summary && (
+          <StatsGrid
+            stats={[
+              {
+                label: 'Inventory value',
+                value: money(summary.inventoryValue, summary.baseCurrency),
+              },
+              { label: 'Active items', value: String(summary.products) },
+              {
+                label: 'Low / out of stock',
+                value: `${summary.lowStock} / ${summary.outOfStock}`,
+                tone: summary.outOfStock ? 'danger' : 'warning',
+              },
+              {
+                label: view === 'projects' ? 'Active projects' : 'Warehouses',
+                value: String(view === 'projects' ? summary.activeProjects : summary.warehouses),
+              },
+            ]}
+          />
+        )
       )}
       <section className="panel register-panel">
         <div className="banking-filters">
@@ -179,6 +236,26 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
               </option>
             ))}
           </select>
+          {view === 'products' && (
+            <div className="inventory-view-toggle" aria-label="Inventory view">
+              <button
+                className={display === 'table' ? 'is-active' : ''}
+                aria-label="Table view"
+                aria-pressed={display === 'table'}
+                onClick={() => setDisplay('table')}
+              >
+                <List size={17} />
+              </button>
+              <button
+                className={display === 'cards' ? 'is-active' : ''}
+                aria-label="Card view"
+                aria-pressed={display === 'cards'}
+                onClick={() => setDisplay('cards')}
+              >
+                <LayoutGrid size={17} />
+              </button>
+            </div>
+          )}
         </div>
         {error && (
           <div className="banking-alert">
@@ -188,6 +265,12 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
         )}
         {loading ? (
           <LoadingState label="Loading inventory and operations…" />
+        ) : view === 'products' && display === 'cards' ? (
+          <ProductCards
+            products={rows as Product[]}
+            currency={summary?.baseCurrency}
+            open={openProduct}
+          />
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">
@@ -201,7 +284,13 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id}>
+                  <tr
+                    key={row.id}
+                    className={view === 'products' ? 'inventory-row' : ''}
+                    onClick={
+                      view === 'products' ? () => void openProduct(row as Product) : undefined
+                    }
+                  >
                     {values(view, row, summary?.baseCurrency).map((x, index) => (
                       <td key={index}>{x}</td>
                     ))}
@@ -213,11 +302,17 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
                             row,
                             canEdit,
                             canApprove,
-                            (operation, message) => void run(operation, message),
+                            (operation, message) => {
+                              if (view === 'products') setActionBusy(row.id);
+                              void run(operation, message).finally(() => setActionBusy(''));
+                            },
                             () => {
                               setSelected(row);
                               setModal(true);
                             },
+                            view === 'products'
+                              ? () => void openProduct(row as Product)
+                              : undefined,
                           )}
                         </div>
                       </td>
@@ -240,6 +335,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
         )}
       </section>
       <OperationsModal
+        key={`${view}-${selected?.id || 'new'}-${modal ? 'open' : 'closed'}`}
         open={modal}
         view={view}
         selected={selected}
@@ -255,6 +351,33 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
         submit={(data, transfer) =>
           void run(() => save(view, data, selected, transfer), `${titles[view]} saved`)
         }
+      />
+      <ProductDetailsModal
+        key={detail?.id || (detailOpen ? 'loading' : 'closed')}
+        open={detailOpen}
+        product={detail}
+        loading={detailLoading}
+        error={error}
+        canEdit={canEdit}
+        canDelete={['OWNER', 'ADMIN'].includes(role)}
+        busy={actionBusy}
+        currency={summary?.baseCurrency || 'NGN'}
+        close={() => {
+          if (!actionBusy) {
+            setDetailOpen(false);
+            setDetail(null);
+            setError('');
+          }
+        }}
+        edit={() => {
+          if (detail) {
+            setDetailOpen(false);
+            setSelected(detail);
+            setModal(true);
+          }
+        }}
+        changeStatus={() => void productAction('status')}
+        remove={() => void productAction('delete')}
       />
     </>
   );
@@ -330,23 +453,18 @@ function rowActions(
   canApprove: boolean,
   run: (op: () => Promise<unknown>, message: string) => void,
   edit: () => void,
+  viewProduct?: () => void,
 ) {
   if (view === 'products' && canEdit) {
-    const x = row as Product;
     return (
-      <>
-        <button onClick={edit}>Edit</button>
-        <button
-          onClick={() =>
-            run(
-              () => operationsApi.productStatus(x.id, !x.isActive),
-              x.isActive ? 'Item archived' : 'Item restored',
-            )
-          }
-        >
-          {x.isActive ? 'Archive' : 'Restore'}
-        </button>
-      </>
+      <button
+        onClick={(event) => {
+          event.stopPropagation();
+          viewProduct?.();
+        }}
+      >
+        <Eye size={14} /> Actions
+      </button>
     );
   }
   if (view === 'warehouses' && canEdit) {
@@ -438,6 +556,383 @@ async function save(
     : operationsApi.createProject(data);
 }
 
+function ProductCards({
+  products,
+  currency = 'NGN',
+  open,
+}: {
+  products: Product[];
+  currency?: string;
+  open: (product: Product) => void;
+}) {
+  if (!products.length)
+    return <div className="table-empty inventory-empty">No products or services found.</div>;
+  return (
+    <div className="inventory-card-grid">
+      {products.map((product) => {
+        const low =
+          product.type === 'PRODUCT' &&
+          Number(product.stockQuantity) <= Number(product.reorderLevel);
+        return (
+          <article
+            key={product.id}
+            className="inventory-card"
+            tabIndex={0}
+            role="button"
+            onClick={() => open(product)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                open(product);
+              }
+            }}
+          >
+            <div className="inventory-card__top">
+              <span className="inventory-card__icon">
+                <Package size={21} />
+              </span>
+              <span
+                className={`inventory-status ${product.isActive ? 'is-active' : 'is-archived'}`}
+              >
+                {product.isActive ? 'Active' : 'Archived'}
+              </span>
+            </div>
+            <div>
+              <small>{product.sku}</small>
+              <h3>{product.name}</h3>
+              <p>
+                {product.category || 'Uncategorised'} ·{' '}
+                {product.type === 'PRODUCT' ? 'Product' : 'Service'}
+              </p>
+            </div>
+            <div className="inventory-card__metrics">
+              <span>
+                <small>{product.type === 'PRODUCT' ? 'Stock' : 'Price'}</small>
+                <strong>
+                  {product.type === 'PRODUCT'
+                    ? `${product.stockQuantity} ${product.unit}`
+                    : money(product.salePrice, currency)}
+                </strong>
+              </span>
+              <span>
+                <small>{product.type === 'PRODUCT' ? 'Stock value' : 'Sale price'}</small>
+                <strong>
+                  {money(
+                    product.type === 'PRODUCT' ? product.stockValue : product.salePrice,
+                    currency,
+                  )}
+                </strong>
+              </span>
+            </div>
+            {low && <div className="inventory-card__warning">Low or out of stock</div>}
+            <div className="inventory-card__footer">
+              <span>View product history</span>
+              <Eye size={17} />
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function personName(person: { email: string; firstName?: string; lastName?: string } | null) {
+  if (!person) return 'Not recorded';
+  return [person.firstName, person.lastName].filter(Boolean).join(' ') || person.email;
+}
+
+function ProductDetailsModal({
+  open,
+  product,
+  loading,
+  error,
+  canEdit,
+  canDelete,
+  busy,
+  currency,
+  close,
+  edit,
+  changeStatus,
+  remove,
+}: {
+  open: boolean;
+  product: ProductDetails | null;
+  loading: boolean;
+  error: string;
+  canEdit: boolean;
+  canDelete: boolean;
+  busy: string;
+  currency: string;
+  close: () => void;
+  edit: () => void;
+  changeStatus: () => void;
+  remove: () => void;
+}) {
+  const [tab, setTab] = useState<'overview' | 'sales' | 'stock' | 'activity'>('overview');
+  return (
+    <Modal
+      open={open}
+      onClose={close}
+      wide
+      title={product?.name || 'Product details'}
+      subtitle={
+        product
+          ? `${product.sku} · ${product.type === 'PRODUCT' ? 'Product' : 'Service'}`
+          : 'Loading product history'
+      }
+      footer={
+        product ? (
+          <>
+            <button className="button button--secondary" onClick={close} disabled={Boolean(busy)}>
+              Close
+            </button>
+            {canEdit && (
+              <button className="button button--secondary" onClick={edit} disabled={Boolean(busy)}>
+                Edit
+              </button>
+            )}
+            {canEdit && (
+              <button className="button" onClick={changeStatus} disabled={Boolean(busy)}>
+                {busy === 'status' ? (
+                  <>
+                    <LoaderCircle className="spin" size={16} />{' '}
+                    {product.isActive ? 'Archiving…' : 'Restoring…'}
+                  </>
+                ) : product.isActive ? (
+                  'Archive'
+                ) : (
+                  'Restore'
+                )}
+              </button>
+            )}
+            {canDelete && !product.isActive && (
+              <button className="button button--danger" onClick={remove} disabled={Boolean(busy)}>
+                {busy === 'delete' ? (
+                  <>
+                    <LoaderCircle className="spin" size={16} /> Deleting…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} /> Delete permanently
+                  </>
+                )}
+              </button>
+            )}
+          </>
+        ) : undefined
+      }
+    >
+      {loading ? (
+        <LoadingState label="Loading product history…" />
+      ) : error && !product ? (
+        <div className="banking-alert">{error}</div>
+      ) : (
+        product && (
+          <div className="product-details">
+            {error && <div className="banking-alert">{error}</div>}
+            <div className="product-details__hero">
+              <div className="product-details__identity">
+                <span className="inventory-card__icon">
+                  <Package size={24} />
+                </span>
+                <div>
+                  <strong>{product.category || 'Uncategorised'}</strong>
+                  <span>{product.description || 'No description added.'}</span>
+                </div>
+              </div>
+              <span
+                className={`inventory-status ${product.isActive ? 'is-active' : 'is-archived'}`}
+              >
+                {product.isActive ? 'Active' : 'Archived'}
+              </span>
+            </div>
+            <div className="product-details__stats">
+              <div>
+                <small>Current stock</small>
+                <strong>
+                  {product.type === 'PRODUCT'
+                    ? `${product.stockQuantity} ${product.unit}`
+                    : 'Service'}
+                </strong>
+              </div>
+              <div>
+                <small>Stock value</small>
+                <strong>{money(product.stockValue, currency)}</strong>
+              </div>
+              <div>
+                <small>Units sold</small>
+                <strong>{product.salesSummary.unitsSold}</strong>
+              </div>
+              <div>
+                <small>Net sales</small>
+                <strong>{money(product.salesSummary.netSales, currency)}</strong>
+              </div>
+            </div>
+            <div className="product-detail-tabs" role="tablist">
+              {(['overview', 'sales', 'stock', 'activity'] as const).map((value) => (
+                <button
+                  key={value}
+                  role="tab"
+                  aria-selected={tab === value}
+                  className={tab === value ? 'is-active' : ''}
+                  onClick={() => setTab(value)}
+                >
+                  {value === 'stock' ? 'Stock history' : value[0].toUpperCase() + value.slice(1)}
+                  {value === 'sales'
+                    ? ` (${product.sales.length})`
+                    : value === 'stock'
+                      ? ` (${product.movements.length})`
+                      : value === 'activity'
+                        ? ` (${product.activity.length})`
+                        : ''}
+                </button>
+              ))}
+            </div>
+            {tab === 'overview' && (
+              <div className="product-overview-grid">
+                <div>
+                  <small>Date added</small>
+                  <strong>{new Date(product.createdAt).toLocaleString('en-NG')}</strong>
+                </div>
+                <div>
+                  <small>Added by</small>
+                  <strong>{personName(product.createdBy)}</strong>
+                </div>
+                <div>
+                  <small>Sale price</small>
+                  <strong>{money(product.salePrice, currency)}</strong>
+                </div>
+                <div>
+                  <small>Cost price</small>
+                  <strong>{money(product.costPrice, currency)}</strong>
+                </div>
+                <div>
+                  <small>Tax rate</small>
+                  <strong>{product.taxRate}%</strong>
+                </div>
+                <div>
+                  <small>Reorder level</small>
+                  <strong>
+                    {product.reorderLevel} {product.unit}
+                  </strong>
+                </div>
+              </div>
+            )}
+            {tab === 'sales' && (
+              <div className="product-history-stack">
+                <div className="product-sales-summary">
+                  <span>
+                    <small>Gross sales</small>
+                    <strong>{money(product.salesSummary.grossSales, currency)}</strong>
+                  </span>
+                  <span>
+                    <small>Returns</small>
+                    <strong>{money(product.salesSummary.returnsValue, currency)}</strong>
+                  </span>
+                  <span>
+                    <small>Net sales</small>
+                    <strong>{money(product.salesSummary.netSales, currency)}</strong>
+                  </span>
+                </div>
+                <HistoryTable
+                  headers={['Receipt', 'Date', 'Quantity', 'Amount', 'Cashier', 'Status']}
+                  empty="No sales recorded for this item."
+                  rows={product.sales.map((sale) => [
+                    sale.sale.receiptNumber,
+                    date(sale.sale.createdAt),
+                    `${sale.quantity} ${product.unit}`,
+                    money(sale.lineTotal, sale.sale.currency),
+                    personName(sale.cashier),
+                    sale.sale.status,
+                  ])}
+                />
+              </div>
+            )}
+            {tab === 'stock' && (
+              <>
+                <HistoryTable
+                  headers={['Reference', 'Date', 'Warehouse', 'Movement', 'Quantity', 'Unit cost']}
+                  empty="No stock movements recorded for this item."
+                  rows={product.movements.map((movement) => [
+                    movement.reference,
+                    date(movement.movementDate),
+                    movement.warehouse.name,
+                    movement.type.replaceAll('_', ' '),
+                    movement.quantity,
+                    money(movement.unitCost, currency),
+                  ])}
+                />
+                {product.adjustments.length > 0 && (
+                  <>
+                    <h3 className="product-details__subheading">Stock adjustments</h3>
+                    <HistoryTable
+                      headers={['Reference', 'Date', 'Warehouse', 'Reason', 'Change', 'Status']}
+                      empty=""
+                      rows={product.adjustments.map((adjustment) => [
+                        adjustment.reference,
+                        date(adjustment.adjustmentDate),
+                        adjustment.warehouse.name,
+                        adjustment.reason,
+                        adjustment.quantityDelta,
+                        adjustment.status,
+                      ])}
+                    />
+                  </>
+                )}
+              </>
+            )}
+            {tab === 'activity' && (
+              <HistoryTable
+                headers={['Action', 'Date', 'Performed by']}
+                empty="No product activity has been recorded yet."
+                rows={product.activity.map((entry) => [
+                  entry.action,
+                  new Date(entry.createdAt).toLocaleString('en-NG'),
+                  personName(entry.actor),
+                ])}
+              />
+            )}
+          </div>
+        )
+      )}
+    </Modal>
+  );
+}
+
+function HistoryTable({
+  headers,
+  rows,
+  empty,
+}: {
+  headers: string[];
+  rows: Array<Array<string | number>>;
+  empty: string;
+}) {
+  if (!rows.length) return <div className="product-history-empty">{empty}</div>;
+  return (
+    <div className="data-table-wrap product-history-table">
+      <table className="data-table">
+        <thead>
+          <tr>
+            {headers.map((header) => (
+              <th key={header}>{header}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {row.map((cell, index) => (
+                <td key={index}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function OperationsModal({
   open,
   view,
@@ -462,7 +957,9 @@ function OperationsModal({
   submit: (data: Record<string, unknown>, transfer: boolean) => void;
 }) {
   const [transfer, setTransfer] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(
+    view === 'products' ? ((selected as Product | null)?.category ?? '') : '',
+  );
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategory, setNewCategory] = useState('');
   const [categoryError, setCategoryError] = useState('');
@@ -565,7 +1062,6 @@ function OperationsModal({
   const p = selected as Product | null,
     w = selected as Warehouse | null,
     project = selected as Project | null;
-  useEffect(() => setSelectedCategory(p?.category || ''), [open, p?.category]);
   const addCategory = async () => {
     const name = newCategory.trim();
     if (!name) return;
@@ -617,14 +1113,50 @@ function OperationsModal({
             <label>
               Category
               <div className="category-picker">
-                <select name="category" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
+                <select
+                  name="category"
+                  value={selectedCategory}
+                  onChange={(event) => setSelectedCategory(event.target.value)}
+                >
                   <option value="">Uncategorised</option>
-                  {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
-                  {selectedCategory && !categories.some((category) => category.name === selectedCategory) && <option value={selectedCategory}>{selectedCategory}</option>}
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+                  {selectedCategory &&
+                    !categories.some((category) => category.name === selectedCategory) && (
+                      <option value={selectedCategory}>{selectedCategory}</option>
+                    )}
                 </select>
-                <button type="button" className="icon-button" aria-label="Add category" title="Add category" onClick={() => setAddingCategory((value) => !value)}><Plus size={16} /></button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Add category"
+                  title="Add category"
+                  onClick={() => setAddingCategory((value) => !value)}
+                >
+                  <Plus size={16} />
+                </button>
               </div>
-              {addingCategory && <div className="category-picker__add"><input value={newCategory} placeholder="New category" onChange={(event) => setNewCategory(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void addCategory(); } }} /><button type="button" onClick={() => void addCategory()}>Add</button></div>}
+              {addingCategory && (
+                <div className="category-picker__add">
+                  <input
+                    value={newCategory}
+                    placeholder="New category"
+                    onChange={(event) => setNewCategory(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void addCategory();
+                      }
+                    }}
+                  />
+                  <button type="button" onClick={() => void addCategory()}>
+                    Add
+                  </button>
+                </div>
+              )}
               {categoryError && <small className="form-error">{categoryError}</small>}
             </label>
             <label>
@@ -677,17 +1209,29 @@ function OperationsModal({
             </label>
             <label>
               Default stock warehouse
-              <select name="defaultWarehouseId" defaultValue={p?.defaultWarehouseId || ""}>
+              <select name="defaultWarehouseId" defaultValue={p?.defaultWarehouseId || ''}>
                 <option value="">No default warehouse</option>
-                {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>)}
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.code} — {warehouse.name}
+                  </option>
+                ))}
               </select>
             </label>
-            {!p && <>
-              <label>
-                Opening quantity
-                <input name="openingQuantity" type="number" min="0" step=".0001" defaultValue="0" />
-              </label>
-            </>}
+            {!p && (
+              <>
+                <label>
+                  Opening quantity
+                  <input
+                    name="openingQuantity"
+                    type="number"
+                    min="0"
+                    step=".0001"
+                    defaultValue="0"
+                  />
+                </label>
+              </>
+            )}
             <label className="full">
               Description
               <textarea name="description" defaultValue={p?.description} />

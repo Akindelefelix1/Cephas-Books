@@ -278,6 +278,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         )}
       </section>
       <CreateModal
+        key={`${view}-${modal ? 'open' : 'closed'}-${selected?.id || 'new'}`}
         open={modal}
         view={view}
         selected={selected}
@@ -400,16 +401,26 @@ function actions(
     const invoice = r as Invoice;
     return (
       <>
-        <button onClick={() => preview(invoice)}><Eye size={15} /> Preview</button>
-        <button onClick={() => printInvoice(invoice)}><Download size={15} /> Download</button>
-        <button onClick={() => run(() => salesApi.sendInvoice(invoice.id), 'Invoice emailed to customer')}><Send size={15} /> Send</button>
+        <button onClick={() => preview(invoice)}>
+          <Eye size={15} /> Preview
+        </button>
+        <button onClick={() => printInvoice(invoice)}>
+          <Download size={15} /> Download
+        </button>
+        <button
+          onClick={() => run(() => salesApi.sendInvoice(invoice.id), 'Invoice emailed to customer')}
+        >
+          <Send size={15} /> Send
+        </button>
       </>
     );
   }
   if (v === 'customers')
     return (
       <>
-        <button onClick={() => history(r as Customer)}><History size={15} /> History</button>
+        <button onClick={() => history(r as Customer)}>
+          <History size={15} /> History
+        </button>
         {canEdit && <button onClick={edit}>Edit</button>}
         {canEdit && (r as Customer).isActive && (
           <button onClick={() => run(() => salesApi.archiveCustomer(r.id), 'Customer archived')}>
@@ -480,7 +491,32 @@ async function create(v: View, d: Record<string, unknown>, selected: Customer | 
 function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose: () => void }) {
   if (!invoice) return null;
   return (
-    <Modal open title={`Invoice ${invoice.number}`} onClose={onClose} wide footer={<><button className="button button--secondary" onClick={onClose}>Close</button><button className="button button--secondary" onClick={() => printInvoice(invoice)}><Download size={16} /> Download PDF</button><button className="button" onClick={() => void salesApi.sendInvoice(invoice.id).then(() => confirmAction('Invoice emailed to customer'))}><Send size={16} /> Send email</button></>}>
+    <Modal
+      open
+      title={`Invoice ${invoice.number}`}
+      onClose={onClose}
+      wide
+      footer={
+        <>
+          <button className="button button--secondary" onClick={onClose}>
+            Close
+          </button>
+          <button className="button button--secondary" onClick={() => printInvoice(invoice)}>
+            <Download size={16} /> Download PDF
+          </button>
+          <button
+            className="button"
+            onClick={() =>
+              void salesApi
+                .sendInvoice(invoice.id)
+                .then(() => confirmAction('Invoice emailed to customer'))
+            }
+          >
+            <Send size={16} /> Send email
+          </button>
+        </>
+      }
+    >
       <InvoicePaper invoice={invoice} />
     </Modal>
   );
@@ -515,55 +551,80 @@ function CustomerHistoryModal({
       title={`${customer.displayName} purchase history`}
       subtitle={customer.billingAddress || customer.email || 'Customer account history'}
       onClose={onClose}
-      footer={<button className="button button--secondary" onClick={onClose}>Close</button>}
+      footer={
+        <button className="button button--secondary" onClick={onClose}>
+          Close
+        </button>
+      }
     >
       <div className="customer-history">
         {loading ? (
           <LoadingState label="Loading purchase history…" />
         ) : (
           <>
-        <div className="customer-history__summary">
-          <div><span>Invoices</span><strong>{purchases.length}</strong></div>
-          <div><span>Total purchases</span><strong>{cash(String(total))}</strong></div>
-          <div><span>Outstanding</span><strong>{cash(String(Math.max(0, outstanding)))}</strong></div>
-        </div>
-        <div className="data-table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Invoice</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th className="is-right">Total</th>
-                <th className="is-right">Paid</th>
-                <th className="is-right">Balance</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {purchases.map((invoice) => {
-                const balance =
-                  Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount);
-                return (
-                  <tr key={invoice.id}>
-                    <td className="is-primary">{invoice.number}</td>
-                    <td>{day(invoice.issueDate)}</td>
-                    <td><span className="banking-status">{invoice.status.replace('_', ' ')}</span></td>
-                    <td className="is-right">{cash(invoice.total, invoice.currency)}</td>
-                    <td className="is-right">{cash(invoice.paidAmount, invoice.currency)}</td>
-                    <td className="is-right">{cash(String(Math.max(0, balance)), invoice.currency)}</td>
-                    <td className="is-right">
-                      <button onClick={() => onPreview(invoice)}><Eye size={15} /> View</button>
-                    </td>
+            <div className="customer-history__summary">
+              <div>
+                <span>Invoices</span>
+                <strong>{purchases.length}</strong>
+              </div>
+              <div>
+                <span>Total purchases</span>
+                <strong>{cash(String(total))}</strong>
+              </div>
+              <div>
+                <span>Outstanding</span>
+                <strong>{cash(String(Math.max(0, outstanding)))}</strong>
+              </div>
+            </div>
+            <div className="data-table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th className="is-right">Total</th>
+                    <th className="is-right">Paid</th>
+                    <th className="is-right">Balance</th>
+                    <th aria-label="Actions" />
                   </tr>
-                );
-              })}
-              {!purchases.length && (
-                <tr><td className="table-empty" colSpan={7}>No purchases recorded for this customer.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {purchases.map((invoice) => {
+                    const balance =
+                      Number(invoice.total) -
+                      Number(invoice.paidAmount) -
+                      Number(invoice.creditedAmount);
+                    return (
+                      <tr key={invoice.id}>
+                        <td className="is-primary">{invoice.number}</td>
+                        <td>{day(invoice.issueDate)}</td>
+                        <td>
+                          <span className="banking-status">{invoice.status.replace('_', ' ')}</span>
+                        </td>
+                        <td className="is-right">{cash(invoice.total, invoice.currency)}</td>
+                        <td className="is-right">{cash(invoice.paidAmount, invoice.currency)}</td>
+                        <td className="is-right">
+                          {cash(String(Math.max(0, balance)), invoice.currency)}
+                        </td>
+                        <td className="is-right">
+                          <button onClick={() => onPreview(invoice)}>
+                            <Eye size={15} /> View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!purchases.length && (
+                    <tr>
+                      <td className="table-empty" colSpan={7}>
+                        No purchases recorded for this customer.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>
@@ -572,23 +633,160 @@ function CustomerHistoryModal({
 }
 
 function InvoicePaper({ invoice }: { invoice: Invoice }) {
-  const subtotal = invoice.items?.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0) ?? Number(invoice.subtotal);
-  return <article className="invoice-paper" id="invoice-paper">
-    <header><div><h1>INVOICE</h1><span>THANK YOU FOR YOUR BUSINESS</span></div><div className="invoice-paper__meta"><b>DATE</b><strong>{day(invoice.issueDate)}</strong><b>INVOICE NO.</b><strong>{invoice.number}</strong></div></header>
-    <section className="invoice-paper__addresses"><div><b>FROM</b><strong>Cephas Books</strong><span>Professional accounting made simple</span></div><div><b>BILL TO</b><strong>{invoice.customer.displayName}</strong><span>{invoice.customer.companyName || invoice.customer.email || 'Valued customer'}</span></div></section>
-    <table><thead><tr><th>NAME</th><th>DESCRIPTION</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>{invoice.items?.map((item, index) => <tr key={index}><td>{item.name}</td><td>{item.description}</td><td>{item.quantity}</td><td>{cash(String(item.unitPrice), invoice.currency)}</td><td>{cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency)}</td></tr>)}</tbody></table>
-    <footer><div><b>PAYMENT INFORMATION</b><p>Please remit payment by {day(invoice.dueDate)}.</p><em>Thank you!</em></div><div className="invoice-paper__totals"><span>SUBTOTAL <b>{cash(String(subtotal), invoice.currency)}</b></span><span>TAX <b>{cash(invoice.taxTotal, invoice.currency)}</b></span><strong>TOTAL DUE <b>{cash(invoice.total, invoice.currency)}</b></strong></div></footer>
-  </article>;
+  const subtotal =
+    invoice.items?.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0) ??
+    Number(invoice.subtotal);
+  const companyName = invoice.organization?.name || 'Cephas Books';
+  const terms = Math.max(
+    0,
+    Math.round(
+      (new Date(invoice.dueDate).getTime() - new Date(invoice.issueDate).getTime()) / 86_400_000,
+    ),
+  );
+  return (
+    <article className="invoice-paper" id="invoice-paper">
+      <div className="invoice-paper__accent" aria-hidden="true" />
+      <div className="invoice-paper__content">
+        <header className="invoice-paper__header">
+          <div className="invoice-paper__brand">
+            <div className="invoice-paper__logo" aria-label={`${companyName} logo`}>
+              {companyName
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part[0])
+                .join('')
+                .toUpperCase()}
+            </div>
+            <strong>{companyName}</strong>
+            <span>Professional accounting made simple</span>
+          </div>
+          <h1>Invoice</h1>
+        </header>
+        <section className="invoice-paper__parties">
+          <div>
+            <b>Bill to</b>
+            <strong>{invoice.customer.displayName}</strong>
+            <span>
+              {invoice.customer.companyName || invoice.customer.email || 'Valued customer'}
+            </span>
+            {invoice.customer.billingAddress && <span>{invoice.customer.billingAddress}</span>}
+          </div>
+          <div>
+            <b>Ship to</b>
+            <strong>{invoice.customer.displayName}</strong>
+            <span>
+              {invoice.shippingAddress ||
+                invoice.customer.billingAddress ||
+                invoice.customer.email ||
+                'As agreed'}
+            </span>
+          </div>
+          <div className="invoice-paper__details">
+            <b>Details</b>
+            <span>
+              Invoice # <strong>{invoice.number}</strong>
+            </span>
+            <span>
+              Invoice date <strong>{day(invoice.issueDate)}</strong>
+            </span>
+            <span>
+              Terms <strong>Net {terms}</strong>
+            </span>
+            <span>
+              Due date <strong>{day(invoice.dueDate)}</strong>
+            </span>
+          </div>
+        </section>
+        <table>
+          <thead>
+            <tr>
+              <th>Product/service</th>
+              <th>Description</th>
+              <th>Quantity/hrs</th>
+              <th>Rate</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoice.items?.map((item, index) => (
+              <tr key={index}>
+                <td>{item.name}</td>
+                <td>{item.description}</td>
+                <td>{item.quantity}</td>
+                <td>{cash(String(item.unitPrice), invoice.currency)}</td>
+                <td>
+                  {cash(
+                    item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)),
+                    invoice.currency,
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <footer className="invoice-paper__footer">
+          <div className="invoice-paper__message">
+            <b>Customer message</b>
+            <strong>Hello!</strong>
+            <p>
+              {invoice.notes ||
+                `Thank you for your business. Please remit this invoice by ${day(invoice.dueDate)}.`}
+            </p>
+          </div>
+          <div className="invoice-paper__totals">
+            <span>
+              Subtotal <b>{cash(String(subtotal), invoice.currency)}</b>
+            </span>
+            <span>
+              Sales tax <b>{cash(invoice.taxTotal, invoice.currency)}</b>
+            </span>
+            <span>
+              Shipping <b>{cash(invoice.shippingAmount || '0', invoice.currency)}</b>
+            </span>
+            <strong>
+              Total <b>{cash(invoice.total, invoice.currency)}</b>
+            </strong>
+          </div>
+        </footer>
+        <div className="invoice-paper__bottom-line" />
+      </div>
+    </article>
+  );
 }
 function printInvoice(invoice: Invoice) {
   const source = document.getElementById('invoice-paper');
   const popup = window.open('', '_blank', 'width=900,height=1100');
   if (!popup) return;
-  const fallback = `<article class="invoice-paper"><header><div><h1>INVOICE</h1><span>THANK YOU FOR YOUR BUSINESS</span></div><div class="invoice-paper__meta"><b>DATE</b><strong>${day(invoice.issueDate)}</strong><b>INVOICE NO.</b><strong>${invoice.number}</strong></div></header><section class="invoice-paper__addresses"><div><b>FROM</b><strong>Cephas Books</strong></div><div><b>BILL TO</b><strong>${invoice.customer.displayName}</strong><span>${invoice.customer.email || ''}</span></div></section><table><thead><tr><th>DESCRIPTION</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>${(invoice.items || []).map((item) => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${cash(String(item.unitPrice), invoice.currency)}</td><td>${cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency)}</td></tr>`).join('')}</tbody></table><footer><div><b>PAYMENT INFORMATION</b><p>Please remit payment by ${day(invoice.dueDate)}.</p><em>Thank you!</em></div><div class="invoice-paper__totals"><strong>TOTAL DUE <b>${cash(invoice.total, invoice.currency)}</b></strong></div></footer></article>`;
-  popup.document.write(`<html><head><title>Invoice ${invoice.number}</title><style>${invoicePrintCss}</style></head><body>${source?.outerHTML || fallback}<script>window.onload=()=>window.print()</script></body></html>`);
+  const safe = (value: unknown) =>
+    String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  const company = invoice.organization?.name || 'Cephas Books';
+  const initials = company
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+  const terms = Math.max(
+    0,
+    Math.round(
+      (new Date(invoice.dueDate).getTime() - new Date(invoice.issueDate).getTime()) / 86_400_000,
+    ),
+  );
+  const subtotal =
+    invoice.items?.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0) ??
+    Number(invoice.subtotal);
+  const fallback = `<article class="invoice-paper"><div class="invoice-paper__accent"></div><div class="invoice-paper__content"><header class="invoice-paper__header"><div class="invoice-paper__brand"><div class="invoice-paper__logo">${safe(initials)}</div><strong>${safe(company)}</strong><span>Professional accounting made simple</span></div><h1>Invoice</h1></header><section class="invoice-paper__parties"><div><b>Bill to</b><strong>${safe(invoice.customer.displayName)}</strong><span>${safe(invoice.customer.companyName || invoice.customer.email || 'Valued customer')}</span><span>${safe(invoice.customer.billingAddress)}</span></div><div><b>Ship to</b><strong>${safe(invoice.customer.displayName)}</strong><span>${safe(invoice.shippingAddress || invoice.customer.billingAddress || invoice.customer.email || 'As agreed')}</span></div><div class="invoice-paper__details"><b>Details</b><span>Invoice # <strong>${safe(invoice.number)}</strong></span><span>Invoice date <strong>${safe(day(invoice.issueDate))}</strong></span><span>Terms <strong>Net ${terms}</strong></span><span>Due date <strong>${safe(day(invoice.dueDate))}</strong></span></div></section><table><thead><tr><th>Product/service</th><th>Description</th><th>Quantity/hrs</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${(invoice.items || []).map((item) => `<tr><td>${safe(item.name)}</td><td>${safe(item.description)}</td><td>${safe(item.quantity)}</td><td>${safe(cash(String(item.unitPrice), invoice.currency))}</td><td>${safe(cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency))}</td></tr>`).join('')}</tbody></table><footer class="invoice-paper__footer"><div class="invoice-paper__message"><b>Customer message</b><strong>Hello!</strong><p>${safe(invoice.notes || `Thank you for your business. Please remit this invoice by ${day(invoice.dueDate)}.`)}</p></div><div class="invoice-paper__totals"><span>Subtotal <b>${safe(cash(String(subtotal), invoice.currency))}</b></span><span>Sales tax <b>${safe(cash(invoice.taxTotal, invoice.currency))}</b></span><span>Shipping <b>${safe(cash(invoice.shippingAmount || '0', invoice.currency))}</b></span><strong>Total <b>${safe(cash(invoice.total, invoice.currency))}</b></strong></div></footer><div class="invoice-paper__bottom-line"></div></div></article>`;
+  popup.document.write(
+    `<html><head><title>Invoice ${invoice.number}</title><style>${invoicePrintCss}</style></head><body>${source?.outerHTML || fallback}<script>window.onload=()=>window.print()</script></body></html>`,
+  );
   popup.document.close();
 }
-const invoicePrintCss = `body{margin:0;background:#eee;font-family:Arial,sans-serif}.invoice-paper{box-sizing:border-box;width:210mm;min-height:297mm;margin:auto;padding:20mm;background:#f8f1e2;color:#493b2e;border:10px solid #604a34}.invoice-paper header,.invoice-paper footer,.invoice-paper__addresses{display:flex;justify-content:space-between;gap:28px}.invoice-paper h1{font-family:Georgia,serif;font-style:italic;font-size:35px;margin:0}.invoice-paper header span,.invoice-paper b{font-size:10px;letter-spacing:.7px}.invoice-paper__meta{display:grid;grid-template-columns:auto auto;gap:5px 16px}.invoice-paper__meta strong{font-size:12px}.invoice-paper__addresses{margin:45px 0 24px}.invoice-paper__addresses div{display:grid;gap:5px;min-width:180px}.invoice-paper__addresses strong{font-family:Georgia,serif}.invoice-paper__addresses span{font-size:12px}.invoice-paper table{width:100%;border-collapse:collapse;background:#fffdf8;border:1px solid #9a876e}.invoice-paper th{padding:10px;background:#604a34;color:white;font-size:10px;text-align:left}.invoice-paper td{padding:13px 10px;border-bottom:1px solid #ddd1bf;font-size:12px}.invoice-paper th:nth-child(2),.invoice-paper td:nth-child(2){text-align:center}.invoice-paper th:nth-child(3),.invoice-paper th:nth-child(4),.invoice-paper td:nth-child(3),.invoice-paper td:nth-child(4){text-align:right}.invoice-paper footer{margin-top:32px}.invoice-paper footer>div{flex:1;font-size:12px}.invoice-paper footer em{display:block;margin-top:45px;font-family:Georgia,serif;font-size:18px}.invoice-paper__totals{border:1px solid #9a876e;align-self:start}.invoice-paper__totals span,.invoice-paper__totals strong{display:flex;justify-content:space-between;padding:9px 12px;font-size:11px}.invoice-paper__totals strong{background:#604a34;color:#fff}@page{size:A4;margin:0}@media print{body{background:white}.invoice-paper{border-width:8px}}`;
+const invoicePrintCss = `*{box-sizing:border-box}body{margin:0;background:#eceff3;font-family:Arial,sans-serif;color:#20242c}.invoice-paper{position:relative;width:210mm;min-height:297mm;margin:auto;overflow:hidden;background:#fff}.invoice-paper__accent{position:absolute;z-index:0;top:-44mm;left:50%;width:238mm;height:238mm;border-radius:50%;background:#ff8500;transform:translateX(-50%)}.invoice-paper__content{position:relative;z-index:1;width:174mm;min-height:253mm;margin:22mm auto;padding:9mm 10mm 8mm;background:#fff;box-shadow:0 8px 30px #1f293726}.invoice-paper__header{display:flex;align-items:flex-start;justify-content:space-between;border-top:2px solid #ff8500;padding-top:8mm}.invoice-paper__header h1{margin:3mm 0 0;font-size:27px}.invoice-paper__brand{display:grid;gap:2px;font-size:10px}.invoice-paper__logo{display:grid;width:15mm;height:12mm;place-items:center;margin-bottom:2mm;background:#20242c;color:#fff;font-size:18px;font-weight:800}.invoice-paper__brand>strong{font-size:14px}.invoice-paper__brand>span{color:#667085}.invoice-paper__parties{display:grid;grid-template-columns:1fr 1fr 1.25fr;gap:8mm;margin:16mm -10mm 7mm;padding:5mm 10mm;background:#f3f4f6}.invoice-paper__parties>div{display:grid;align-content:start;gap:2px;font-size:9px}.invoice-paper__parties b{margin-bottom:2px}.invoice-paper__parties strong{font-size:10px}.invoice-paper__parties span{color:#555d69}.invoice-paper__details span{display:flex;justify-content:space-between;gap:5px}.invoice-paper table{width:100%;border-collapse:collapse}.invoice-paper th{padding:3mm 2mm;border-bottom:1px solid #272b32;font-size:9px;text-align:left}.invoice-paper td{padding:3mm 2mm;border-bottom:1px solid #e5e7eb;font-size:9px}.invoice-paper th:nth-child(n+3),.invoice-paper td:nth-child(n+3){text-align:right}.invoice-paper__footer{display:grid;grid-template-columns:1.5fr 1fr;gap:14mm;margin-top:9mm}.invoice-paper__message{display:grid;align-content:start;gap:3px;font-size:9px}.invoice-paper__message>strong{margin-top:2mm}.invoice-paper__message p{margin:0;line-height:1.5;color:#59616d}.invoice-paper__totals{display:grid;align-self:start}.invoice-paper__totals span,.invoice-paper__totals>strong{display:flex;justify-content:space-between;padding:2.3mm 1mm;font-size:9px}.invoice-paper__totals>strong{margin-top:1mm;border-top:1.5px solid #252932;font-size:14px}.invoice-paper__bottom-line{height:2px;margin-top:18mm;background:#ff8500}@page{size:A4;margin:0}@media print{body{background:#fff}.invoice-paper{break-after:page}}`;
 function CreateModal({
   open,
   view,
@@ -611,17 +809,26 @@ function CreateModal({
   submit: (d: Record<string, unknown>) => void;
 }) {
   const document = view === 'quotations' || view === 'invoices';
-  const [lineItems, setLineItems] = useState([{ name: '', description: '', quantity: '', unitPrice: '' }]);
+  const [lineItems, setLineItems] = useState([
+    { name: '', description: '', quantity: '', unitPrice: '' },
+  ]);
   const [invoiceNumber, setInvoiceNumber] = useState('Generating…');
   useEffect(() => {
-    if (!open || view !== 'invoices') return;
-    setInvoiceNumber('Generating…');
-    void salesApi.nextInvoiceNumber()
+    if (!open || !document) return;
+    const request =
+      view === 'invoices' ? salesApi.nextInvoiceNumber() : salesApi.nextQuotationNumber();
+    void request
       .then(({ number }) => setInvoiceNumber(number))
       .catch(() => setInvoiceNumber('Available after saving'));
-  }, [open, view]);
-  const updateLine = (index: number, field: 'name' | 'description' | 'quantity' | 'unitPrice', value: string) =>
-    setLineItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  }, [document, open, view]);
+  const updateLine = (
+    index: number,
+    field: 'name' | 'description' | 'quantity' | 'unitPrice',
+    value: string,
+  ) =>
+    setLineItems((items) =>
+      items.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)),
+    );
   return (
     <Modal
       open={open}
@@ -668,15 +875,22 @@ function CreateModal({
           else if (document)
             submit({
               customerId: get('customerId'),
-              ...(view === 'quotations' ? { number: get('number') } : {}),
               currency: getDefaultCurrency(),
               issueDate: get('issueDate'),
               ...(view === 'quotations'
                 ? { expiryDate: get('dueDate') }
-                : { dueDate: get('dueDate'), status: 'DRAFT' }),
-              items: view === 'invoices'
-                ? lineItems.map((item) => ({ ...item, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), taxRate: Number(get('taxRate')) }))
-                : [{ name: get('name'), description: get('description'), quantity: Number(get('quantity')), unitPrice: Number(get('unitPrice')), taxRate: Number(get('taxRate')) }],
+                : {
+                    dueDate: get('dueDate'),
+                    status: 'DRAFT',
+                    shippingAddress: get('shippingAddress') || undefined,
+                    shippingAmount: Number(get('shippingAmount')),
+                  }),
+              items: lineItems.map((item) => ({
+                ...item,
+                quantity: Number(item.quantity),
+                unitPrice: Number(item.unitPrice),
+                taxRate: Number(get('taxRate')),
+              })),
               notes: get('notes') || undefined,
             });
           else if (view === 'credit-notes')
@@ -717,7 +931,9 @@ function CreateModal({
               <input name="phone" defaultValue={selected?.phone} />
             </label>
             <label className="full">
-              <span className="field-label"><MapPin size={14} /> Address <small>Optional</small></span>
+              <span className="field-label">
+                <MapPin size={14} /> Address <small>Optional</small>
+              </span>
               <textarea
                 name="billingAddress"
                 rows={2}
@@ -745,7 +961,11 @@ function CreateModal({
               <>
                 <label>
                   Number
-                  {view === 'invoices' ? <input value={invoiceNumber} readOnly aria-label="Automatically generated invoice number" /> : <input name="number" required />}
+                  <input
+                    value={invoiceNumber}
+                    readOnly
+                    aria-label={`Automatically generated ${view === 'invoices' ? 'invoice' : 'quotation'} number`}
+                  />
                 </label>
                 <label>
                   Issue date
@@ -755,28 +975,107 @@ function CreateModal({
                   {view === 'quotations' ? 'Expiry' : 'Due'} date
                   <input name="dueDate" type="date" required />
                 </label>
-                {view === 'invoices' ? (
-                  <div className="invoice-line-editor full">
-                    <div className="invoice-line-editor__heading"><span>Invoice items</span><small>Only these fields change for each line.</small></div>
-                    {lineItems.map((item, index) => (
-                      <div className="invoice-line-editor__row" key={index}>
-                        <label>Name<input required value={item.name} onChange={(event) => updateLine(index, 'name', event.target.value)} /></label>
-                        <label>Line description<input required value={item.description} onChange={(event) => updateLine(index, 'description', event.target.value)} /></label>
-                        <label>Quantity<input required type="number" min=".0001" step=".0001" value={item.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} /></label>
-                        <label>Unit price<input required type="number" min="0" step=".01" value={item.unitPrice} onChange={(event) => updateLine(index, 'unitPrice', event.target.value)} /></label>
-                        <button type="button" className="icon-button" aria-label={`Remove item ${index + 1}`} disabled={lineItems.length === 1} onClick={() => setLineItems((items) => items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={16} /></button>
-                      </div>
-                    ))}
-                    <button type="button" className="invoice-line-editor__add" onClick={() => setLineItems((items) => [...items, { name: '', description: '', quantity: '', unitPrice: '' }])}><Plus size={16} /> Add another item</button>
+                <div className="invoice-line-editor full">
+                  <div className="invoice-line-editor__heading">
+                    <span>{view === 'invoices' ? 'Invoice' : 'Quotation'} items</span>
+                    <small>Add as many line items as needed.</small>
                   </div>
-                ) : <>
-                  <label>Name<input name="name" required /></label>
-                  <label>Line description<input name="description" required /></label>
-                  <label>Quantity<input name="quantity" type="number" min=".0001" step=".0001" required /></label>
-                  <label>Unit price<input name="unitPrice" type="number" min="0" step=".01" required /></label>
-                </>}
+                  {lineItems.map((item, index) => (
+                    <div className="invoice-line-editor__row" key={index}>
+                      <label>
+                        Name
+                        <input
+                          required
+                          value={item.name}
+                          onChange={(event) => updateLine(index, 'name', event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Line description
+                        <input
+                          required
+                          value={item.description}
+                          onChange={(event) => updateLine(index, 'description', event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Quantity
+                        <input
+                          required
+                          type="number"
+                          min=".0001"
+                          step=".0001"
+                          value={item.quantity}
+                          onChange={(event) => updateLine(index, 'quantity', event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Unit price
+                        <input
+                          required
+                          type="number"
+                          min="0"
+                          step=".01"
+                          value={item.unitPrice}
+                          onChange={(event) => updateLine(index, 'unitPrice', event.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`Remove item ${index + 1}`}
+                        disabled={lineItems.length === 1}
+                        onClick={() =>
+                          setLineItems((items) =>
+                            items.filter((_, itemIndex) => itemIndex !== index),
+                          )
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="invoice-line-editor__add"
+                    onClick={() =>
+                      setLineItems((items) => [
+                        ...items,
+                        { name: '', description: '', quantity: '', unitPrice: '' },
+                      ])
+                    }
+                  >
+                    <Plus size={16} /> Add another item
+                  </button>
+                </div>
                 <label>
                   Tax %<input name="taxRate" type="number" min="0" step=".01" defaultValue="0" />
+                </label>
+                {view === 'invoices' && (
+                  <>
+                    <label>
+                      Shipping amount
+                      <input
+                        name="shippingAmount"
+                        type="number"
+                        min="0"
+                        step=".01"
+                        defaultValue="0"
+                      />
+                    </label>
+                    <label className="full">
+                      Shipping address <small>Optional — billing address is used by default</small>
+                      <textarea name="shippingAddress" rows={2} placeholder="Delivery address" />
+                    </label>
+                  </>
+                )}
+                <label className="full">
+                  Customer message <small>Optional</small>
+                  <textarea
+                    name="notes"
+                    rows={3}
+                    placeholder="Thank you for your business. Please remit this invoice by the due date."
+                  />
                 </label>
               </>
             )}

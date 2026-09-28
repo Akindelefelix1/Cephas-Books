@@ -728,111 +728,179 @@
   gap: 4px;
 }
 .invoice-paper {
+  position: relative;
   margin: 18px 0;
-  padding: 34px;
-  border: 7px solid #604a34;
-  background: #f8f1e2;
-  color: #493b2e;
-  box-shadow: 0 4px 16px #3d2c1b33;
+  overflow: hidden;
+  background: #fff;
+  color: #20242c;
+  box-shadow: 0 8px 26px #2632471f;
 }
-.invoice-paper header,
-.invoice-paper footer,
-.invoice-paper__addresses {
+.invoice-paper__accent {
+  position: absolute;
+  z-index: 0;
+  top: -260px;
+  left: 50%;
+  width: 880px;
+  height: 880px;
+  border-radius: 50%;
+  background: #ff8500;
+  transform: translateX(-50%);
+}
+.invoice-paper__content {
+  position: relative;
+  z-index: 1;
+  width: calc(100% - 64px);
+  min-height: 720px;
+  margin: 38px auto;
+  padding: 34px 38px 28px;
+  background: #fff;
+  box-shadow: 0 8px 30px #1f293726;
+}
+.invoice-paper__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-top: 24px;
+  border-top: 4px solid #ff8500;
+}
+.invoice-paper__header h1 {
+  margin: 0;
+  padding-top: 10px;
+  font-size: 1.8rem;
+  letter-spacing: -0.03em;
+}
+.invoice-paper__brand {
+  display: grid;
+  gap: 2px;
+}
+.invoice-paper__logo {
+  display: grid;
+  width: 52px;
+  height: 42px;
+  place-items: center;
+  margin-bottom: 7px;
+  border-radius: 3px;
+  background: #20242c;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.invoice-paper__brand > strong {
+  font-size: 0.8rem;
+}
+.invoice-paper__brand > span {
+  color: #667085;
+  font-size: 0.56rem;
+}
+.invoice-paper__parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.25fr;
+  gap: 24px;
+  margin: 48px -38px 24px;
+  padding: 18px 38px;
+  background: #f3f4f6;
+}
+.invoice-paper__parties > div {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  font-size: 0.58rem;
+}
+.invoice-paper__parties b {
+  margin-bottom: 3px;
+}
+.invoice-paper__parties strong {
+  font-size: 0.64rem;
+}
+.invoice-paper__parties span {
+  color: #59616d;
+}
+.invoice-paper__details span {
   display: flex;
   justify-content: space-between;
-  gap: 22px;
-}
-.invoice-paper h1 {
-  margin: 0;
-  font-family: Georgia, serif;
-  font-size: 2rem;
-  font-style: italic;
-  letter-spacing: 0.04em;
-}
-.invoice-paper header span,
-.invoice-paper b {
-  font-size: 0.55rem;
-  letter-spacing: 0.08em;
-}
-.invoice-paper__meta {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-content: start;
-  gap: 4px 14px;
-}
-.invoice-paper__meta strong {
-  font-size: 0.69rem;
-}
-.invoice-paper__addresses {
-  margin: 34px 0 20px;
-}
-.invoice-paper__addresses div {
-  display: grid;
-  gap: 4px;
-}
-.invoice-paper__addresses strong {
-  font-family: Georgia, serif;
-  font-size: 0.78rem;
-}
-.invoice-paper__addresses span {
-  font-size: 0.64rem;
+  gap: 5px;
 }
 .invoice-paper table {
   width: 100%;
   border-collapse: collapse;
-  background: #fffdf8;
-  border: 1px solid #a18e73;
 }
 .invoice-paper th {
-  padding: 9px;
-  background: #604a34;
-  color: #fff;
-  font-size: 0.55rem;
+  padding: 9px 7px;
+  border-bottom: 1px solid #272b32;
+  color: #20242c;
+  font-size: 0.52rem;
   text-align: left;
 }
 .invoice-paper td {
-  padding: 10px 9px;
-  border-bottom: 1px solid #dfd2bf;
-  font-size: 0.66rem;
-}
-.invoice-paper th:nth-child(2),
-.invoice-paper td:nth-child(2) {
-  text-align: center;
+  padding: 11px 7px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.58rem;
 }
 .invoice-paper th:nth-child(3),
 .invoice-paper th:nth-child(4),
+.invoice-paper th:nth-child(5),
 .invoice-paper td:nth-child(3),
-.invoice-paper td:nth-child(4) {
+.invoice-paper td:nth-child(4),
+.invoice-paper td:nth-child(5) {
   text-align: right;
 }
-.invoice-paper footer {
-  margin-top: 25px;
+.invoice-paper__footer {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 44px;
+  margin-top: 30px;
 }
-.invoice-paper footer > div {
-  flex: 1;
-  font-size: 0.65rem;
+.invoice-paper__message {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  font-size: 0.58rem;
 }
-.invoice-paper footer em {
-  display: block;
-  margin-top: 26px;
-  font-family: Georgia, serif;
-  font-size: 1rem;
+.invoice-paper__message > strong {
+  margin-top: 8px;
+}
+.invoice-paper__message p {
+  margin: 0;
+  color: #59616d;
+  line-height: 1.5;
 }
 .invoice-paper__totals {
-  border: 1px solid #a18e73;
+  display: grid;
   align-self: start;
 }
 .invoice-paper__totals span,
-.invoice-paper__totals strong {
+.invoice-paper__totals > strong {
   display: flex;
   justify-content: space-between;
-  gap: 35px;
-  padding: 8px 10px;
-  font-size: 0.62rem;
+  gap: 28px;
+  padding: 7px 4px;
+  font-size: 0.58rem;
 }
-.invoice-paper__totals strong {
-  background: #604a34;
-  color: #fff;
+.invoice-paper__totals > strong {
+  margin-top: 4px;
+  border-top: 2px solid #252932;
+  font-size: 0.82rem;
+}
+.invoice-paper__bottom-line {
+  height: 3px;
+  margin-top: 58px;
+  background: #ff8500;
+}
+@media (max-width: 720px) {
+  .invoice-paper__content {
+    width: calc(100% - 28px);
+    margin: 18px auto;
+    padding: 24px 20px;
+  }
+  .invoice-paper__parties {
+    grid-template-columns: 1fr;
+    margin: 30px -20px 20px;
+    padding: 18px 20px;
+  }
+  .invoice-paper__footer {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
 }
 .quick-create-grid {
   display: grid;
@@ -1800,7 +1868,10 @@
   font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
 }
 .archive-toggle:hover {
   border-color: #9eafe4;

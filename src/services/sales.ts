@@ -27,13 +27,16 @@ export interface Invoice {
   dueDate: string;
   subtotal: string;
   taxTotal: string;
+  shippingAmount: string;
   total: string;
   paidAmount: string;
   creditedAmount: string;
   notes?: string;
+  shippingAddress?: string;
   customer: Customer;
   customerId: string;
   items?: Line[];
+  organization?: { name: string; countryCode: string };
 }
 export interface Quotation {
   id: string;
@@ -109,6 +112,7 @@ export const salesApi = {
     authorizedRequest<{ sent: true }>(`/invoices/${id}/send`, { method: 'POST' }),
   quotations: (filters: Record<string, string>) =>
     authorizedRequest<Quotation[]>(`/sales/quotations?${q(filters)}`),
+  nextQuotationNumber: () => authorizedRequest<{ number: string }>('/sales/quotations/next-number'),
   createQuotation: (data: object) =>
     authorizedRequest<Quotation>('/sales/quotations', {
       method: 'POST',

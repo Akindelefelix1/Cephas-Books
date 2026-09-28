@@ -18,6 +18,41 @@ export interface Product {
   stockValue: string;
   defaultWarehouseId?: string;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ProductDetails extends Product {
+  createdBy: { email: string; firstName?: string; lastName?: string } | null;
+  activity: Array<{
+    id: string;
+    action: string;
+    createdAt: string;
+    actor: { email: string; firstName?: string; lastName?: string } | null;
+  }>;
+  salesSummary: {
+    unitsSold: string;
+    grossSales: string;
+    returnedUnits: string;
+    returnsValue: string;
+    netSales: string;
+  };
+  movements: Array<Omit<StockMovement, 'product'>>;
+  adjustments: Array<Omit<StockAdjustment, 'product'>>;
+  sales: Array<{
+    id: string;
+    quantity: string;
+    unitPrice: string;
+    discount: string;
+    lineTotal: string;
+    sale: {
+      id: string;
+      receiptNumber: string;
+      status: string;
+      currency: string;
+      createdAt: string;
+    };
+    cashier: { email: string; firstName?: string; lastName?: string } | null;
+  }>;
 }
 export interface ProductCategory {
   id: string;
@@ -92,6 +127,7 @@ const req = <T>(path: string, method = 'GET', body?: object) =>
 export const operationsApi = {
   summary: () => req<OperationsSummary>('/operations/summary'),
   products: (filters = {}) => req<Product[]>(`/operations/products?${query(filters)}`),
+  product: (id: string) => req<ProductDetails>(`/operations/products/${id}`),
   categories: () => req<ProductCategory[]>('/operations/product-categories'),
   createCategory: (name: string) =>
     req<ProductCategory>('/operations/product-categories', 'POST', { name }),
@@ -100,6 +136,7 @@ export const operationsApi = {
     req<Product>(`/operations/products/${id}`, 'PATCH', data),
   productStatus: (id: string, isActive: boolean) =>
     req<Product>(`/operations/products/${id}/status`, 'PATCH', { isActive }),
+  deleteProduct: (id: string) => req<{ deleted: boolean }>(`/operations/products/${id}`, 'DELETE'),
   warehouses: (filters = {}) => req<Warehouse[]>(`/operations/warehouses?${query(filters)}`),
   createWarehouse: (data: object) => req<Warehouse>('/operations/warehouses', 'POST', data),
   updateWarehouse: (id: string, data: object) =>
