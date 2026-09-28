@@ -124,6 +124,7 @@ const query = (filters: Record<string, string> = {}) =>
   new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
 const req = <T>(path: string, method = 'GET', body?: object) =>
   authorizedRequest<T>(path, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
+export const INVENTORY_CHANGED_EVENT = 'cephas:inventory-changed';
 export const operationsApi = {
   summary: () => req<OperationsSummary>('/operations/summary'),
   products: (filters = {}) => req<Product[]>(`/operations/products?${query(filters)}`),
@@ -137,6 +138,8 @@ export const operationsApi = {
   productStatus: (id: string, isActive: boolean) =>
     req<Product>(`/operations/products/${id}/status`, 'PATCH', { isActive }),
   deleteProduct: (id: string) => req<{ deleted: boolean }>(`/operations/products/${id}`, 'DELETE'),
+  restockProduct: (id: string, data: object) =>
+    req<StockMovement>(`/operations/products/${id}/restock`, 'POST', data),
   warehouses: (filters = {}) => req<Warehouse[]>(`/operations/warehouses?${query(filters)}`),
   createWarehouse: (data: object) => req<Warehouse>('/operations/warehouses', 'POST', data),
   updateWarehouse: (id: string, data: object) =>

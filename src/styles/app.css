@@ -1278,6 +1278,30 @@
 .product-sales-summary strong {
   display: block;
 }
+.inventory-restock-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.inventory-restock-summary span {
+  padding: 14px;
+  border: 1px solid #e2e7f0;
+  border-radius: 10px;
+  background: #f8faff;
+}
+.inventory-restock-summary small,
+.inventory-restock-summary strong {
+  display: block;
+}
+.inventory-restock-summary small {
+  color: #7e8799;
+  font-size: 0.62rem;
+}
+.inventory-restock-summary strong {
+  margin-top: 5px;
+  color: #172033;
+  font-size: 0.82rem;
+}
 .product-sales-summary small {
   color: #7e8799;
   font-size: 0.6rem;
@@ -1299,6 +1323,9 @@
     grid-template-columns: 1fr;
   }
   .product-sales-summary {
+    grid-template-columns: 1fr;
+  }
+  .inventory-restock-summary {
     grid-template-columns: 1fr;
   }
 }

@@ -13,7 +13,12 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
-import { operationsApi, type Product, type Warehouse } from '@/services/operations';
+import {
+  INVENTORY_CHANGED_EVENT,
+  operationsApi,
+  type Product,
+  type Warehouse,
+} from '@/services/operations';
 import { posApi, type PosRegister, type PosSale, type PosShift } from '@/services/pos';
 import { salesApi, type Customer } from '@/services/sales';
 import { getDefaultCurrency } from '@/utils/currency';
@@ -193,6 +198,7 @@ export function PosPage({
         payments: settledPayments,
       });
       setSale(s);
+      window.dispatchEvent(new Event(INVENTORY_CHANGED_EVENT));
       setRecentSales((current) => [s, ...current.filter((item) => item.id !== s.id)].slice(0, 10));
       setCart([]);
       setPayments([{ method: 'CASH', amount: '' }]);

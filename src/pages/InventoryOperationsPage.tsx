@@ -6,6 +6,7 @@ import {
   List,
   LoaderCircle,
   Package,
+  PackagePlus,
   Plus,
   Sparkles,
   Trash2,
@@ -15,6 +16,7 @@ import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
 import {
+  INVENTORY_CHANGED_EVENT,
   operationsApi,
   type OperationsSummary,
   type OperationsView,
@@ -31,6 +33,8 @@ import {
 type Row = Product | Warehouse | StockMovement | StockAdjustment | Project;
 const money = (value: string | number, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value));
+const quantity = (value: string | number) =>
+  new Intl.NumberFormat('en-NG', { maximumFractionDigits: 4 }).format(Number(value));
 const date = (value?: string) => (value ? new Date(value).toLocaleDateString('en-NG') : '—');
 const titles: Record<OperationsView, string> = {
   products: 'Products & services',
@@ -61,6 +65,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState('');
+  const [restockOpen, setRestockOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (view === 'project-ai') {
@@ -97,6 +102,20 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 200);
     return () => window.clearTimeout(timer);
+  }, [load]);
+  useEffect(() => {
+    const refresh = () => void load();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener(INVENTORY_CHANGED_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener(INVENTORY_CHANGED_EVENT, refresh);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [load]);
   const run = async (operation: () => Promise<unknown>, message: string) => {
     setBusy(true);
@@ -146,6 +165,24 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to update item');
+    } finally {
+      setActionBusy('');
+    }
+  };
+  const restock = async (data: Record<string, unknown>) => {
+    if (!detail || actionBusy) return;
+    setActionBusy('restock');
+    setError('');
+    try {
+      await operationsApi.restockProduct(detail.id, data);
+      window.dispatchEvent(new Event(INVENTORY_CHANGED_EVENT));
+      confirmAction(`${detail.name} restocked`);
+      setRestockOpen(false);
+      await load();
+      setDetail(await operationsApi.product(detail.id));
+      setDetailOpen(true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to restock item');
     } finally {
       setActionBusy('');
     }
@@ -377,7 +414,29 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
           }
         }}
         changeStatus={() => void productAction('status')}
+        restock={() => {
+          setDetailOpen(false);
+          setRestockOpen(true);
+          setError('');
+        }}
         remove={() => void productAction('delete')}
+      />
+      <RestockModal
+        key={`${detail?.id || 'none'}-${restockOpen ? 'open' : 'closed'}`}
+        open={restockOpen}
+        product={detail}
+        warehouses={warehouses}
+        busy={actionBusy === 'restock'}
+        error={error}
+        currency={summary?.baseCurrency || 'NGN'}
+        close={() => {
+          if (!actionBusy) {
+            setRestockOpen(false);
+            setDetailOpen(Boolean(detail));
+            setError('');
+          }
+        }}
+        submit={(data) => void restock(data)}
       />
     </>
   );
@@ -401,7 +460,7 @@ function values(view: OperationsView, row: Row, currency = 'NGN') {
       `${x.type} · ${x.category || 'Uncategorised'}`,
       x.type === 'SERVICE'
         ? money(x.salePrice, currency)
-        : `${x.stockQuantity} ${x.unit} · ${money(x.stockValue, currency)}`,
+        : `${quantity(x.stockQuantity)} ${x.unit} available · ${money(x.stockValue, currency)}`,
       x.isActive ? 'ACTIVE' : 'ARCHIVED',
     ];
   }
@@ -610,7 +669,7 @@ function ProductCards({
                 <small>{product.type === 'PRODUCT' ? 'Stock' : 'Price'}</small>
                 <strong>
                   {product.type === 'PRODUCT'
-                    ? `${product.stockQuantity} ${product.unit}`
+                    ? `${quantity(product.stockQuantity)} ${product.unit} available`
                     : money(product.salePrice, currency)}
                 </strong>
               </span>
@@ -653,6 +712,7 @@ function ProductDetailsModal({
   close,
   edit,
   changeStatus,
+  restock,
   remove,
 }: {
   open: boolean;
@@ -666,6 +726,7 @@ function ProductDetailsModal({
   close: () => void;
   edit: () => void;
   changeStatus: () => void;
+  restock: () => void;
   remove: () => void;
 }) {
   const [tab, setTab] = useState<'overview' | 'sales' | 'stock' | 'activity'>('overview');
@@ -689,6 +750,15 @@ function ProductDetailsModal({
             {canEdit && (
               <button className="button button--secondary" onClick={edit} disabled={Boolean(busy)}>
                 Edit
+              </button>
+            )}
+            {canEdit && product.isActive && product.type === 'PRODUCT' && (
+              <button
+                className="button button--secondary"
+                onClick={restock}
+                disabled={Boolean(busy)}
+              >
+                <PackagePlus size={16} /> Restock
               </button>
             )}
             {canEdit && (
@@ -751,7 +821,7 @@ function ProductDetailsModal({
                 <small>Current stock</small>
                 <strong>
                   {product.type === 'PRODUCT'
-                    ? `${product.stockQuantity} ${product.unit}`
+                    ? `${quantity(product.stockQuantity)} ${product.unit} available`
                     : 'Service'}
                 </strong>
               </div>
@@ -895,6 +965,127 @@ function ProductDetailsModal({
           </div>
         )
       )}
+    </Modal>
+  );
+}
+
+function RestockModal({
+  open,
+  product,
+  warehouses,
+  busy,
+  error,
+  currency,
+  close,
+  submit,
+}: {
+  open: boolean;
+  product: ProductDetails | null;
+  warehouses: Warehouse[];
+  busy: boolean;
+  error: string;
+  currency: string;
+  close: () => void;
+  submit: (data: Record<string, unknown>) => void;
+}) {
+  if (!product) return null;
+  const today = new Date().toLocaleDateString('en-CA');
+  return (
+    <Modal
+      open={open}
+      onClose={close}
+      title={`Restock ${product.name}`}
+      subtitle={`${quantity(product.stockQuantity)} ${product.unit} currently available`}
+      footer={
+        <>
+          <button className="button button--secondary" onClick={close} disabled={busy}>
+            Cancel
+          </button>
+          <button className="button" type="submit" form="restock-form" disabled={busy}>
+            {busy ? (
+              <>
+                <LoaderCircle className="spin" size={16} /> Adding stock…
+              </>
+            ) : (
+              <>
+                <PackagePlus size={16} /> Add stock
+              </>
+            )}
+          </button>
+        </>
+      }
+    >
+      <form
+        id="restock-form"
+        className="form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          const get = (name: string) => String(form.get(name) || '');
+          submit({
+            warehouseId: get('warehouseId'),
+            quantity: Number(get('quantity')),
+            unitCost: Number(get('unitCost')),
+            movementDate: get('movementDate'),
+            reference: get('reference') || undefined,
+            notes: get('notes') || undefined,
+          });
+        }}
+      >
+        <div className="inventory-restock-summary full">
+          <span>
+            <small>Available now</small>
+            <strong>
+              {quantity(product.stockQuantity)} {product.unit}
+            </strong>
+          </span>
+          <span>
+            <small>Current unit cost</small>
+            <strong>{money(product.costPrice, currency)}</strong>
+          </span>
+        </div>
+        <label className="full">
+          Warehouse
+          <select name="warehouseId" required defaultValue={product.defaultWarehouseId || ''}>
+            <option value="" disabled>
+              Select warehouse
+            </option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.code} — {warehouse.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Quantity to add
+          <input name="quantity" type="number" min=".0001" step=".0001" required autoFocus />
+        </label>
+        <label>
+          Unit cost
+          <input
+            name="unitCost"
+            type="number"
+            min="0"
+            step=".01"
+            required
+            defaultValue={product.costPrice}
+          />
+        </label>
+        <label>
+          Restock date
+          <input name="movementDate" type="date" required defaultValue={today} />
+        </label>
+        <label>
+          Reference <small>Optional — generated automatically</small>
+          <input name="reference" maxLength={120} placeholder="Supplier receipt or delivery note" />
+        </label>
+        <label className="full">
+          Notes <small>Optional</small>
+          <textarea name="notes" rows={3} placeholder="Supplier, batch, or delivery details" />
+        </label>
+        {error && <p className="form-error full">{error}</p>}
+      </form>
     </Modal>
   );
 }
