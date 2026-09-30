@@ -1379,7 +1379,15 @@ function OperationsModal({
             </label>
             <label>
               Unit
-              <input name="unit" required defaultValue={p?.unit || 'unit'} />
+              <input
+                name="unit"
+                required
+                maxLength={40}
+                pattern=".*[A-Za-z].*"
+                title="Enter a unit name such as unit, kg, pack, or bottle"
+                placeholder="e.g. unit, kg, pack"
+                defaultValue={p?.unit && /[A-Za-z]/.test(p.unit) ? p.unit : 'unit'}
+              />
             </label>
             <label>
               Sale price

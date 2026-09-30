@@ -26,6 +26,8 @@ const money = (v: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(v);
 const quantity = (value: string | number) =>
   new Intl.NumberFormat('en-NG', { maximumFractionDigits: 3 }).format(Number(value));
+const productUnit = (unit?: string) =>
+  unit && /[A-Za-z]/.test(unit.trim()) ? unit.trim() : 'units';
 const paymentLabel = (method: string) =>
   ({ CASH: 'Cash', CARD: 'POS / Card', TRANSFER: 'Bank transfer', CREDIT: 'Customer credit' })[
     method
@@ -473,7 +475,7 @@ export function PosPage({
               <small>
                 {x.type === 'SERVICE'
                   ? 'Service'
-                  : `${quantity(x.stockQuantity)} ${x.unit} available`}
+                  : `${quantity(x.stockQuantity)} ${productUnit(x.unit)} available`}
               </small>
             </span>
             <div className="pos-qty">
