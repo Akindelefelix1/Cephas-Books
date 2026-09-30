@@ -1180,6 +1180,9 @@ function OperationsModal({
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategory, setNewCategory] = useState('');
   const [categoryError, setCategoryError] = useState('');
+  const [allowFractionalSale, setAllowFractionalSale] = useState(
+    view === 'products' ? ((selected as Product | null)?.allowFractionalSale ?? false) : false,
+  );
   const today = new Date().toLocaleDateString('en-CA');
   const closeModal = () => {
     setTransfer(false);
@@ -1203,9 +1206,11 @@ function OperationsModal({
           costPrice: num('costPrice'),
           taxRate: num('taxRate'),
           reorderLevel: num('reorderLevel'),
-          allowFractionalSale: f.get('allowFractionalSale') === 'on',
+          allowFractionalSale,
           defaultWarehouseId: get('defaultWarehouseId') || undefined,
-          ...(p ? {} : { openingQuantity: num('openingQuantity') }),
+          ...(p
+            ? { availableQuantity: num('availableQuantity') }
+            : { openingQuantity: num('openingQuantity') }),
         },
         false,
       );
@@ -1452,17 +1457,35 @@ function OperationsModal({
                     name="openingQuantity"
                     type="number"
                     min="0"
-                    step=".0001"
+                    step={allowFractionalSale ? '.5' : '1'}
                     defaultValue="0"
                   />
                 </label>
               </>
             )}
+            {p && p.type === 'PRODUCT' && (
+              <label>
+                Total available quantity
+                <input
+                  name="availableQuantity"
+                  type="number"
+                  min="0"
+                  step={allowFractionalSale ? '.5' : '1'}
+                  defaultValue={p.stockQuantity}
+                  required
+                />
+                <small>
+                  Exact stock count in {p.unit || 'units'}. Changes are saved as an inventory
+                  adjustment.
+                </small>
+              </label>
+            )}
             <label className="full fractional-sale-option">
               <input
                 name="allowFractionalSale"
                 type="checkbox"
-                defaultChecked={p?.allowFractionalSale ?? false}
+                checked={allowFractionalSale}
+                onChange={(event) => setAllowFractionalSale(event.target.checked)}
               />
               <span>
                 <strong>Allow sales in half units</strong>
