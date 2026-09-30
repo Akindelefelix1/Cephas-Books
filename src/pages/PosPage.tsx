@@ -64,24 +64,25 @@ export function PosPage({
     [recentSales, setRecentSales] = useState<PosSale[]>([]);
   useEffect(() => {
     void Promise.all([
-      operationsApi.products({ status: 'active' }),
       salesApi.customers(),
       posApi.registers(),
       operationsApi.warehouses({ status: 'active' }),
       posApi.currentShift(),
       posApi.sales({ limit: '10' }),
     ])
-      .then(([p, c, r, w, s, recent]) => {
-        setProducts(p.filter((x) => x.isActive));
+      .then(([c, r, w, s, recent]) => {
         setCustomers(c.data.filter((x) => x.isActive));
         setRegisters(r);
         setWarehouses(w);
         setShift(s);
         setRegisterId(s?.registerId || r[0]?.id || '');
         setRecentSales(recent.data);
+        if (!r.length) setProductsLoading(false);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load POS data'))
-      .finally(() => setProductsLoading(false));
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Unable to load POS data');
+        setProductsLoading(false);
+      });
   }, []);
   useEffect(() => {
     const register = registers.find((item) => item.id === registerId);
@@ -131,8 +132,9 @@ export function PosPage({
     product.type === 'SERVICE' ? Infinity : Number(product.stockQuantity);
   const cartQuantity = (productId: string) =>
     cart.find((item) => item.id === productId)?.quantity ?? 0;
-  const canAdd = (product: Product) => cartQuantity(product.id) < available(product);
   const saleStep = (product: Product) => (product.allowFractionalSale ? 0.5 : 1);
+  const canAdd = (product: Product) =>
+    cartQuantity(product.id) + saleStep(product) <= available(product);
   const updateCartQuantity = (product: Line, nextQuantity: number) => {
     const step = saleStep(product);
     const increments = nextQuantity / step;
@@ -165,7 +167,7 @@ export function PosPage({
               ? { ...item, quantity: item.quantity + saleStep(product) }
               : item,
           )
-        : [...current, { ...product, quantity: 1 }],
+        : [...current, { ...product, quantity: saleStep(product) }],
     );
   };
   const submit = async (e: FormEvent<HTMLFormElement>) => {

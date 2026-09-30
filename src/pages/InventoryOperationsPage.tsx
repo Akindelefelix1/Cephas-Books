@@ -1183,6 +1183,9 @@ function OperationsModal({
   const [allowFractionalSale, setAllowFractionalSale] = useState(
     view === 'products' ? ((selected as Product | null)?.allowFractionalSale ?? false) : false,
   );
+  const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>(
+    view === 'products' ? ((selected as Product | null)?.type ?? 'PRODUCT') : 'PRODUCT',
+  );
   const today = new Date().toLocaleDateString('en-CA');
   const closeModal = () => {
     setTransfer(false);
@@ -1198,7 +1201,7 @@ function OperationsModal({
         {
           sku: get('sku'),
           name: get('name'),
-          type: get('type'),
+          type: itemType,
           category: selectedCategory || undefined,
           description: get('description') || undefined,
           unit: get('unit'),
@@ -1208,9 +1211,11 @@ function OperationsModal({
           reorderLevel: num('reorderLevel'),
           allowFractionalSale,
           defaultWarehouseId: get('defaultWarehouseId') || undefined,
-          ...(p
-            ? { availableQuantity: num('availableQuantity') }
-            : { openingQuantity: num('openingQuantity') }),
+          ...(itemType === 'PRODUCT'
+            ? p
+              ? { availableQuantity: num('availableQuantity') }
+              : { openingQuantity: num('openingQuantity') }
+            : {}),
         },
         false,
       );
@@ -1328,10 +1333,16 @@ function OperationsModal({
             </label>
             <label>
               Type
-              <select name="type" defaultValue={p?.type || 'PRODUCT'}>
+              <select
+                name="type"
+                value={itemType}
+                onChange={(event) => setItemType(event.target.value as 'PRODUCT' | 'SERVICE')}
+                disabled={Boolean(p)}
+              >
                 <option>PRODUCT</option>
                 <option>SERVICE</option>
               </select>
+              {p && <small>Item type cannot change after creation.</small>}
             </label>
             <label>
               Category
@@ -1438,18 +1449,20 @@ function OperationsModal({
                 defaultValue={p?.reorderLevel || 0}
               />
             </label>
-            <label>
-              Default stock warehouse
-              <select name="defaultWarehouseId" defaultValue={p?.defaultWarehouseId || ''}>
-                <option value="">No default warehouse</option>
-                {warehouses.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>
-                    {warehouse.code} — {warehouse.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {!p && (
+            {itemType === 'PRODUCT' && (
+              <label>
+                Default stock warehouse
+                <select name="defaultWarehouseId" defaultValue={p?.defaultWarehouseId || ''}>
+                  <option value="">No default warehouse</option>
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.id} value={warehouse.id}>
+                      {warehouse.code} — {warehouse.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {!p && itemType === 'PRODUCT' && (
               <>
                 <label>
                   Opening quantity
@@ -1463,7 +1476,7 @@ function OperationsModal({
                 </label>
               </>
             )}
-            {p && p.type === 'PRODUCT' && (
+            {p && itemType === 'PRODUCT' && (
               <label>
                 Total available quantity
                 <input
