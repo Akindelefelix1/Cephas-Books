@@ -926,7 +926,7 @@ function UsersSection({
           {canManage && (
             <div className="page-header__actions">
               <button className="button button--secondary" onClick={() => setRoleDialog('new')}>
-                <ShieldCheck /> Create role
+                <ShieldCheck /> Create access level
               </button>
               <button className="button" onClick={onInvite}>
                 <Users /> Onboard staff
@@ -1036,8 +1036,8 @@ function UsersSection({
       <section className="panel settings-api-panel custom-roles-panel">
         <header className="settings-heading">
           <div>
-            <h2>Custom roles</h2>
-            <p>Create reusable permission sets with a secure system-role ceiling.</p>
+            <h2>Organization access levels</h2>
+            <p>Create organization-specific permission sets; each becomes available for team assignment.</p>
           </div>
         </header>
         <div className="custom-role-grid">
@@ -1055,8 +1055,8 @@ function UsersSection({
           ))}
           {!customRoles.length && (
             <p>
-              No custom roles yet. Create roles such as Cashier, Branch Manager, or Senior
-              Accountant.
+              No organization access levels yet. Add levels such as Cashier, Branch Manager, or
+              Senior Accountant; they will be available when assigning team access.
             </p>
           )}
         </div>
@@ -1201,7 +1201,7 @@ function RoleDialog({
   return (
     <Modal
       open
-      title={role ? 'Edit role' : 'Create role'}
+      title={role ? 'Edit access level' : 'Create access level'}
       onClose={onClose}
       footer={
         <>
@@ -1218,7 +1218,7 @@ function RoleDialog({
             Cancel
           </button>
           <button className="button" form="custom-role-form" disabled={busy} aria-busy={busy}>
-            {busy ? 'Saving…' : 'Save role'}
+            {busy ? 'Saving…' : 'Save access level'}
           </button>
         </>
       }
@@ -1238,7 +1238,7 @@ function RoleDialog({
         }}
       >
         <label>
-          Name
+          Access level name
           <input
             name="name"
             defaultValue={role?.name}
@@ -1248,7 +1248,7 @@ function RoleDialog({
           />
         </label>
         <label>
-          Maximum system access
+          System access ceiling
           <select name="baseRole" defaultValue={role?.baseRole || 'MEMBER'}>
             {roles
               .filter((item) => item !== 'OWNER')
@@ -1256,7 +1256,7 @@ function RoleDialog({
                 <option key={item}>{item}</option>
               ))}
           </select>
-          <small>Permissions selected below cannot exceed this security boundary.</small>
+          <small>Limits the built-in system access this organization-defined level can inherit.</small>
         </label>
         <label className="full">
           Description
