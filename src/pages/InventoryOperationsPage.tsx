@@ -906,6 +906,12 @@ function ProductDetailsModal({
                     {product.reorderLevel} {product.unit}
                   </strong>
                 </div>
+                <div>
+                  <small>Sale quantity</small>
+                  <strong>
+                    {product.allowFractionalSale ? 'Half units allowed' : 'Whole units only'}
+                  </strong>
+                </div>
               </div>
             )}
             {tab === 'sales' && (
@@ -1197,6 +1203,7 @@ function OperationsModal({
           costPrice: num('costPrice'),
           taxRate: num('taxRate'),
           reorderLevel: num('reorderLevel'),
+          allowFractionalSale: f.get('allowFractionalSale') === 'on',
           defaultWarehouseId: get('defaultWarehouseId') || undefined,
           ...(p ? {} : { openingQuantity: num('openingQuantity') }),
         },
@@ -1443,6 +1450,20 @@ function OperationsModal({
                 </label>
               </>
             )}
+            <label className="full fractional-sale-option">
+              <input
+                name="allowFractionalSale"
+                type="checkbox"
+                defaultChecked={p?.allowFractionalSale ?? false}
+              />
+              <span>
+                <strong>Allow sales in half units</strong>
+                <small>
+                  Cashiers can sell quantities such as 0.5, 1.5, or 5.5. Leave off for whole-unit
+                  sales only.
+                </small>
+              </span>
+            </label>
             <label className="full">
               Description
               <textarea name="description" defaultValue={p?.description} />

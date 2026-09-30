@@ -811,6 +811,20 @@
   min-width: 22px;
   text-align: center;
 }
+.pos-qty input {
+  width: 54px;
+  height: 27px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font: inherit;
+  font-weight: 700;
+}
+.pos-qty input:focus {
+  outline: 2px solid #9db4ff;
+  border-radius: 4px;
+}
 .pos-qty button,
 .pos-cart-lines > button {
   display: grid;

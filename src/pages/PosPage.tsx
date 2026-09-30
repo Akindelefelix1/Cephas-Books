@@ -130,6 +130,24 @@ export function PosPage({
   const cartQuantity = (productId: string) =>
     cart.find((item) => item.id === productId)?.quantity ?? 0;
   const canAdd = (product: Product) => cartQuantity(product.id) < available(product);
+  const saleStep = (product: Product) => (product.allowFractionalSale ? 0.5 : 1);
+  const updateCartQuantity = (product: Line, nextQuantity: number) => {
+    const step = saleStep(product);
+    const increments = nextQuantity / step;
+    const maximum = available(product);
+    if (
+      !Number.isFinite(nextQuantity) ||
+      Math.abs(increments - Math.round(increments)) > 1e-9 ||
+      nextQuantity < step ||
+      nextQuantity > maximum
+    )
+      return false;
+    setError('');
+    setCart((current) =>
+      current.map((item) => (item.id === product.id ? { ...item, quantity: nextQuantity } : item)),
+    );
+    return true;
+  };
   const add = (product: Product) => {
     if (!canAdd(product)) {
       setError(
@@ -141,7 +159,9 @@ export function PosPage({
     setCart((current) =>
       current.some((item) => item.id === product.id)
         ? current.map((item) =>
-            item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
+            item.id === product.id
+              ? { ...item, quantity: item.quantity + saleStep(product) }
+              : item,
           )
         : [...current, { ...product, quantity: 1 }],
     );
@@ -458,24 +478,38 @@ export function PosPage({
             </span>
             <div className="pos-qty">
               <button
-                onClick={() =>
-                  setCart((c) =>
-                    c.map((y) =>
-                      y.id === x.id ? { ...y, quantity: Math.max(1, y.quantity - 1) } : y,
-                    ),
-                  )
-                }
+                disabled={x.quantity <= saleStep(x)}
+                onClick={() => updateCartQuantity(x, x.quantity - saleStep(x))}
+                aria-label={`Reduce ${x.name} quantity by ${saleStep(x)}`}
               >
                 <Minus size={13} />
               </button>
-              <b>{x.quantity}</b>
+              <input
+                key={`${x.id}-${x.quantity}`}
+                aria-label={`${x.name} quantity`}
+                type="number"
+                min={saleStep(x)}
+                max={Number.isFinite(available(x)) ? available(x) : undefined}
+                step={saleStep(x)}
+                defaultValue={x.quantity}
+                onBlur={(event) => {
+                  if (!updateCartQuantity(x, Number(event.currentTarget.value))) {
+                    setError(
+                      x.allowFractionalSale
+                        ? `${x.name} must be sold in half-unit increments.`
+                        : `${x.name} must be sold in whole units.`,
+                    );
+                    event.currentTarget.value = String(x.quantity);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur();
+                }}
+              />
               <button
-                disabled={x.quantity >= available(x)}
-                onClick={() =>
-                  setCart((c) =>
-                    c.map((y) => (y.id === x.id ? { ...y, quantity: y.quantity + 1 } : y)),
-                  )
-                }
+                disabled={x.quantity + saleStep(x) > available(x)}
+                onClick={() => updateCartQuantity(x, x.quantity + saleStep(x))}
+                aria-label={`Increase ${x.name} quantity by ${saleStep(x)}`}
               >
                 <Plus size={13} />
               </button>

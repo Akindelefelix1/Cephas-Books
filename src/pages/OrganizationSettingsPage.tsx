@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   Plus,
   ShieldCheck,
+  Trash2,
   Users,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
@@ -98,7 +99,15 @@ const objectValue = (value: unknown): Record<string, unknown> =>
     : {};
 const arrayValue = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 
-export function OrganizationSettingsPage({ view, role }: { view: OrganizationView; role: string }) {
+export function OrganizationSettingsPage({
+  view,
+  role,
+  onDeleted,
+}: {
+  view: OrganizationView;
+  role: string;
+  onDeleted: () => void;
+}) {
   const canManage = role === 'OWNER' || role === 'ADMIN';
   const canViewAdministration = canManage || role === 'AUDITOR';
   const [admin, setAdmin] = useState<OrganizationAdmin | null>(null);
@@ -120,6 +129,45 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
   } | null>(null);
   const [auditSearch, setAuditSearch] = useState('');
   const [currencyMenu, setCurrencyMenu] = useState<string | null>(null);
+  const [deletionOpen, setDeletionOpen] = useState(false);
+  const [deletionCodeSent, setDeletionCodeSent] = useState(false);
+  const [deletionCode, setDeletionCode] = useState('');
+  const [deletionBusy, setDeletionBusy] = useState(false);
+  const [deletionError, setDeletionError] = useState('');
+
+  const closeDeletion = () => {
+    if (deletionBusy) return;
+    setDeletionOpen(false);
+    setDeletionCodeSent(false);
+    setDeletionCode('');
+    setDeletionError('');
+  };
+
+  const requestDeletionCode = async () => {
+    setDeletionBusy(true);
+    setDeletionError('');
+    try {
+      await organizationApi.requestDeletionCode();
+      setDeletionCodeSent(true);
+    } catch (caught) {
+      setDeletionError(caught instanceof Error ? caught.message : 'Unable to send deletion code');
+    } finally {
+      setDeletionBusy(false);
+    }
+  };
+
+  const deleteOrganization = async () => {
+    setDeletionBusy(true);
+    setDeletionError('');
+    try {
+      await organizationApi.deleteOrganization(deletionCode);
+      onDeleted();
+    } catch (caught) {
+      setDeletionError(caught instanceof Error ? caught.message : 'Unable to delete organisation');
+    } finally {
+      setDeletionBusy(false);
+    }
+  };
 
   useEffect(() => {
     const closeCurrencyMenu = (event: PointerEvent) => {
@@ -307,6 +355,19 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
             </div>
           )}
         </form>
+      )}
+      {view === 'settings' && role === 'OWNER' && (
+        <section className="panel settings-api-panel organization-danger-zone">
+          <header className="settings-heading">
+            <div>
+              <h2>Delete organisation</h2>
+              <p>Permanently remove this organisation and all of its business data.</p>
+            </div>
+            <button className="button button--danger" onClick={() => setDeletionOpen(true)}>
+              <Trash2 /> Delete organisation
+            </button>
+          </header>
+        </section>
       )}
       {view === 'branches' && (
         <section className="panel settings-api-panel">
@@ -741,6 +802,88 @@ export function OrganizationSettingsPage({ view, role }: { view: OrganizationVie
           </div>
         </section>
       )}
+      <Modal
+        open={deletionOpen}
+        onClose={closeDeletion}
+        title="Permanently delete organisation?"
+        subtitle="This action cannot be undone. All sales, accounts, inventory, documents, settings, and team access will be removed."
+        footer={
+          <>
+            <button
+              className="button button--secondary"
+              onClick={closeDeletion}
+              disabled={deletionBusy}
+            >
+              Cancel
+            </button>
+            {!deletionCodeSent ? (
+              <button
+                className="button button--danger"
+                onClick={() => void requestDeletionCode()}
+                disabled={deletionBusy}
+              >
+                {deletionBusy ? 'Sending code…' : 'Email verification code'}
+              </button>
+            ) : (
+              <button
+                className="button button--danger"
+                onClick={() => void deleteOrganization()}
+                disabled={deletionBusy || !/^\d{6}$/.test(deletionCode)}
+              >
+                {deletionBusy ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            )}
+          </>
+        }
+      >
+        {!deletionCodeSent ? (
+          <div className="organization-delete-warning">
+            <Trash2 />
+            <p>
+              To verify this request, a six-digit code will be sent to your registered owner email.
+              The code expires after 10 minutes.
+            </p>
+          </div>
+        ) : (
+          <form
+            className="form-grid"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (/^\d{6}$/.test(deletionCode)) void deleteOrganization();
+            }}
+          >
+            <label className="full">
+              Verification code
+              <input
+                value={deletionCode}
+                onChange={(event) =>
+                  setDeletionCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                }
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="\d{6}"
+                maxLength={6}
+                autoFocus
+                required
+              />
+              <small>Enter the code sent to your registered email address.</small>
+            </label>
+            <button
+              type="button"
+              className="row-action"
+              onClick={() => void requestDeletionCode()}
+              disabled={deletionBusy}
+            >
+              Send a new code
+            </button>
+          </form>
+        )}
+        {deletionError && (
+          <div className="banking-alert" role="alert">
+            {deletionError}
+          </div>
+        )}
+      </Modal>
       <CreateDialog
         dialog={dialog}
         busy={busy}

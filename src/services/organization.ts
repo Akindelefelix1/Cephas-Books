@@ -118,6 +118,10 @@ export const organizationApi = {
     request<CustomRole>(`/organizations/current/roles/${id}`, 'PATCH', data),
   deleteRole: (id: string) =>
     request<{ deleted: true }>(`/organizations/current/roles/${id}`, 'DELETE'),
+  requestDeletionCode: () =>
+    request<{ message: string; expiresIn: number }>('/organizations/current/deletion-code', 'POST'),
+  deleteOrganization: (code: string) =>
+    request<{ deleted: true }>('/organizations/current', 'DELETE', { code }),
   auditLogs: (search = '') =>
     request<AuditEntry[]>(
       `/organizations/current/audit-logs?${new URLSearchParams(search ? { search } : {})}`,

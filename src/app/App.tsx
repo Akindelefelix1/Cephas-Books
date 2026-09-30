@@ -321,6 +321,11 @@ export function App() {
           key={active}
           view={active as OrganizationView}
           role={identity.role}
+          onDeleted={() => {
+            clearAuthTokens();
+            localStorage.removeItem('cephas:active-branch');
+            setView('landing');
+          }}
         />
       );
     if (['budgets', 'tax', 'payroll'].includes(active)) return <SimpleFeaturePage type={active} />;

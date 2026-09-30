@@ -14,6 +14,7 @@ export interface Product {
   costPrice: string;
   taxRate: string;
   reorderLevel: string;
+  allowFractionalSale: boolean;
   stockQuantity: string;
   stockValue: string;
   defaultWarehouseId?: string;
