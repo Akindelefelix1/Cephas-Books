@@ -53,6 +53,7 @@ export function PosPage({
     [staff, setStaff] = useState<OrganizationMember[]>([]),
     [shift, setShift] = useState<PosShift | null>(null),
     [cart, setCart] = useState<Line[]>([]),
+    [branchId, setBranchId] = useState(''),
     [registerId, setRegisterId] = useState(''),
     [customerId, setCustomerId] = useState(''),
     [search, setSearch] = useState(''),
@@ -69,7 +70,9 @@ export function PosPage({
     void Promise.all([
       salesApi.customers(),
       posApi.registers(),
-      operationsApi.warehouses({ status: 'active' }),
+      ['OWNER', 'ADMIN'].includes(role)
+        ? operationsApi.warehouses({ status: 'active' })
+        : Promise.resolve([]),
       posApi.currentShift(),
       posApi.sales({ limit: '10' }),
       ['OWNER', 'ADMIN'].includes(role) ? organizationApi.users() : Promise.resolve([]),
@@ -80,7 +83,17 @@ export function PosPage({
         setRegisters(r);
         setWarehouses(w);
         setShift(s);
-        setRegisterId(s?.registerId || r[0]?.id || '');
+        const shiftRegister = s ? r.find((register) => register.id === s.registerId) : undefined;
+        const initialBranchId =
+          shiftRegister?.branchId ||
+          (accessibleBranches.length === 1 ? accessibleBranches[0].id : '');
+        const branchRegisters = initialBranchId
+          ? r.filter((register) => register.branchId === initialBranchId)
+          : [];
+        setBranchId(initialBranchId);
+        setRegisterId(
+          s?.registerId || (branchRegisters.length === 1 ? branchRegisters[0].id : ''),
+        );
         setRecentSales(recent.data);
         setStaff(members.filter((member) => member.user.isActive));
         setBranches(accessibleBranches);
@@ -117,7 +130,11 @@ export function PosPage({
       current = false;
     };
   }, [registerId, registers]);
-  const visible = useMemo(
+  const availableRegisters = useMemo(
+      () => registers.filter((register) => register.branchId === branchId),
+      [branchId, registers],
+    ),
+    visible = useMemo(
       () =>
         products.filter((x) => `${x.name} ${x.sku}`.toLowerCase().includes(search.toLowerCase())),
       [products, search],
@@ -191,6 +208,7 @@ export function PosPage({
           branchId: f.get('branchId'),
         });
         setRegisters((x) => [...x, r]);
+        setBranchId(r.branchId || '');
         setRegisterId(r.id);
         setSetup(null);
       } else if (setup === 'ASSIGN') {
@@ -202,6 +220,7 @@ export function PosPage({
         setRegisters((current) =>
           current.map((register) => (register.id === updated.id ? updated : register)),
         );
+        setBranchId(updated.branchId || '');
         setSetup(null);
       } else if (setup === 'SHIFT') {
         const s = await posApi.openShift({
@@ -448,7 +467,35 @@ export function PosPage({
         <div className="pos-customer">
           <div>
             <select
+              aria-label="Branch"
+              value={branchId}
+              disabled={Boolean(shift)}
+              onChange={(event) => {
+                const nextBranchId = event.target.value;
+                const nextRegisters = registers.filter(
+                  (register) => register.branchId === nextBranchId,
+                );
+                setBranchId(nextBranchId);
+                setRegisterId(nextRegisters.length === 1 ? nextRegisters[0].id : '');
+                setShift(null);
+                setProducts([]);
+                setCart([]);
+                setError('');
+              }}
+            >
+              <option value="">Select branch</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <select
+              aria-label="Register"
               value={registerId}
+              disabled={!branchId}
               onChange={(e) => {
                 setRegisterId(e.target.value);
                 setShift(null);
@@ -457,7 +504,7 @@ export function PosPage({
               }}
             >
               <option value="">Select register</option>
-              {registers.map((r) => (
+              {availableRegisters.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.code} — {r.name}
                   {r.assignedStaff
@@ -466,7 +513,7 @@ export function PosPage({
                 </option>
               ))}
             </select>
-            {!registers.length && ['OWNER', 'ADMIN'].includes(role) && (
+            {!availableRegisters.length && ['OWNER', 'ADMIN'].includes(role) && (
               <button className="button button--secondary" onClick={() => setSetup('REGISTER')}>
                 Set up
               </button>
