@@ -15,6 +15,7 @@ import {
 import { Logo } from '@/components/brand/Logo';
 import { allNavigation, primaryNavigation, secondaryNavigation } from '@/data/navigation';
 import { Modal } from '@/components/ui/Modal';
+import { can, canAccessRoute } from '@/utils/permissions';
 
 interface AppShellProps extends PropsWithChildren {
   active: string;
@@ -27,6 +28,8 @@ interface AppShellProps extends PropsWithChildren {
     role: string;
     baseCurrency: string;
     countryCode: string;
+    customRoleId?: string;
+    permissions: string[];
   };
 }
 
@@ -57,28 +60,31 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
     setMobileOpen(false);
   };
   const navGroup = (items: typeof allNavigation) =>
-    items.map((item) => {
+    items.flatMap((item) => {
+      const visibleChildren = item.children?.filter((child) => canAccessRoute(identity, child.id));
+      if (item.children && !visibleChildren?.length) return [];
+      if (!item.children && !canAccessRoute(identity, item.id)) return [];
       const isParentActive =
-        item.id === active || item.children?.some((child) => child.id === active);
+        item.id === active || visibleChildren?.some((child) => child.id === active);
       return (
         <div className="nav-entry" key={item.id}>
           <button
             className={`nav-item ${isParentActive ? 'active' : ''}`}
-            aria-expanded={item.children ? expanded === item.id : undefined}
+            aria-expanded={visibleChildren ? expanded === item.id : undefined}
             onClick={() =>
-              item.children
+              visibleChildren
                 ? setExpanded((value) => (value === item.id ? null : item.id))
                 : navigate(item.id)
             }
           >
             <item.icon size={18} />
             <span>{item.label}</span>
-            {item.children &&
+            {visibleChildren &&
               (expanded === item.id ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
           </button>
-          {item.children && expanded === item.id && (
+          {visibleChildren && expanded === item.id && (
             <div className="subnav">
-              {item.children.map((child) => (
+              {visibleChildren.map((child) => (
                 <button
                   className={child.id === active ? 'active' : ''}
                   onClick={() => navigate(child.id)}
@@ -111,10 +117,13 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
             <X size={19} />
           </button>
         </div>
-        <button className="create-button" onClick={onQuickCreate}>
-          <Plus size={18} />
-          Quick create<kbd>C</kbd>
-        </button>
+        {(!identity.customRoleId ||
+          identity.permissions.some((item) => item.endsWith('.manage'))) && (
+          <button className="create-button" onClick={onQuickCreate}>
+            <Plus size={18} />
+            Quick create<kbd>C</kbd>
+          </button>
+        )}
         <nav className="app-nav">
           {navGroup(primaryNavigation)}
           {navGroup(secondaryNavigation.filter((item) => item.id !== 'organisation-group'))}
@@ -158,14 +167,16 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
             </kbd>
           </button>
           <div className="topbar__right">
-            <button
-              className="icon-button notification-button"
-              title="Notifications"
-              onClick={() => navigate('notifications')}
-            >
-              <Bell size={19} />
-              <i />
-            </button>
+            {can(identity, 'settings.manage') && (
+              <button
+                className="icon-button notification-button"
+                title="Notifications"
+                onClick={() => navigate('notifications')}
+              >
+                <Bell size={19} />
+                <i />
+              </button>
+            )}
             <button
               className="icon-button topbar-settings-button"
               title="Organisation settings"
@@ -204,20 +215,22 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
         }
       >
         <div className="settings-shortcuts">
-          {settingsNavigation?.children?.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              className={active === item.id ? 'is-active' : ''}
-              onClick={() => {
-                setSettingsOpen(false);
-                navigate(item.id);
-              }}
-            >
-              {item.label}
-              <ChevronRight size={16} />
-            </button>
-          ))}
+          {settingsNavigation?.children
+            ?.filter((item) => canAccessRoute(identity, item.id))
+            .map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className={active === item.id ? 'is-active' : ''}
+                onClick={() => {
+                  setSettingsOpen(false);
+                  navigate(item.id);
+                }}
+              >
+                {item.label}
+                <ChevronRight size={16} />
+              </button>
+            ))}
         </div>
       </Modal>
       {searchOpen && (

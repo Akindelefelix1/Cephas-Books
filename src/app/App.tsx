@@ -49,6 +49,8 @@ import {
   logoutSession,
 } from '@/services/auth';
 import { onboardingApi } from '@/services/onboarding';
+import { can, canAccessRoute } from '@/utils/permissions';
+import { LoadingState } from '@/components/ui/LoadingState';
 
 const marketingViews = ['platform', 'solutions', 'pricing', 'security', 'resources'] as const;
 const authViews = ['login', 'register', 'forgot', 'mfa'] as const;
@@ -76,12 +78,15 @@ export function App() {
   const routerNavigate = useNavigate();
   const { view, active } = resolvePage(location.pathname);
   const setView = (nextView: View) =>
-    routerNavigate(nextView === 'landing' ? '/' : nextView === 'app' ? '/dashboard' : `/${nextView}`);
+    routerNavigate(
+      nextView === 'landing' ? '/' : nextView === 'app' ? '/dashboard' : `/${nextView}`,
+    );
   const navigate = (id: string) => routerNavigate(`/${id}`);
   const [quick, setQuick] = useState(false);
   const [logoutConfirmation, setLogoutConfirmation] = useState<Confirmation | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState('');
+  const [identityReady, setIdentityReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(
     () => localStorage.getItem('cephas:onboarding-complete') === 'true',
   );
@@ -95,6 +100,8 @@ export function App() {
     role: '',
     baseCurrency: 'NGN',
     countryCode: 'NG',
+    customRoleId: undefined as string | undefined,
+    permissions: [] as string[],
   });
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -120,7 +127,10 @@ export function App() {
         role: '',
         baseCurrency: 'NGN',
         countryCode: 'NG',
+        customRoleId: undefined,
+        permissions: [],
       });
+      setIdentityReady(false);
       setQuick(false);
       routerNavigate('/login', { replace: true });
     };
@@ -152,7 +162,10 @@ export function App() {
           role: profile.role,
           baseCurrency: profile.organization.baseCurrency,
           countryCode: profile.organization.countryCode,
+          customRoleId: profile.customRoleId,
+          permissions: profile.permissions,
         });
+        setIdentityReady(true);
       })
       .catch((caught) => {
         if (caught instanceof ApiError && caught.status === 401)
@@ -187,7 +200,20 @@ export function App() {
         }}
       />
     );
+  if (view === 'app' && !identityReady) return <LoadingState label="Loading your workspace…" />;
+  const roleFor = (managePermission: string) =>
+    identity.customRoleId ? (can(identity, managePermission) ? 'ADMIN' : 'AUDITOR') : identity.role;
   const content = (() => {
+    if (!canAccessRoute(identity, active))
+      return (
+        <section className="route-not-found" role="alert">
+          <p>Access restricted</p>
+          <h1>You do not have permission to view this page.</h1>
+          <button className="button" onClick={() => navigate('dashboard')}>
+            Return to dashboard
+          </button>
+        </section>
+      );
     if (active === 'dashboard')
       return (
         <DashboardPage
@@ -196,14 +222,17 @@ export function App() {
           onboardingComplete={onboardingComplete}
           onResumeOnboarding={() => setView('onboarding')}
           companyName={identity.companyName}
+          access={identity}
         />
       );
     if (active === 'pos')
       return (
         <PosPage
-          role={identity.role}
+          role={roleFor('sales.manage')}
           onNavigate={navigate}
-          salesperson={[identity.firstName, identity.lastName].filter(Boolean).join(' ') || identity.email}
+          salesperson={
+            [identity.firstName, identity.lastName].filter(Boolean).join(' ') || identity.email
+          }
         />
       );
     if (active === 'pos-history') return <PosHistoryPage />;
@@ -219,7 +248,7 @@ export function App() {
             active as
               'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables'
           }
-          role={identity.role}
+          role={roleFor('sales.manage')}
         />
       );
     if (
@@ -234,7 +263,11 @@ export function App() {
       ].includes(active)
     )
       return (
-        <PurchasesSpendingPage key={active} view={active as PurchaseView} role={identity.role} />
+        <PurchasesSpendingPage
+          key={active}
+          view={active as PurchaseView}
+          role={roleFor('purchases.manage')}
+        />
       );
     if (
       [
@@ -249,7 +282,11 @@ export function App() {
       ].includes(active)
     )
       return (
-        <AccountingFinancePage key={active} view={active as AccountingView} role={identity.role} />
+        <AccountingFinancePage
+          key={active}
+          view={active as AccountingView}
+          role={roleFor('accounting.manage')}
+        />
       );
     if (
       [
@@ -265,15 +302,19 @@ export function App() {
         <InventoryOperationsPage
           key={active}
           view={active as OperationsView}
-          role={identity.role}
+          role={roleFor('inventory.manage')}
         />
       );
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;
     if (active === 'banking' || active === 'transactions' || active === 'reconciliation')
-      return <BankingPage key={active} view={active} role={identity.role} />;
+      return <BankingPage key={active} view={active} role={roleFor('banking.manage')} />;
     if (['reports', 'custom-reports', 'analytics', 'ai-assistant', 'excel-sync'].includes(active))
       return (
-        <InsightsAutomationPage key={active} view={active as InsightsView} role={identity.role} />
+        <InsightsAutomationPage
+          key={active}
+          view={active as InsightsView}
+          role={roleFor('reports.export')}
+        />
       );
     if (['documents', 'approvals', 'notifications', 'workflows'].includes(active))
       return (
@@ -320,7 +361,13 @@ export function App() {
         <OrganizationSettingsPage
           key={active}
           view={active as OrganizationView}
-          role={identity.role}
+          role={
+            identity.customRoleId
+              ? can(identity, 'settings.manage') || can(identity, 'users.manage')
+                ? 'ADMIN'
+                : 'AUDITOR'
+              : identity.role
+          }
           onDeleted={() => {
             clearAuthTokens();
             localStorage.removeItem('cephas:active-branch');
@@ -346,6 +393,7 @@ export function App() {
           setQuick(false);
           navigate(id);
         }}
+        access={identity}
       />
       <ConfirmModal
         confirmation={logoutConfirmation}
@@ -361,18 +409,20 @@ function QuickCreate({
   open,
   onClose,
   onComplete,
+  access,
 }: {
   open: boolean;
   onClose: () => void;
   onComplete: (id: string) => void;
+  access: { customRoleId?: string; permissions: string[] };
 }) {
   const choices = [
-    ['Invoice', 'Bill a customer', FileText, 'invoices'],
-    ['Expense', 'Record spend or scan receipt', ReceiptText, 'expenses'],
-    ['Payment', 'Receive customer payment', WalletCards, 'payments'],
-    ['Bill', 'Record a supplier bill', ShoppingCart, 'bills'],
-    ['Transaction', 'Deposit, withdrawal or transfer', Landmark, 'transactions'],
-  ];
+    ['Invoice', 'Bill a customer', FileText, 'invoices', 'sales.manage'],
+    ['Expense', 'Record spend or scan receipt', ReceiptText, 'expenses', 'purchases.manage'],
+    ['Payment', 'Receive customer payment', WalletCards, 'payments', 'sales.manage'],
+    ['Bill', 'Record a supplier bill', ShoppingCart, 'bills', 'purchases.manage'],
+    ['Transaction', 'Deposit, withdrawal or transfer', Landmark, 'transactions', 'banking.manage'],
+  ].filter((choice) => !access.customRoleId || access.permissions.includes(String(choice[4])));
   return (
     <Modal
       open={open}

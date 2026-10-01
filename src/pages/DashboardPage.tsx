@@ -27,12 +27,9 @@ import { salesApi, type SalesSummary } from '@/services/sales';
 import { purchasesApi, type PurchaseSummary } from '@/services/purchases';
 import { insightsApi, type AiInsight, type InsightAnalytics } from '@/services/insights';
 import { accountingApi, type FinanceRecord } from '@/services/accounting';
-import {
-  workflowApi,
-  type AppNotification,
-  type WorkflowSummary,
-} from '@/services/workflow';
+import { workflowApi, type AppNotification, type WorkflowSummary } from '@/services/workflow';
 import type { Invoice } from '@/services/sales';
+import { can, canAccessRoute, type PermissionIdentity } from '@/utils/permissions';
 
 const dateUntil = (value: string | undefined, now: number) => {
   if (!value) return 'No end date';
@@ -51,12 +48,14 @@ export function DashboardPage({
   onboardingComplete,
   onResumeOnboarding,
   companyName,
+  access,
 }: {
   onNavigate: (id: string) => void;
   onCreate: () => void;
   onboardingComplete: boolean;
   onResumeOnboarding: () => void;
   companyName: string;
+  access: PermissionIdentity;
 }) {
   const [bankSummary, setBankSummary] = useState<BankingSummary | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -75,18 +74,20 @@ export function DashboardPage({
   useEffect(() => {
     let active = true;
     Promise.allSettled([
-      bankingApi.summary(),
-      bankingApi.accounts(),
-      bankingApi.transactions({ limit: 5 }),
-      salesApi.summary(),
-      purchasesApi.summary(),
-      insightsApi.analytics(),
-      accountingApi.records('TAX'),
-      accountingApi.records('BUDGET'),
-      workflowApi.summary(),
+      can(access, 'banking.view') ? bankingApi.summary() : Promise.resolve(undefined),
+      can(access, 'banking.view') ? bankingApi.accounts() : Promise.resolve(undefined),
+      can(access, 'banking.view')
+        ? bankingApi.transactions({ limit: 5 })
+        : Promise.resolve(undefined),
+      can(access, 'sales.view') ? salesApi.summary() : Promise.resolve(undefined),
+      can(access, 'purchases.view') ? purchasesApi.summary() : Promise.resolve(undefined),
+      can(access, 'reports.view') ? insightsApi.analytics() : Promise.resolve(undefined),
+      can(access, 'accounting.view') ? accountingApi.records('TAX') : Promise.resolve(undefined),
+      can(access, 'accounting.view') ? accountingApi.records('BUDGET') : Promise.resolve(undefined),
+      can(access, 'approvals.review') ? workflowApi.summary() : Promise.resolve(undefined),
       workflowApi.notifications(),
-      salesApi.invoices(),
-      insightsApi.aiHistory(),
+      can(access, 'sales.view') ? salesApi.invoices() : Promise.resolve(undefined),
+      can(access, 'reports.view') ? insightsApi.aiHistory() : Promise.resolve(undefined),
     ]).then(
       ([
         summary,
@@ -103,24 +104,27 @@ export function DashboardPage({
         ai,
       ]) => {
         if (active) {
-          if (summary.status === 'fulfilled') setBankSummary(summary.value);
-          if (accounts.status === 'fulfilled') setBankAccounts(accounts.value);
-          if (transactions.status === 'fulfilled')
+          if (summary.status === 'fulfilled' && summary.value) setBankSummary(summary.value);
+          if (accounts.status === 'fulfilled' && accounts.value) setBankAccounts(accounts.value);
+          if (transactions.status === 'fulfilled' && transactions.value)
             setRecentBankTransactions(transactions.value.data);
-          if (sales.status === 'fulfilled') setSalesSummary(sales.value);
-          if (purchases.status === 'fulfilled') setPurchaseSummary(purchases.value);
-          if (insightData.status === 'fulfilled') setAnalytics(insightData.value);
-          if (tax.status === 'fulfilled') setTaxRecords(tax.value);
-          if (budgets.status === 'fulfilled') setBudgetRecords(budgets.value);
-          if (workflow.status === 'fulfilled') setWorkflowSummary(workflow.value);
+          if (sales.status === 'fulfilled' && sales.value) setSalesSummary(sales.value);
+          if (purchases.status === 'fulfilled' && purchases.value)
+            setPurchaseSummary(purchases.value);
+          if (insightData.status === 'fulfilled' && insightData.value)
+            setAnalytics(insightData.value);
+          if (tax.status === 'fulfilled' && tax.value) setTaxRecords(tax.value);
+          if (budgets.status === 'fulfilled' && budgets.value) setBudgetRecords(budgets.value);
+          if (workflow.status === 'fulfilled' && workflow.value) setWorkflowSummary(workflow.value);
           if (notifications.status === 'fulfilled')
             setRecentNotifications(
               [...notifications.value]
                 .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
                 .slice(0, 5),
             );
-          if (invoiceData.status === 'fulfilled') setInvoices(invoiceData.value);
-          if (ai.status === 'fulfilled') setAiHistory(ai.value);
+          if (invoiceData.status === 'fulfilled' && invoiceData.value)
+            setInvoices(invoiceData.value);
+          if (ai.status === 'fulfilled' && ai.value) setAiHistory(ai.value);
           const failed = [
             summary,
             accounts,
@@ -145,13 +149,15 @@ export function DashboardPage({
     return () => {
       active = false;
     };
-  }, []);
-  const bankingFeatures = [
-    ['Bank accounts', 'Balances and account details', 'banking', Landmark],
-    ['Transactions', 'Review money in and out', 'transactions', CreditCard],
-    ['Reconciliation', 'Match and resolve entries', 'reconciliation', Sparkles],
-    ['Capture receipt', 'Attach proof of payment', 'expenses', FileUp],
-  ] as const;
+  }, [access]);
+  const bankingFeatures = (
+    [
+      ['Bank accounts', 'Balances and account details', 'banking', Landmark],
+      ['Transactions', 'Review money in and out', 'transactions', CreditCard],
+      ['Reconciliation', 'Match and resolve entries', 'reconciliation', Sparkles],
+      ['Capture receipt', 'Attach proof of payment', 'expenses', FileUp],
+    ] as const
+  ).filter(([, , id]) => canAccessRoute(access, id));
   const today = new Intl.DateTimeFormat('en-NG', { dateStyle: 'full' }).format(new Date());
   const hour = new Date().getHours();
   const dayPeriod = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
@@ -229,9 +235,12 @@ export function DashboardPage({
             <CalendarDays size={17} />
             <span>All records</span>
           </div>
-          <button className="button" onClick={onCreate}>
-            + Quick create
-          </button>
+          {(!access.customRoleId ||
+            access.permissions.some((item) => item.endsWith('.manage'))) && (
+            <button className="button" onClick={onCreate}>
+              + Quick create
+            </button>
+          )}
         </div>
       </div>
       {dashboardError && (
@@ -289,28 +298,30 @@ export function DashboardPage({
           </article>
         ))}
       </div>
-      <section className="dashboard-feature-section" aria-labelledby="banking-tools-title">
-        <header className="panel-header">
-          <div>
-            <h2 id="banking-tools-title">Banking tools</h2>
-            <p>Features available to your role</p>
+      {bankingFeatures.length > 0 && (
+        <section className="dashboard-feature-section" aria-labelledby="banking-tools-title">
+          <header className="panel-header">
+            <div>
+              <h2 id="banking-tools-title">Banking tools</h2>
+              <p>Features available to your role</p>
+            </div>
+          </header>
+          <div className="dashboard-feature-grid">
+            {bankingFeatures.map(([title, description, id, Icon]) => (
+              <button key={title} onClick={() => onNavigate(id)}>
+                <i>
+                  <Icon size={19} />
+                </i>
+                <span>
+                  <strong>{title}</strong>
+                  <small>{description}</small>
+                </span>
+                <ChevronDown className="feature-arrow" size={16} />
+              </button>
+            ))}
           </div>
-        </header>
-        <div className="dashboard-feature-grid">
-          {bankingFeatures.map(([title, description, id, Icon]) => (
-            <button key={title} onClick={() => onNavigate(id)}>
-              <i>
-                <Icon size={19} />
-              </i>
-              <span>
-                <strong>{title}</strong>
-                <small>{description}</small>
-              </span>
-              <ChevronDown className="feature-arrow" size={16} />
-            </button>
-          ))}
-        </div>
-      </section>
+        </section>
+      )}
       <div className="dashboard-grid">
         <article className="panel chart-panel">
           <header className="panel-header">

@@ -37,6 +37,8 @@ export interface CurrentUserProfile {
   createdAt: string;
   isActive: boolean;
   role: string;
+  customRoleId?: string;
+  permissions: string[];
   organization: {
     name: string;
     baseCurrency: string;
