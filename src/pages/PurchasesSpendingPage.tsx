@@ -56,7 +56,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
         purchasesApi.suppliers(),
         purchasesApi.list('bills'),
         purchasesApi.list('purchase-requests', '', 'APPROVED'),
-        bankingApi.accounts(),
+        canEdit ? bankingApi.accounts() : Promise.resolve([]),
         view === 'suppliers'
           ? purchasesApi.suppliers(search)
           : purchasesApi.list(view, search, status),
@@ -78,7 +78,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     } finally {
       setLoading(false);
     }
-  }, [view, search, status]);
+  }, [view, search, status, canEdit]);
   useEffect(() => {
     const t = setTimeout(() => void load(), 250);
     return () => clearTimeout(t);

@@ -190,8 +190,20 @@ export function OrganizationSettingsPage({
     setLoading(true);
     setError('');
     try {
-      const base = await organizationApi.admin();
-      setAdmin(base);
+      if (view === 'users' || view === 'audit-logs') {
+        setAdmin({
+          organization: {
+            id: '',
+            name: '',
+            baseCurrency: 'NGN',
+            countryCode: 'NG',
+            updatedAt: new Date(0).toISOString(),
+          },
+          settings: {},
+        });
+      } else {
+        setAdmin(await organizationApi.admin());
+      }
       if ((view === 'users' || view === 'branches') && canViewAdministration) {
         const [loadedMembers, loadedRoles] = await Promise.all([
           organizationApi.users(),
