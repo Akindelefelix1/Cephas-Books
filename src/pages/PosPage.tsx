@@ -21,6 +21,7 @@ import {
 } from '@/services/operations';
 import { posApi, type PosRegister, type PosSale, type PosShift } from '@/services/pos';
 import { salesApi, type Customer } from '@/services/sales';
+import { organizationApi, type OrganizationMember } from '@/services/organization';
 import { getDefaultCurrency } from '@/utils/currency';
 const money = (v: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(v);
@@ -48,6 +49,7 @@ export function PosPage({
     [customers, setCustomers] = useState<Customer[]>([]),
     [registers, setRegisters] = useState<PosRegister[]>([]),
     [warehouses, setWarehouses] = useState<Warehouse[]>([]),
+    [staff, setStaff] = useState<OrganizationMember[]>([]),
     [shift, setShift] = useState<PosShift | null>(null),
     [cart, setCart] = useState<Line[]>([]),
     [registerId, setRegisterId] = useState(''),
@@ -56,7 +58,7 @@ export function PosPage({
     [catalogView, setCatalogView] = useState<'TABLE' | 'CARDS'>('TABLE'),
     [payments, setPayments] = useState<PaymentInput[]>([{ method: 'CASH', amount: '' }]),
     [splitMode, setSplitMode] = useState(false),
-    [setup, setSetup] = useState<'REGISTER' | 'SHIFT' | 'CUSTOMER' | null>(null),
+    [setup, setSetup] = useState<'REGISTER' | 'ASSIGN' | 'SHIFT' | 'CUSTOMER' | null>(null),
     [error, setError] = useState(''),
     [productsLoading, setProductsLoading] = useState(true),
     [busy, setBusy] = useState(false),
@@ -69,21 +71,23 @@ export function PosPage({
       operationsApi.warehouses({ status: 'active' }),
       posApi.currentShift(),
       posApi.sales({ limit: '10' }),
+      ['OWNER', 'ADMIN'].includes(role) ? organizationApi.users() : Promise.resolve([]),
     ])
-      .then(([c, r, w, s, recent]) => {
+      .then(([c, r, w, s, recent, members]) => {
         setCustomers(c.data.filter((x) => x.isActive));
         setRegisters(r);
         setWarehouses(w);
         setShift(s);
         setRegisterId(s?.registerId || r[0]?.id || '');
         setRecentSales(recent.data);
+        setStaff(members.filter((member) => member.user.isActive));
         if (!r.length) setProductsLoading(false);
       })
       .catch((e) => {
         setError(e instanceof Error ? e.message : 'Unable to load POS data');
         setProductsLoading(false);
       });
-  }, []);
+  }, [role]);
   useEffect(() => {
     const register = registers.find((item) => item.id === registerId);
     if (!register) return;
@@ -180,10 +184,20 @@ export function PosPage({
           code: f.get('code'),
           name: f.get('name'),
           warehouseId: f.get('warehouseId'),
+          assignedStaffId: f.get('assignedStaffId'),
         });
         setRegisters((x) => [...x, r]);
         setRegisterId(r.id);
-        setSetup('SHIFT');
+        setSetup(null);
+      } else if (setup === 'ASSIGN') {
+        const updated = await posApi.assignRegisterStaff(
+          registerId,
+          String(f.get('assignedStaffId')),
+        );
+        setRegisters((current) =>
+          current.map((register) => (register.id === updated.id ? updated : register)),
+        );
+        setSetup(null);
       } else if (setup === 'SHIFT') {
         const s = await posApi.openShift({
           registerId,
@@ -441,6 +455,9 @@ export function PosPage({
               {registers.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.code} — {r.name}
+                  {r.assignedStaff
+                    ? ` · ${[r.assignedStaff.firstName, r.assignedStaff.lastName].filter(Boolean).join(' ') || r.assignedStaff.email}`
+                    : ' · Staff not assigned'}
                 </option>
               ))}
             </select>
@@ -451,9 +468,16 @@ export function PosPage({
             )}
           </div>
           {registerId && !shift && (
-            <button className="button button--secondary" onClick={() => setSetup('SHIFT')}>
-              Open cashier shift
-            </button>
+            <>
+              {['OWNER', 'ADMIN'].includes(role) && (
+                <button className="button button--secondary" onClick={() => setSetup('ASSIGN')}>
+                  Assign staff
+                </button>
+              )}
+              <button className="button button--secondary" onClick={() => setSetup('SHIFT')}>
+                Open cashier shift
+              </button>
+            </>
           )}
           {shift && <small className="pos-status">Shift open on {shift.register.code}</small>}
           <div>
@@ -640,6 +664,8 @@ export function PosPage({
         title={
           setup === 'REGISTER'
             ? 'Set up register'
+            : setup === 'ASSIGN'
+              ? 'Assign register staff'
             : setup === 'SHIFT'
               ? 'Open cashier shift'
               : 'Add customer'
@@ -659,6 +685,22 @@ export function PosPage({
                 <input name="name" required />
               </label>
               <label className="full">
+                Assigned staff
+                <select name="assignedStaffId" required defaultValue="">
+                  <option value="" disabled>
+                    Select existing staff
+                  </option>
+                  {staff.map((member) => (
+                    <option key={member.user.id} value={member.user.id}>
+                      {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
+                        member.user.email}{' '}
+                      — {member.role}
+                    </option>
+                  ))}
+                </select>
+                {!staff.length && <small>No active staff accounts are available.</small>}
+              </label>
+              <label className="full">
                 Warehouse
                 <select
                   name="warehouseId"
@@ -674,6 +716,22 @@ export function PosPage({
                 </select>
               </label>
             </>
+          ) : setup === 'ASSIGN' ? (
+            <label className="full">
+              Assigned staff
+              <select name="assignedStaffId" required defaultValue="">
+                <option value="" disabled>
+                  Select existing staff
+                </option>
+                {staff.map((member) => (
+                  <option key={member.user.id} value={member.user.id}>
+                    {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
+                      member.user.email}{' '}
+                    — {member.role}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : setup === 'SHIFT' ? (
             <label className="full">
               Opening cash

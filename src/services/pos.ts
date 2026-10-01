@@ -20,6 +20,13 @@ export interface PosRegister {
   code: string;
   name: string;
   warehouseId: string;
+  assignedStaffId?: string;
+  assignedStaff?: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+  } | null;
 }
 export interface PosShift {
   id: string;
@@ -40,6 +47,11 @@ export const posApi = {
     authorizedRequest<PosRegister>('/pos/registers', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  assignRegisterStaff: (id: string, assignedStaffId: string) =>
+    authorizedRequest<PosRegister>(`/pos/registers/${id}/staff`, {
+      method: 'PATCH',
+      body: JSON.stringify({ assignedStaffId }),
     }),
   openShift: (data: object) =>
     authorizedRequest<PosShift>('/pos/shifts', { method: 'POST', body: JSON.stringify(data) }),
