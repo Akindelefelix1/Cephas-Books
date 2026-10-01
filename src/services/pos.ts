@@ -21,12 +21,18 @@ export interface PosRegister {
   name: string;
   warehouseId: string;
   assignedStaffId?: string;
+  branchId?: string;
   assignedStaff?: {
     id: string;
     email: string;
     firstName?: string;
     lastName?: string;
   } | null;
+}
+export interface PosBranch {
+  id: string;
+  name: string;
+  address?: string;
 }
 export interface PosShift {
   id: string;
@@ -42,16 +48,17 @@ export const posApi = {
     );
   },
   registers: () => authorizedRequest<PosRegister[]>('/pos/registers'),
+  branches: () => authorizedRequest<PosBranch[]>('/pos/branches'),
   currentShift: () => authorizedRequest<PosShift | null>('/pos/shifts/current'),
   createRegister: (data: object) =>
     authorizedRequest<PosRegister>('/pos/registers', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  assignRegisterStaff: (id: string, assignedStaffId: string) =>
+  assignRegisterStaff: (id: string, assignedStaffId: string, branchId: string) =>
     authorizedRequest<PosRegister>(`/pos/registers/${id}/staff`, {
       method: 'PATCH',
-      body: JSON.stringify({ assignedStaffId }),
+      body: JSON.stringify({ assignedStaffId, branchId }),
     }),
   openShift: (data: object) =>
     authorizedRequest<PosShift>('/pos/shifts', { method: 'POST', body: JSON.stringify(data) }),

@@ -19,7 +19,7 @@ import {
   type Product,
   type Warehouse,
 } from '@/services/operations';
-import { posApi, type PosRegister, type PosSale, type PosShift } from '@/services/pos';
+import { posApi, type PosBranch, type PosRegister, type PosSale, type PosShift } from '@/services/pos';
 import { salesApi, type Customer } from '@/services/sales';
 import { organizationApi, type OrganizationMember } from '@/services/organization';
 import { getDefaultCurrency } from '@/utils/currency';
@@ -49,6 +49,7 @@ export function PosPage({
     [customers, setCustomers] = useState<Customer[]>([]),
     [registers, setRegisters] = useState<PosRegister[]>([]),
     [warehouses, setWarehouses] = useState<Warehouse[]>([]),
+    [branches, setBranches] = useState<PosBranch[]>([]),
     [staff, setStaff] = useState<OrganizationMember[]>([]),
     [shift, setShift] = useState<PosShift | null>(null),
     [cart, setCart] = useState<Line[]>([]),
@@ -72,8 +73,9 @@ export function PosPage({
       posApi.currentShift(),
       posApi.sales({ limit: '10' }),
       ['OWNER', 'ADMIN'].includes(role) ? organizationApi.users() : Promise.resolve([]),
+      posApi.branches(),
     ])
-      .then(([c, r, w, s, recent, members]) => {
+      .then(([c, r, w, s, recent, members, accessibleBranches]) => {
         setCustomers(c.data.filter((x) => x.isActive));
         setRegisters(r);
         setWarehouses(w);
@@ -81,6 +83,7 @@ export function PosPage({
         setRegisterId(s?.registerId || r[0]?.id || '');
         setRecentSales(recent.data);
         setStaff(members.filter((member) => member.user.isActive));
+        setBranches(accessibleBranches);
         if (!r.length) setProductsLoading(false);
       })
       .catch((e) => {
@@ -185,6 +188,7 @@ export function PosPage({
           name: f.get('name'),
           warehouseId: f.get('warehouseId'),
           assignedStaffId: f.get('assignedStaffId'),
+          branchId: f.get('branchId'),
         });
         setRegisters((x) => [...x, r]);
         setRegisterId(r.id);
@@ -193,6 +197,7 @@ export function PosPage({
         const updated = await posApi.assignRegisterStaff(
           registerId,
           String(f.get('assignedStaffId')),
+          String(f.get('branchId')),
         );
         setRegisters((current) =>
           current.map((register) => (register.id === updated.id ? updated : register)),
@@ -701,6 +706,19 @@ export function PosPage({
                 {!staff.length && <small>No active staff accounts are available.</small>}
               </label>
               <label className="full">
+                Branch
+                <select name="branchId" required defaultValue="">
+                  <option value="" disabled>
+                    Select branch
+                  </option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="full">
                 Warehouse
                 <select
                   name="warehouseId"
@@ -717,21 +735,36 @@ export function PosPage({
               </label>
             </>
           ) : setup === 'ASSIGN' ? (
-            <label className="full">
-              Assigned staff
-              <select name="assignedStaffId" required defaultValue="">
-                <option value="" disabled>
-                  Select existing staff
-                </option>
-                {staff.map((member) => (
-                  <option key={member.user.id} value={member.user.id}>
-                    {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
-                      member.user.email}{' '}
-                    — {member.role}
+            <>
+              <label className="full">
+                Primary staff
+                <select name="assignedStaffId" required defaultValue="">
+                  <option value="" disabled>
+                    Select existing staff
                   </option>
-                ))}
-              </select>
-            </label>
+                  {staff.map((member) => (
+                    <option key={member.user.id} value={member.user.id}>
+                      {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
+                        member.user.email}{' '}
+                      — {member.role}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="full">
+                Branch
+                <select name="branchId" required defaultValue="">
+                  <option value="" disabled>
+                    Select branch
+                  </option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           ) : setup === 'SHIFT' ? (
             <label className="full">
               Opening cash
