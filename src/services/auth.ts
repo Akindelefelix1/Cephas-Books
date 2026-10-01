@@ -34,6 +34,7 @@ export interface CurrentUserProfile {
   phone: string | null;
   address: string | null;
   mustChangePassword: boolean;
+  passwordChangedAt: string | null;
   createdAt: string;
   isActive: boolean;
   role: string;
@@ -121,7 +122,7 @@ export const authApi = {
       body: JSON.stringify(data),
     }),
   changePassword: (currentPassword: string, newPassword: string) =>
-    authorizedRequest<{ changed: true }>('/auth/password', {
+    authorizedRequest<{ changed: true; passwordChangedAt: string }>('/auth/password', {
       method: 'PATCH',
       body: JSON.stringify({ currentPassword, newPassword }),
     }),

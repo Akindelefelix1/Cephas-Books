@@ -1187,6 +1187,15 @@ export function NotificationsPage() {
   );
 }
 
+function formatPasswordChangedAt(value: string | null) {
+  if (!value) return 'Password change history unavailable';
+  return `Last changed on ${new Intl.DateTimeFormat('en-NG', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(value))}`;
+}
+
 export function ProfilePage({
   profile,
   onLogout,
@@ -1198,6 +1207,7 @@ export function ProfilePage({
     companyName: string;
     role: string;
     createdAt: string;
+    passwordChangedAt: string | null;
     isActive: boolean;
     baseCurrency: string;
   };
@@ -1211,6 +1221,7 @@ export function ProfilePage({
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [passwordChangedAt, setPasswordChangedAt] = useState(profile.passwordChangedAt);
   const saveProfile = async () => {
     setSaving(true);
     setError('');
@@ -1382,7 +1393,7 @@ export function ProfilePage({
                 <LockKeyhole />
                 <span>
                   <strong>Password</strong>
-                  <small>Last changed 42 days ago</small>
+                  <small>{formatPasswordChangedAt(passwordChangedAt)}</small>
                 </span>
               </span>
               <button
@@ -1471,7 +1482,8 @@ export function ProfilePage({
             setPasswordError('');
             void authApi
               .changePassword(currentPassword, newPassword)
-              .then(() => {
+              .then((result) => {
+                setPasswordChangedAt(result.passwordChangedAt);
                 setPasswordOpen(false);
                 confirmAction('Password changed successfully');
               })
