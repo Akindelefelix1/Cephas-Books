@@ -660,7 +660,11 @@ export function PosPage({
               </label>
               <label className="full">
                 Warehouse
-                <select name="warehouseId" required>
+                <select
+                  name="warehouseId"
+                  required
+                  defaultValue={warehouses.find((warehouse) => warehouse.isDefault)?.id || ''}
+                >
                   <option value="">Select warehouse</option>
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>

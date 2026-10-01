@@ -65,6 +65,7 @@ export interface Warehouse {
   name: string;
   address?: string;
   manager?: string;
+  isDefault: boolean;
   isActive: boolean;
 }
 export interface StockMovement {
@@ -147,6 +148,8 @@ export const operationsApi = {
     req<Warehouse>(`/operations/warehouses/${id}`, 'PATCH', data),
   warehouseStatus: (id: string, isActive: boolean) =>
     req<Warehouse>(`/operations/warehouses/${id}/status`, 'PATCH', { isActive }),
+  makeDefaultWarehouse: (id: string) =>
+    req<Warehouse>(`/operations/warehouses/${id}/default`, 'PATCH'),
   movements: (filters = {}) => req<StockMovement[]>(`/operations/movements?${query(filters)}`),
   createMovement: (data: object) => req<StockMovement>('/operations/movements', 'POST', data),
   transfer: (data: object) => req<StockMovement[]>('/operations/transfers', 'POST', data),

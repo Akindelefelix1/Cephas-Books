@@ -55,6 +55,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   const [rows, setRows] = useState<Row[]>([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -85,7 +86,8 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       setProducts(p.filter((x) => x.isActive && x.type === 'PRODUCT'));
       setWarehouses(w.filter((x) => x.isActive));
       setCategories(c);
-      if (view === 'products') setRows(await operationsApi.products({ search, status }));
+      if (view === 'products')
+        setRows(await operationsApi.products({ search, status, category: categoryFilter }));
       else if (view === 'warehouses') setRows(await operationsApi.warehouses({ search, status }));
       else if (view === 'stock-movements')
         setRows(await operationsApi.movements({ search, type: status }));
@@ -98,7 +100,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
     } finally {
       setLoading(false);
     }
-  }, [view, search, status]);
+  }, [view, search, status, categoryFilter]);
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 200);
     return () => window.clearTimeout(timer);
@@ -273,6 +275,20 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
               </option>
             ))}
           </select>
+          {view === 'products' && (
+            <select
+              aria-label="Category"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+            >
+              <option value="">All categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.name}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          )}
           {view === 'products' && (
             <div className="inventory-view-toggle" aria-label="Inventory view">
               <button
@@ -475,7 +491,13 @@ function values(view: OperationsView, row: Row, currency = 'NGN') {
   }
   if (view === 'warehouses') {
     const x = row as Warehouse;
-    return [x.code, x.name, x.manager || '—', x.address || '—', x.isActive ? 'ACTIVE' : 'ARCHIVED'];
+    return [
+      x.code,
+      `${x.name}${x.isDefault ? ' · Default' : ''}`,
+      x.manager || '—',
+      x.address || '—',
+      x.isActive ? 'ACTIVE' : 'ARCHIVED',
+    ];
   }
   if (view === 'stock-movements') {
     const x = row as StockMovement;
@@ -508,7 +530,8 @@ function values(view: OperationsView, row: Row, currency = 'NGN') {
   ];
 }
 function statusOptions(view: OperationsView) {
-  if (view === 'products' || view === 'warehouses') return ['active', 'archived'];
+  if (view === 'products') return ['active', 'archived', 'low_stock', 'out_of_stock'];
+  if (view === 'warehouses') return ['active', 'archived'];
   if (view === 'stock-movements')
     return ['RECEIPT', 'ISSUE', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'];
   if (view === 'stock-adjustments') return ['DRAFT', 'APPROVED', 'VOID'];
@@ -540,6 +563,15 @@ function rowActions(
     return (
       <>
         <button onClick={edit}>Edit</button>
+        {!x.isDefault && x.isActive && (
+          <button
+            onClick={() =>
+              run(() => operationsApi.makeDefaultWarehouse(x.id), `${x.name} is now the default`)
+            }
+          >
+            Make default
+          </button>
+        )}
         <button
           onClick={() =>
             run(
@@ -1452,7 +1484,14 @@ function OperationsModal({
             {itemType === 'PRODUCT' && (
               <label>
                 Default stock warehouse
-                <select name="defaultWarehouseId" defaultValue={p?.defaultWarehouseId || ''}>
+                <select
+                  name="defaultWarehouseId"
+                  defaultValue={
+                    p?.defaultWarehouseId ||
+                    warehouses.find((warehouse) => warehouse.isDefault)?.id ||
+                    ''
+                  }
+                >
                   <option value="">No default warehouse</option>
                   {warehouses.map((warehouse) => (
                     <option key={warehouse.id} value={warehouse.id}>
@@ -1551,7 +1590,11 @@ function OperationsModal({
             </label>
             <label>
               Warehouse
-              <select name="warehouseId" required defaultValue="">
+              <select
+                name="warehouseId"
+                required
+                defaultValue={warehouses.find((warehouse) => warehouse.isDefault)?.id || ''}
+              >
                 <option value="" disabled>
                   Select warehouse
                 </option>
