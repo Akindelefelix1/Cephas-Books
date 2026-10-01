@@ -693,6 +693,7 @@ export function OrganizationSettingsPage({
           onUpdate={(id, data) =>
             run(() => organizationApi.updateUser(id, data), 'User access updated')
           }
+          onDelete={(id) => run(() => organizationApi.deleteUser(id), 'User removed')}
           onSaveRole={(id, data) =>
             run(
               () => (id ? organizationApi.updateRole(id, data) : organizationApi.createRole(data)),
@@ -1018,6 +1019,7 @@ function UsersSection({
   busy,
   onInvite,
   onUpdate,
+  onDelete,
   onSaveRole,
   onDeleteRole,
 }: {
@@ -1038,6 +1040,7 @@ function UsersSection({
       address?: string;
     },
   ) => Promise<boolean>;
+  onDelete: (id: string) => Promise<boolean>;
   onSaveRole: (id: string | null, data: Omit<CustomRole, 'id' | '_count'>) => Promise<boolean>;
   onDeleteRole: (id: string) => Promise<boolean>;
 }) {
@@ -1239,6 +1242,16 @@ function UsersSection({
               (updated) => updated && setEditingMember(null),
             );
           }}
+          onDelete={() => {
+            if (
+              window.confirm(
+                `Remove ${editingMember.user.email} from this organisation? They will lose access immediately.`,
+              )
+            )
+              void onDelete(editingMember.id).then(
+                (deleted) => deleted && setEditingMember(null),
+              );
+          }}
         />
       )}
     </>
@@ -1250,11 +1263,13 @@ function UserDetailsDialog({
   busy,
   onClose,
   onSubmit,
+  onDelete,
 }: {
   member: OrganizationMember;
   busy: boolean;
   onClose: () => void;
   onSubmit: (data: { firstName: string; lastName: string; phone: string; address: string }) => void;
+  onDelete: () => void;
 }) {
   return (
     <Modal
@@ -1263,6 +1278,13 @@ function UserDetailsDialog({
       onClose={onClose}
       footer={
         <>
+          <button
+            className="button button--danger modal-delete-action"
+            onClick={onDelete}
+            disabled={busy}
+          >
+            <Trash2 size={16} /> Remove user
+          </button>
           <button className="button button--secondary" onClick={onClose}>
             Cancel
           </button>

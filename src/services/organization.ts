@@ -111,6 +111,8 @@ export const organizationApi = {
       address?: string;
     },
   ) => request<OrganizationMember>(`/organizations/current/users/${id}`, 'PATCH', data),
+  deleteUser: (id: string) =>
+    request<{ deleted: true }>(`/organizations/current/users/${id}`, 'DELETE'),
   roles: () => request<CustomRole[]>('/organizations/current/roles'),
   createRole: (data: Omit<CustomRole, 'id' | '_count'>) =>
     request<CustomRole>('/organizations/current/roles', 'POST', data),
