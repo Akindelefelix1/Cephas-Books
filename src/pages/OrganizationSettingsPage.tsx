@@ -13,6 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -1046,6 +1047,7 @@ function UsersSection({
 }) {
   const [roleDialog, setRoleDialog] = useState<CustomRole | 'new' | null>(null);
   const [editingMember, setEditingMember] = useState<OrganizationMember | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<OrganizationMember | null>(null);
   return (
     <>
       <StatsGrid
@@ -1243,17 +1245,31 @@ function UsersSection({
             );
           }}
           onDelete={() => {
-            if (
-              window.confirm(
-                `Remove ${editingMember.user.email} from this organisation? They will lose access immediately.`,
-              )
-            )
-              void onDelete(editingMember.id).then(
-                (deleted) => deleted && setEditingMember(null),
-              );
+            setMemberToDelete(editingMember);
+            setEditingMember(null);
           }}
         />
       )}
+      <ConfirmModal
+        key={memberToDelete?.id ?? 'remove-user'}
+        confirmation={
+          memberToDelete
+            ? {
+                title: memberToDelete.user.mustChangePassword
+                  ? 'Remove invited user?'
+                  : 'Remove user?',
+                message: `${memberToDelete.user.email} will immediately lose access to this organisation. This action cannot be undone.`,
+                confirmLabel: 'Remove user',
+                onConfirm: () =>
+                  void onDelete(memberToDelete.id).then(
+                    (deleted) => deleted && setMemberToDelete(null),
+                  ),
+              }
+            : null
+        }
+        busy={busy}
+        onClose={() => setMemberToDelete(null)}
+      />
     </>
   );
 }
