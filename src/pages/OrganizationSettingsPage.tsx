@@ -1098,7 +1098,11 @@ function UsersSection({
                       <i>{(member.user.firstName?.[0] || member.user.email[0]).toUpperCase()}</i>
                       <strong>
                         {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
-                          'Invited user'}
+                          (member.role === 'OWNER'
+                            ? 'Account owner'
+                            : member.user.mustChangePassword
+                              ? 'Invited user'
+                              : member.user.email.split('@')[0])}
                       </strong>
                     </span>
                   </td>
