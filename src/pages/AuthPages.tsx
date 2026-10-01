@@ -27,7 +27,9 @@ export function AuthPage({
   const [showPassword, setShowPassword] = useState(false);
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [flowStep, setFlowStep] = useState<'form' | 'otp' | 'new-password'>('form');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(
+    () => new URLSearchParams(window.location.search).get('email')?.trim() ?? '',
+  );
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [organizationName, setOrganizationName] = useState('');
@@ -142,7 +144,11 @@ export function AuthPage({
         const progress = await onboardingApi.get();
         onView(progress.onboardingCompletedAt ? 'app' : 'onboarding');
       } catch (caught) {
-        if (caught instanceof ApiError && caught.status === 403) {
+        if (
+          caught instanceof ApiError &&
+          caught.status === 403 &&
+          caught.message.toLowerCase().includes('email verification required')
+        ) {
           try {
             await authApi.resendVerification(email.trim());
           } catch {
