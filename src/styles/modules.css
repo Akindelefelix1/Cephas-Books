@@ -621,8 +621,49 @@
   text-align: right;
 }
 .receipt-card {
-  min-width: min(100%, 360px);
+  width: 100%;
+  min-width: 0;
   padding: 6px 2px;
+}
+.sales-receipt-paper {
+  margin-top: 0;
+}
+.sales-receipt-paper .invoice-paper__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.sales-receipt-paper__table {
+  width: 100%;
+  overflow-x: auto;
+}
+.sales-receipt-paper table {
+  table-layout: fixed;
+  min-width: 600px;
+}
+.sales-receipt-paper th:first-child {
+  width: 25%;
+}
+.sales-receipt-paper th:nth-child(2) {
+  width: 9%;
+}
+.sales-receipt-paper th:nth-child(n + 3) {
+  width: 16.5%;
+}
+.sales-receipt-paper th:nth-child(n + 2),
+.sales-receipt-paper td:nth-child(n + 2) {
+  text-align: right;
+  white-space: nowrap;
+}
+.sales-receipt-paper td:first-child {
+  overflow-wrap: anywhere;
+}
+.sales-receipt-paper .invoice-paper__message b {
+  display: block;
+  margin: 0 0 5px;
+}
+.sales-receipt-paper .invoice-paper__message p {
+  margin: 3px 0 10px;
 }
 .receipt-card__heading {
   flex-direction: column;

@@ -238,7 +238,15 @@ export function App() {
           }
         />
       );
-    if (active === 'pos-history') return <PosHistoryPage />;
+    if (active === 'pos-history')
+      return (
+        <PosHistoryPage
+          canReprint={
+            (!identity.customRoleId && ['OWNER', 'ADMIN'].includes(identity.role)) ||
+            identity.permissions.includes('sales.manage')
+          }
+        />
+      );
     if (
       ['customers', 'quotations', 'invoices', 'payments', 'credit-notes', 'receivables'].includes(
         active,

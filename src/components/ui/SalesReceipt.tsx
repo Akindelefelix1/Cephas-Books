@@ -8,309 +8,38 @@ import { getDefaultCurrency } from '@/utils/currency';
 
 const money = (value: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(value);
-const escapeHtml = (value: string) =>
-  value.replace(/[&<>"']/g, (character) => {
-    const entities: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    };
-    return entities[character];
-  });
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+})[character] || character);
 
 function receiptHtml(sale: PosSale, salesperson: string, thermal: boolean, qrCode: string) {
   const context = sale.receipt;
-  const rows = sale.items
-    .map((item) => {
-      const discountPerUnit = Number(item.discount || 0) / Number(item.quantity || 1);
-      const soldPrice = Number(item.unitPrice) - discountPerUnit;
-      return `<tr><td>${escapeHtml(item.description)}</td><td class="number">${escapeHtml(item.quantity)}</td><td class="number">${money(Number(item.unitPrice), sale.currency)}</td><td class="number">${money(discountPerUnit, sale.currency)}</td><td class="number">${money(soldPrice, sale.currency)}</td><td class="number">${money(Number(item.lineTotal), sale.currency)}</td></tr>`;
-    })
-    .join('');
-  const signature = (label: string, value?: string | null) =>
-    value
-      ? `<div class="signature"><img src="${escapeHtml(value)}" alt="${label} signature"><span>${label}</span></div>`
-      : '';
+  const rows = sale.items.map((item) => {
+    const discount = Number(item.discount || 0) / Number(item.quantity || 1);
+    return `<tr><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.quantity)}</td><td>${money(Number(item.unitPrice), sale.currency)}</td><td>${money(discount, sale.currency)}</td><td>${money(Number(item.unitPrice) - discount, sale.currency)}</td><td>${money(Number(item.lineTotal), sale.currency)}</td></tr>`;
+  }).join('');
+  const payments = sale.payments.map((payment) => `<p><span>${escapeHtml(payment.method)}${payment.reference ? ` - ${escapeHtml(payment.reference)}` : ''}</span><strong>${money(Number(payment.amount), sale.currency)}</strong></p>`).join('');
+  const signature = (label: string, value?: string | null) => value ? `<div class="signature"><img src="${escapeHtml(value)}" alt="${label} signature"><span>${label}</span></div>` : '';
+  const name = context?.organizationName || 'Cephas Books';
+  const logo = context?.logoUrl ? `<img src="${escapeHtml(context.logoUrl)}">` : escapeHtml(name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
   return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt ${escapeHtml(sale.receiptNumber)}</title><style>
-    *{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#172033;max-width:${thermal ? '80mm' : '210mm'};margin:${thermal ? '0' : '20mm auto'};padding:${thermal ? '3mm' : '10mm'}header{text-align:center;padding-bottom:10px;border-bottom:1px dashed #555}h1{font-size:18px;margin:0 0 5px}.logo{max-width:70px;max-height:48px}p{margin:4px 0;color:#475467}.meta{margin-top:8px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:6px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:${thermal ? '9px' : '11px'}}th{text-transform:uppercase}.number{text-align:right;white-space:nowrap}.total{margin-top:10px;padding:10px 3px;border-top:2px solid #172033;display:flex;justify-content:space-between;font-size:16px;font-weight:700}.settlement{padding:0 3px;display:flex;justify-content:space-between}.thanks,.policy{text-align:center;margin:14px 0}.qr{display:block;width:90px;height:90px;margin:12px auto}.signatures{display:flex;gap:24px;margin-top:24px}.signature{flex:1;text-align:center}.signature img{width:100%;height:55px;object-fit:contain;border-bottom:1px solid #667085}.signature span{display:block;font-size:10px}@page{size:${thermal ? '80mm auto' : 'A4'};margin:${thermal ? '2mm' : '10mm'}}
-    </style></head><body><header>${context?.logoUrl ? `<img class="logo" src="${escapeHtml(context.logoUrl)}">` : ''}<h1>${escapeHtml(context?.organizationName || 'Cephas Books')}</h1><p>${escapeHtml(context?.branchName || '')}</p><p>${escapeHtml(context?.branchAddress || context?.organizationAddress || '')}</p><p>${escapeHtml(context?.branchPhone || context?.organizationPhone || '')}</p><div class="meta"><p>${escapeHtml(sale.receiptNumber)} · ${escapeHtml(new Date(sale.createdAt).toLocaleString())}</p><p>Register: ${escapeHtml(context?.register?.name || '—')}</p><p>Cashier: ${escapeHtml(context?.cashier?.name || salesperson || '—')}</p>${sale.customer ? `<p>Customer: ${escapeHtml(sale.customer.displayName)}</p>` : ''}</div></header><table><thead><tr><th>Item</th><th class="number">Qty</th><th class="number">Price</th><th class="number">Disc.</th><th class="number">Sold at</th><th class="number">Total</th></tr></thead><tbody>${rows}</tbody></table><p class="settlement"><span>Tax</span><strong>${money(Number(sale.taxTotal || 0), sale.currency)}</strong></p>${Number(sale.discountTotal || 0) > 0 ? `<p class="settlement"><span>Discount</span><strong>-${money(Number(sale.discountTotal), sale.currency)}</strong></p>` : ''}<div class="total"><span>Total</span><span>${money(Number(sale.total), sale.currency)}</span></div>${sale.payments.map((payment) => `<p class="settlement"><span>${escapeHtml(payment.method)}${payment.reference ? ` · ${escapeHtml(payment.reference)}` : ''}</span><strong>${money(Number(payment.amount), sale.currency)}</strong></p>`).join('')}<p class="settlement"><span>Paid</span><strong>${money(Number(sale.paidAmount), sale.currency)}</strong></p><p class="settlement"><span>Change</span><strong>${money(Number(sale.changeAmount), sale.currency)}</strong></p><img class="qr" src="${qrCode}"><p class="thanks">Verify: ${escapeHtml(context?.verificationCode || '')}</p><p class="policy">${escapeHtml(context?.returnPolicy || '')}</p><p class="thanks">Thank you for your business.</p><div class="signatures">${signature('Customer', sale.customerSignature)}${signature('Sales manager', sale.salesManagerSignature)}</div></body></html>`;
+  *{box-sizing:border-box}body{margin:0;background:${thermal ? '#fff' : '#eceff3'};font-family:Arial,sans-serif;color:#20242c}.paper{position:relative;width:${thermal ? '80mm' : '210mm'};min-height:${thermal ? 'auto' : '297mm'};margin:auto;overflow:hidden;background:#fff}.accent{position:absolute;top:-44mm;left:50%;width:238mm;height:238mm;border-radius:50%;background:#ff8500;transform:translateX(-50%)}.content{position:relative;width:${thermal ? '100%' : '174mm'};min-height:${thermal ? 'auto' : '253mm'};margin:${thermal ? '0' : '22mm auto'};padding:${thermal ? '4mm' : '9mm 10mm 8mm'};background:#fff;box-shadow:${thermal ? 'none' : '0 8px 30px #1f293726'}}header{display:flex;align-items:flex-start;justify-content:space-between;border-top:${thermal ? '1px' : '2px'} solid #ff8500;padding-top:${thermal ? '3mm' : '8mm'}}h1{margin:3mm 0 0;font-size:${thermal ? '16px' : '27px'}}.brand{display:grid;gap:2px;font-size:10px}.logo{display:grid;width:15mm;height:12mm;place-items:center;margin-bottom:2mm;background:#20242c;color:#fff;font-size:18px;font-weight:800}.logo img{max-width:100%;max-height:100%;object-fit:contain}.brand>strong{font-size:14px}.brand>span,.details span,.message{color:#667085}.details{display:grid;grid-template-columns:1fr 1fr 1.25fr;gap:8mm;margin:${thermal ? '6mm 0 4mm' : '16mm -10mm 7mm'};padding:${thermal ? '3mm 0' : '5mm 10mm'};background:#f3f4f6}.details>div{display:grid;align-content:start;gap:2px;font-size:9px}.details strong{font-size:10px}.details .meta span{display:flex;justify-content:space-between;gap:5px}table{width:100%;table-layout:fixed;border-collapse:collapse}th,td{padding:${thermal ? '2mm 1mm' : '3mm 2mm'};border-bottom:1px solid #e5e7eb;font-size:${thermal ? '7px' : '9px'};overflow-wrap:anywhere}th{border-color:#272b32;text-align:left}th:not(:first-child),td:not(:first-child){text-align:right}.footer{display:grid;grid-template-columns:${thermal ? '1fr' : '1.5fr 1fr'};gap:${thermal ? '4mm' : '14mm'};margin-top:9mm}.message{font-size:9px;line-height:1.5}.message p,.totals p{display:flex;justify-content:space-between;margin:2px 0}.totals p{padding:2.3mm 1mm}.totals .total{margin-top:1mm;border-top:1.5px solid #252932;font-size:14px}.qr{display:block;width:24mm;height:24mm;margin:5mm auto 2mm}.verify,.policy{text-align:center;font-size:9px;color:#59616d}.signatures{display:flex;gap:8mm;margin-top:8mm}.signature{flex:1;text-align:center;font-size:9px}.signature img{width:100%;height:18mm;object-fit:contain;border-bottom:1px solid #667085}.bottom{height:2px;margin-top:12mm;background:#ff8500}@page{size:${thermal ? '80mm auto' : 'A4'};margin:0}@media print{body{background:#fff}}
+  </style></head><body><article class="paper">${thermal ? '' : '<div class="accent"></div>'}<div class="content"><header><div class="brand"><div class="logo">${logo}</div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(context?.organizationWebsite || 'Professional accounting made simple')}</span></div><h1>Sales receipt</h1></header><section class="details"><div><b>Sold to</b><strong>${escapeHtml(sale.customer?.displayName || 'Walk-in customer')}</strong><span>${escapeHtml(sale.customer?.email || '')}</span><span>${escapeHtml(sale.customer?.phone || '')}</span></div><div><b>Sold at</b><strong>${escapeHtml(context?.branchName || 'Main branch')}</strong><span>${escapeHtml(context?.branchAddress || context?.organizationAddress || '')}</span><span>${escapeHtml(context?.branchPhone || context?.organizationPhone || '')}</span></div><div class="meta"><b>Receipt details</b><span>Receipt # <strong>${escapeHtml(sale.receiptNumber)}</strong></span><span>Date <strong>${escapeHtml(new Date(sale.createdAt).toLocaleDateString('en-NG'))}</strong></span><span>Register <strong>${escapeHtml(context?.register?.name || '-')}</strong></span><span>Cashier <strong>${escapeHtml(context?.cashier?.name || salesperson || '-')}</strong></span></div></section><table><thead><tr><th>Item</th><th>Qty</th><th>Original</th><th>Discount</th><th>Sold at</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table><footer class="footer"><div class="message"><b>Payment details</b>${payments}<p><span>Paid</span><strong>${money(Number(sale.paidAmount), sale.currency)}</strong></p><p><span>Change</span><strong>${money(Number(sale.changeAmount), sale.currency)}</strong></p><br><b>Return policy</b><div class="policy">${escapeHtml(context?.returnPolicy || 'Returns are subject to the business return policy.')}</div></div><div class="totals"><p><span>Subtotal</span><b>${money(Number(sale.subtotal ?? sale.total), sale.currency)}</b></p><p><span>Discount</span><b>-${money(Number(sale.discountTotal || 0), sale.currency)}</b></p><p><span>Sales tax</span><b>${money(Number(sale.taxTotal || 0), sale.currency)}</b></p><p class="total"><strong>Total</strong><b>${money(Number(sale.total), sale.currency)}</b></p></div></footer><img class="qr" src="${qrCode}"><div class="verify">Verification: ${escapeHtml(context?.verificationCode || '-')}</div><div class="signatures">${signature('Customer', sale.customerSignature)}${signature('Sales manager', sale.salesManagerSignature)}</div><div class="bottom"></div></div></article></body></html>`;
 }
 
-export function SalesReceipt({
-  sale,
-  salesperson = '',
-  onSaleChange,
-  canReprint = true,
-  historical = false,
-}: {
-  sale: PosSale;
-  salesperson?: string;
-  onSaleChange: (sale: PosSale) => void;
-  canReprint?: boolean;
-  historical?: boolean;
-}) {
-  const [customerSignature, setCustomerSignature] = useState<string | null>(
-    sale.customerSignature ?? null,
-  );
-  const [salesManagerSignature, setSalesManagerSignature] = useState<string | null>(
-    sale.salesManagerSignature ?? null,
-  );
+export function SalesReceipt({ sale, salesperson = '', onSaleChange, canReprint = true, historical = false }: { sale: PosSale; salesperson?: string; onSaleChange: (sale: PosSale) => void; canReprint?: boolean; historical?: boolean }) {
+  const [customerSignature, setCustomerSignature] = useState<string | null>(sale.customerSignature ?? null);
+  const [salesManagerSignature, setSalesManagerSignature] = useState<string | null>(sale.salesManagerSignature ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
-  const prepare = async () => {
-    if (historical) {
-      if (!canReprint) throw new Error('You do not have permission to reprint this receipt.');
-      await posApi.recordReprint(sale.id);
-    }
-    const updatedSale = await posApi.updateReceiptSignatures(sale.id, {
-      customerSignature,
-      salesManagerSignature,
-    });
-    onSaleChange(updatedSale);
-    return updatedSale;
-  };
-  const print = async (thermal: boolean) => {
-    const printWindow = window.open('', '_blank', 'width=760,height=800');
-    if (!printWindow) {
-      setError('Allow pop-ups to print or download this receipt.');
-      return;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      const updatedSale = await prepare();
-      const qrCode = await QRCode.toDataURL(updatedSale.receipt?.digitalUrl || updatedSale.id);
-      printWindow.document.open();
-      printWindow.document.write(receiptHtml(updatedSale, salesperson, thermal, qrCode));
-      printWindow.document.close();
-      window.setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-      }, 250);
-    } catch (caught) {
-      printWindow.close();
-      setError(caught instanceof Error ? caught.message : 'Unable to save receipt signatures.');
-    } finally {
-      setBusy(false);
-    }
-  };
-  const downloadPdf = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const updatedSale = await prepare();
-      const receipt = updatedSale.receipt;
-      const qrCode = await QRCode.toDataURL(receipt?.digitalUrl || updatedSale.id);
-      const document = new jsPDF({ unit: 'mm', format: 'a4' });
-      let y = 16;
-      document.setFontSize(18);
-      document.text(receipt?.organizationName || 'Cephas Books', 105, y, { align: 'center' });
-      document.setFontSize(10);
-      y += 7;
-      [receipt?.branchName, receipt?.branchAddress, receipt?.branchPhone].filter(Boolean).forEach((line) => {
-        document.text(String(line), 105, y, { align: 'center' }); y += 5;
-      });
-      y += 4;
-      document.text(`Receipt: ${updatedSale.receiptNumber}`, 14, y);
-      document.text(`Date: ${new Date(updatedSale.createdAt).toLocaleString()}`, 110, y);
-      y += 6;
-      document.text(`Register: ${receipt?.register?.name || '—'}`, 14, y);
-      document.text(`Cashier: ${receipt?.cashier?.name || salesperson || '—'}`, 110, y);
-      y += 9;
-      updatedSale.items.forEach((item) => {
-        const perUnitDiscount = Number(item.discount || 0) / Number(item.quantity || 1);
-        document.text(`${item.description} × ${item.quantity}`, 14, y);
-        document.text(money(Number(item.lineTotal), updatedSale.currency), 196, y, { align: 'right' });
-        if (perUnitDiscount > 0) {
-          y += 4;
-          document.setTextColor(20, 130, 70);
-          document.text(`Discount ${money(perUnitDiscount, updatedSale.currency)} per unit`, 18, y);
-          document.setTextColor(0, 0, 0);
-        }
-        y += 7;
-        if (y > 260) { document.addPage(); y = 16; }
-      });
-      document.line(14, y, 196, y); y += 7;
-      document.text(`Tax: ${money(Number(updatedSale.taxTotal || 0), updatedSale.currency)}`, 196, y, { align: 'right' }); y += 6;
-      document.setFontSize(14);
-      document.text(`Total: ${money(Number(updatedSale.total), updatedSale.currency)}`, 196, y, { align: 'right' });
-      document.addImage(qrCode, 'PNG', 14, y - 4, 28, 28);
-      document.setFontSize(9);
-      document.text(`Verification: ${receipt?.verificationCode || ''}`, 14, y + 29);
-      document.text(receipt?.returnPolicy || '', 105, y + 38, { align: 'center', maxWidth: 170 });
-      document.save(`${updatedSale.receiptNumber}.pdf`);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to download receipt PDF.');
-    } finally {
-      setBusy(false);
-    }
-  };
-  const deliver = async (method: 'email' | 'sms') => {
-    setBusy(true); setError('');
-    try {
-      if (historical && !canReprint) throw new Error('You do not have permission to deliver this receipt.');
-      if (method === 'email') await posApi.emailReceipt(sale.id);
-      else await posApi.smsReceipt(sale.id);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : `Unable to send ${method} receipt.`);
-    } finally { setBusy(false); }
-  };
-  const copyDigitalReceipt = async () => {
-    setBusy(true); setError('');
-    try {
-      const url = sale.receipt?.digitalUrl || `${window.location.origin}/receipt/${sale.id}`;
-      await navigator.clipboard.writeText(url);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to copy the digital receipt link.');
-    } finally { setBusy(false); }
-  };
-
-  const organizationName = sale.receipt?.organizationName || 'Cephas Books';
-  const branchAddress = [sale.receipt?.branchAddress, sale.receipt?.branchPhone, sale.receipt?.organizationAddress]
-    .filter(Boolean)
-    .join(' · ');
-
-  return (
-    <div className="receipt-card">
-      <div className="receipt-card__heading">
-        {sale.receipt?.logoUrl ? (
-          <img src={sale.receipt.logoUrl} alt={organizationName} style={{ maxHeight: 48, maxWidth: 90, objectFit: 'contain' }} />
-        ) : null}
-        <strong>{organizationName}</strong>
-        <small>{sale.receiptNumber}</small>
-        {sale.receipt?.branchName && <small>{sale.receipt.branchName}</small>}
-        {branchAddress && <small>{branchAddress}</small>}
-        {sale.receipt?.register?.name && <small>Register: {sale.receipt.register.name}</small>}
-        {sale.receipt?.cashier?.name && <small>Cashier: {sale.receipt.cashier.name}</small>}
-        <small>{new Date(sale.createdAt).toLocaleString()}</small>
-        {sale.customer && <small>Customer: {sale.customer.displayName}</small>}
-        {salesperson && <small>Salesperson: {salesperson}</small>}
-      </div>
-      <div className="receipt-card__table-wrap">
-        <table className="receipt-card__table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th className="is-right">Quantity</th>
-              <th className="is-right">Original</th>
-              <th className="is-right">Discount / unit</th>
-              <th className="is-right">Sold at</th>
-              <th className="is-right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sale.items.map((item, index) => {
-              const discountPerUnit = Number(item.discount || 0) / Number(item.quantity || 1);
-              return <tr key={`${item.description}-${index}`}>
-                <td>{item.description}</td>
-                <td className="is-right">{item.quantity}</td>
-                <td className="is-right">{money(Number(item.unitPrice), sale.currency)}</td>
-                <td className="is-right">{money(discountPerUnit, sale.currency)}</td>
-                <td className="is-right">
-                  {money(Number(item.unitPrice) - discountPerUnit, sale.currency)}
-                </td>
-                <td className="is-right">{money(Number(item.lineTotal), sale.currency)}</td>
-              </tr>;
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div className="receipt-card__settlement">
-        <span>Subtotal</span>
-        <strong>{money(Number(sale.subtotal ?? sale.total), sale.currency)}</strong>
-      </div>
-      {Number(sale.taxTotal || 0) > 0 && (
-        <div className="receipt-card__settlement">
-          <span>Tax</span>
-          <strong>{money(Number(sale.taxTotal), sale.currency)}</strong>
-        </div>
-      )}
-      {Number(sale.discountTotal || 0) > 0 && (
-        <div className="receipt-card__settlement">
-          <span>Discount</span>
-          <strong>−{money(Number(sale.discountTotal), sale.currency)}</strong>
-        </div>
-      )}
-      <div className="receipt-card__total">
-        <span>Total</span>
-        <strong>{money(Number(sale.total), sale.currency)}</strong>
-      </div>
-      {sale.payments.length > 0 && (
-        <div className="receipt-card__settlement" style={{ display: 'block' }}>
-          {sale.payments.map((payment) => (
-            <div key={`${payment.method}-${payment.amount}-${payment.reference ?? 'no-ref'}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-              <span>{payment.method}{payment.reference ? ` · ${payment.reference}` : ''}</span>
-              <strong>{money(Number(payment.amount), sale.currency)}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="receipt-card__settlement">
-        <span>Paid</span>
-        <strong>{money(Number(sale.paidAmount), sale.currency)}</strong>
-        <span>Change</span>
-        <strong>{money(Number(sale.changeAmount), sale.currency)}</strong>
-      </div>
-      {sale.receipt?.verificationCode && (
-        <div className="receipt-card__settlement" style={{ display: 'block' }}>
-          <span>Verification</span>
-          <strong>{sale.receipt.verificationCode}</strong>
-        </div>
-      )}
-      {sale.receipt?.digitalUrl && (
-        <div className="receipt-card__settlement" style={{ display: 'block' }}>
-          <span>Digital receipt</span>
-          <strong>{sale.receipt.digitalUrl}</strong>
-        </div>
-      )}
-      {sale.receipt?.returnPolicy && (
-        <div className="receipt-card__settlement" style={{ display: 'block' }}>
-          <span>Return policy</span>
-          <strong>{sale.receipt.returnPolicy}</strong>
-        </div>
-      )}
-      <div className="receipt-card__signatures">
-        <SignaturePad
-          label="Customer signature (optional)"
-          value={customerSignature}
-          onChange={setCustomerSignature}
-        />
-        <SignaturePad
-          label="Sales manager signature (optional)"
-          value={salesManagerSignature}
-          onChange={setSalesManagerSignature}
-        />
-      </div>
-      {error && <p className="form-error">{error}</p>}
-      <div className="receipt-card__actions">
-        <button
-          className="button button--secondary"
-          onClick={() => void print(false)}
-          disabled={busy}
-        >
-          <Printer size={16} /> {busy ? 'Saving…' : 'Print'}
-        </button>
-        <button className="button button--secondary" onClick={() => void print(true)} disabled={busy}>
-          <Printer size={16} /> {busy ? 'Saving…' : 'Print thermal'}
-        </button>
-        <button className="button" onClick={() => void downloadPdf()} disabled={busy}>
-          <Download size={16} /> {busy ? 'Saving…' : 'Download PDF'}
-        </button>
-      </div>
-      <div className="receipt-card__actions">
-        <button className="button button--secondary" onClick={() => void deliver('email')} disabled={busy}>
-          <Mail size={16} /> Email
-        </button>
-        <button className="button button--secondary" onClick={() => void deliver('sms')} disabled={busy}>
-          <MessageSquare size={16} /> SMS
-        </button>
-        <button className="button button--secondary" onClick={() => void copyDigitalReceipt()} disabled={busy}>
-          <Link size={16} /> Copy link
-        </button>
-      </div>
-    </div>
-  );
+  const [notice, setNotice] = useState('');
+  const allowed = !historical || canReprint;
+  const prepare = async () => { if (!allowed) throw new Error('You do not have permission to reprint this receipt.'); if (historical) await posApi.recordReprint(sale.id); const updated = await posApi.updateReceiptSignatures(sale.id, { customerSignature, salesManagerSignature }); onSaleChange(updated); return updated; };
+  const print = async (thermal: boolean) => { const popup = window.open('', '_blank', 'width=900,height=1100'); if (!popup) return setError('Allow pop-ups to print this receipt.'); setBusy(true); setError(''); try { const updated = await prepare(); const qr = await QRCode.toDataURL(updated.receipt?.digitalUrl || updated.id); popup.document.write(receiptHtml(updated, salesperson, thermal, qr)); popup.document.close(); window.setTimeout(() => { popup.focus(); popup.print(); }, 250); } catch (caught) { popup.close(); setError(caught instanceof Error ? caught.message : 'Unable to print receipt.'); } finally { setBusy(false); } };
+  const downloadPdf = async () => { setBusy(true); setError(''); try { const updated = await prepare(); const receipt = updated.receipt; const qr = await QRCode.toDataURL(receipt?.digitalUrl || updated.id); const pdf = new jsPDF({ unit: 'mm', format: 'a4' }); let y = 18; pdf.setFontSize(18); pdf.text(receipt?.organizationName || 'Cephas Books', 105, y, { align: 'center' }); pdf.setFontSize(10); y += 7; [receipt?.branchName, receipt?.branchAddress, receipt?.branchPhone].filter(Boolean).forEach((line) => { pdf.text(String(line), 105, y, { align: 'center' }); y += 5; }); y += 4; pdf.text(`Receipt: ${updated.receiptNumber}`, 14, y); pdf.text(`Date: ${new Date(updated.createdAt).toLocaleString()}`, 110, y); y += 6; pdf.text(`Register: ${receipt?.register?.name || '-'}`, 14, y); pdf.text(`Cashier: ${receipt?.cashier?.name || salesperson || '-'}`, 110, y); y += 10; updated.items.forEach((item) => { const discount = Number(item.discount || 0) / Number(item.quantity || 1); pdf.text(`${item.description} x ${item.quantity}`, 14, y); pdf.text(money(Number(item.lineTotal), updated.currency), 196, y, { align: 'right' }); if (discount) { y += 4; pdf.setTextColor(20, 130, 70); pdf.text(`Discount ${money(discount, updated.currency)} per unit`, 18, y); pdf.setTextColor(0, 0, 0); } y += 7; if (y > 250) { pdf.addPage(); y = 16; } }); pdf.line(14, y, 196, y); y += 7; pdf.text(`Tax: ${money(Number(updated.taxTotal || 0), updated.currency)}`, 196, y, { align: 'right' }); y += 7; pdf.setFontSize(14); pdf.text(`Total: ${money(Number(updated.total), updated.currency)}`, 196, y, { align: 'right' }); pdf.addImage(qr, 'PNG', 14, y - 4, 28, 28); pdf.setFontSize(9); pdf.text(`Verification: ${receipt?.verificationCode || ''}`, 14, y + 29); pdf.text(receipt?.returnPolicy || '', 105, y + 38, { align: 'center', maxWidth: 170 }); pdf.save(`${updated.receiptNumber}.pdf`); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to download receipt PDF.'); } finally { setBusy(false); } };
+  const deliver = async (method: 'email' | 'sms') => { setBusy(true); setError(''); setNotice(''); try { if (!allowed) throw new Error('You do not have permission to send this receipt.'); if (method === 'email') await posApi.emailReceipt(sale.id); else await posApi.smsReceipt(sale.id); setNotice(`Receipt sent by ${method}.`); } catch (caught) { setError(caught instanceof Error ? caught.message : `Unable to send ${method} receipt.`); } finally { setBusy(false); } };
+  const name = sale.receipt?.organizationName || 'Cephas Books';
+  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  const address = [sale.receipt?.branchAddress || sale.receipt?.organizationAddress, sale.receipt?.branchPhone || sale.receipt?.organizationPhone].filter(Boolean).join(' - ');
+  return <div className="receipt-card"><article className="invoice-paper sales-receipt-paper"><div className="invoice-paper__accent" aria-hidden="true" /><div className="invoice-paper__content"><header className="invoice-paper__header"><div className="invoice-paper__brand"><div className="invoice-paper__logo">{sale.receipt?.logoUrl ? <img src={sale.receipt.logoUrl} alt="" /> : initials}</div><strong>{name}</strong><span>{sale.receipt?.organizationWebsite || 'Professional accounting made simple'}</span></div><h1>Sales receipt</h1></header><section className="invoice-paper__parties"><div><b>Sold to</b><strong>{sale.customer?.displayName || 'Walk-in customer'}</strong><span>{sale.customer?.email}</span><span>{sale.customer?.phone}</span></div><div><b>Sold at</b><strong>{sale.receipt?.branchName || 'Main branch'}</strong><span>{address}</span><span>Register: {sale.receipt?.register?.name || '-'}</span></div><div className="invoice-paper__details"><b>Receipt details</b><span>Receipt # <strong>{sale.receiptNumber}</strong></span><span>Date <strong>{new Date(sale.createdAt).toLocaleDateString('en-NG')}</strong></span><span>Cashier <strong>{sale.receipt?.cashier?.name || salesperson || '-'}</strong></span><span>Verification <strong>{sale.receipt?.verificationCode || '-'}</strong></span></div></section><div className="sales-receipt-paper__table"><table><thead><tr><th>Item</th><th>Qty</th><th>Original</th><th>Discount / unit</th><th>Sold at</th><th>Amount</th></tr></thead><tbody>{sale.items.map((item, index) => { const discount = Number(item.discount || 0) / Number(item.quantity || 1); return <tr key={`${item.description}-${index}`}><td>{item.description}</td><td>{item.quantity}</td><td>{money(Number(item.unitPrice), sale.currency)}</td><td>{money(discount, sale.currency)}</td><td>{money(Number(item.unitPrice) - discount, sale.currency)}</td><td>{money(Number(item.lineTotal), sale.currency)}</td></tr>; })}</tbody></table></div><footer className="invoice-paper__footer"><div className="invoice-paper__message"><b>Payment details</b>{sale.payments.map((payment) => <p key={`${payment.method}-${payment.reference || payment.amount}`}><strong>{payment.method}</strong>{payment.reference ? ` - ${payment.reference}` : ''}: {money(Number(payment.amount), sale.currency)}</p>)}<p>Paid: {money(Number(sale.paidAmount), sale.currency)} · Change: {money(Number(sale.changeAmount), sale.currency)}</p><b>Return policy</b><p>{sale.receipt?.returnPolicy || 'Returns are subject to the business return policy.'}</p>{sale.receipt?.digitalUrl && <a href={sale.receipt.digitalUrl} target="_blank" rel="noreferrer">View verified digital receipt</a>}</div><div className="invoice-paper__totals"><span>Subtotal <b>{money(Number(sale.subtotal ?? sale.total), sale.currency)}</b></span><span>Discount <b>-{money(Number(sale.discountTotal || 0), sale.currency)}</b></span><span>Sales tax <b>{money(Number(sale.taxTotal || 0), sale.currency)}</b></span><strong>Total <b>{money(Number(sale.total), sale.currency)}</b></strong></div></footer><div className="invoice-paper__bottom-line" /></div></article><div className="receipt-card__signatures"><SignaturePad label="Customer signature (optional)" value={customerSignature} onChange={setCustomerSignature} /><SignaturePad label="Sales manager signature (optional)" value={salesManagerSignature} onChange={setSalesManagerSignature} /></div>{error && <p className="form-error">{error}</p>}{notice && <p className="form-success">{notice}</p>}<div className="receipt-card__actions"><button className="button button--secondary" onClick={() => void print(false)} disabled={busy || !allowed}><Printer size={16} /> A4 print</button><button className="button button--secondary" onClick={() => void print(true)} disabled={busy || !allowed}><Printer size={16} /> Thermal print</button><button className="button" onClick={() => void downloadPdf()} disabled={busy || !allowed}><Download size={16} /> Download PDF</button></div><div className="receipt-card__actions"><button className="button button--secondary" onClick={() => void deliver('email')} disabled={busy || !allowed || !sale.customer?.email}><Mail size={16} /> Email</button><button className="button button--secondary" onClick={() => void deliver('sms')} disabled={busy || !allowed || !sale.customer?.phone}><MessageSquare size={16} /> SMS</button><button className="button button--secondary" disabled={busy || !sale.receipt?.digitalUrl} onClick={() => sale.receipt?.digitalUrl && void navigator.clipboard.writeText(sale.receipt.digitalUrl).then(() => setNotice('Digital receipt link copied.')).catch(() => setError('Unable to copy the digital receipt link.'))}><Link size={16} /> Copy link</button></div></div>;
 }

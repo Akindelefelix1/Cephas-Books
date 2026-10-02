@@ -10,7 +10,7 @@ import { getDefaultCurrency } from '@/utils/currency';
 const money = (value: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(value);
 
-export function PosHistoryPage() {
+export function PosHistoryPage({ canReprint = false }: { canReprint?: boolean }) {
   const [sales, setSales] = useState<PosSale[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [page, setPage] = useState(1);
@@ -162,10 +162,12 @@ export function PosHistoryPage() {
         </div>
       </section>
       {selectedSale && (
-        <Modal open title="Sales receipt" onClose={() => setSelectedSale(null)} footer={null}>
+        <Modal open title="Sales receipt" onClose={() => setSelectedSale(null)} footer={null} wide>
           <SalesReceipt
             key={selectedSale.id}
             sale={selectedSale}
+            historical
+            canReprint={canReprint}
             onSaleChange={(updatedSale) => {
               setSelectedSale(updatedSale);
               setSales((current) =>

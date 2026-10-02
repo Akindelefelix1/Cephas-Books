@@ -273,7 +273,6 @@ export function PosPage({
   };
   const complete = async () => {
     if (!registerId) return setError('Set up a register first.');
-    if (!shift) return setError('Open a cashier shift first.');
     if (!cart.length) return setError('Add an item to the sale.');
     const settledPayments = paymentRows
       .map((payment) => ({ ...payment, amount: Number(payment.amount || 0) }))
@@ -300,7 +299,11 @@ export function PosPage({
         })),
         payments: settledPayments,
       });
-      const s = await posApi.receipt(completed.id);
+      const [s, activeShift] = await Promise.all([
+        posApi.receipt(completed.id),
+        shift ? Promise.resolve(shift) : posApi.currentShift(),
+      ]);
+      setShift(activeShift);
       setSale(s);
       setProducts((current) => {
         const updated = current.map((product) => {
@@ -613,8 +616,9 @@ export function PosPage({
                 </button>
               )}
               <button className="button button--secondary" onClick={() => setSetup('SHIFT')}>
-                Open cashier shift
+                Open shift (optional)
               </button>
+              <small className="pos-helper">Otherwise, a zero-cash shift opens automatically with the first sale.</small>
             </>
           )}
           {shift && <small className="pos-status">Shift open on {shift.register.code}</small>}
@@ -812,7 +816,7 @@ export function PosPage({
           Pay {money(total)}
         </button>
         {sale && (
-          <Modal open={true} onClose={() => setSale(null)} title="Sale completed" footer={null}>
+          <Modal open={true} onClose={() => setSale(null)} title="Sale completed" footer={null} wide>
             <SalesReceipt
               key={sale.id}
               sale={sale}
