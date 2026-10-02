@@ -37,11 +37,11 @@ type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'CREDIT';
 type PaymentInput = { method: PaymentMethod; amount: string };
 type Line = Product & { quantity: number };
 export function PosPage({
-  role,
+  canConfigurePos,
   onNavigate,
   salesperson,
 }: {
-  role: string;
+  canConfigurePos: boolean;
   onNavigate: (id: string) => void;
   salesperson: string;
 }) {
@@ -70,12 +70,12 @@ export function PosPage({
     void Promise.all([
       salesApi.customers(),
       posApi.registers(),
-      ['OWNER', 'ADMIN'].includes(role)
+      canConfigurePos
         ? operationsApi.warehouses({ status: 'active' })
         : Promise.resolve([]),
       posApi.currentShift(),
       posApi.sales({ limit: '10' }),
-      ['OWNER', 'ADMIN'].includes(role) ? organizationApi.users() : Promise.resolve([]),
+      canConfigurePos ? organizationApi.users() : Promise.resolve([]),
       posApi.branches(),
     ])
       .then(([c, r, w, s, recent, members, accessibleBranches]) => {
@@ -103,7 +103,7 @@ export function PosPage({
         setError(e instanceof Error ? e.message : 'Unable to load POS data');
         setProductsLoading(false);
       });
-  }, [role]);
+  }, [canConfigurePos]);
   useEffect(() => {
     const register = registers.find((item) => item.id === registerId);
     if (!register) return;
@@ -513,7 +513,7 @@ export function PosPage({
                 </option>
               ))}
             </select>
-            {!availableRegisters.length && ['OWNER', 'ADMIN'].includes(role) && (
+            {!availableRegisters.length && canConfigurePos && (
               <button className="button button--secondary" onClick={() => setSetup('REGISTER')}>
                 Set up
               </button>
@@ -521,7 +521,7 @@ export function PosPage({
           </div>
           {registerId && !shift && (
             <>
-              {['OWNER', 'ADMIN'].includes(role) && (
+              {canConfigurePos && (
                 <button className="button button--secondary" onClick={() => setSetup('ASSIGN')}>
                   Assign staff
                 </button>

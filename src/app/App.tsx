@@ -231,7 +231,7 @@ export function App() {
     if (active === 'pos')
       return (
         <PosPage
-          role={roleFor('sales.manage')}
+          canConfigurePos={!identity.customRoleId && identity.role === 'OWNER'}
           onNavigate={navigate}
           salesperson={
             [identity.firstName, identity.lastName].filter(Boolean).join(' ') || identity.email
