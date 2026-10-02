@@ -438,6 +438,17 @@
   border-radius: 9px;
   background: #fff;
   text-align: left;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease,
+    background 0.12s ease;
+}
+.pos-products button:active,
+.pos-products button.is-pressed,
+.pos-product-table button:active,
+.pos-product-table button.is-pressed {
+  transform: scale(0.98);
+  border-color: #1233cc;
+  background: #edf3ff;
+  box-shadow: 0 0 0 3px rgba(18, 51, 204, 0.12);
 }
 .pos-products strong,
 .pos-products small,
@@ -781,7 +792,10 @@
 }
 .pos-cart-lines {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 112px auto 32px;
+  grid-template-columns: minmax(0, 1fr) auto 32px;
+  grid-template-areas:
+    "item quantity quantity"
+    "discount total remove";
   gap: 10px;
   align-items: center;
   padding: 11px 0;
@@ -791,12 +805,15 @@
   display: contents;
 }
 .pos-cart-lines > span {
+  grid-area: item;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .pos-cart-lines > b {
+  grid-area: total;
+  align-self: end;
   white-space: nowrap;
   text-align: right;
 }
@@ -806,13 +823,14 @@
   font-weight: 600;
 }
 .pos-line-discount {
+  grid-area: discount;
   display: grid;
   gap: 3px;
   color: #667085;
   font-size: 11px;
 }
 .pos-line-discount input {
-  width: 112px;
+  width: min(150px, 100%);
   height: 34px;
   padding: 5px 8px;
 }
@@ -828,6 +846,10 @@
   margin-top: 12px;
 }
 .pos-qty {
+  grid-area: quantity;
+  display: flex !important;
+  align-items: center;
+  justify-self: end;
   gap: 3px;
   padding: 3px;
   border: 1px solid #dce2ec;
@@ -864,6 +886,8 @@
   background: #fff;
 }
 .pos-cart-lines > button {
+  grid-area: remove;
+  align-self: end;
   color: #a33d3d;
 }
 .pos-qty button:hover {
@@ -2498,6 +2522,8 @@
   font-size: 0.64rem;
   font-weight: 700;
   padding: 6px 9px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease,
+    background 0.12s ease;
 }
 .pos-product-table button:disabled,
 .pos-products button:disabled,

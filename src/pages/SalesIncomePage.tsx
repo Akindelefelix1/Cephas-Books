@@ -8,6 +8,7 @@ import {
   salesApi,
   type CreditNote,
   type Customer,
+  type CustomerHistoryEntry,
   type Invoice,
   type Payment,
   type Quotation,
@@ -34,7 +35,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     [modal, setModal] = useState(false),
     [selected, setSelected] = useState<Customer | null>(null),
     [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null),
-    [historyInvoices, setHistoryInvoices] = useState<Invoice[]>([]),
+    [historyEntries, setHistoryEntries] = useState<CustomerHistoryEntry[]>([]),
     [historyLoading, setHistoryLoading] = useState(false),
     [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -98,9 +99,9 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     if (!historyCustomer) return;
     void salesApi
       .customerPurchaseHistory(historyCustomer.id)
-      .then(setHistoryInvoices)
+      .then((entries) => setHistoryEntries(entries))
       .catch((caught) =>
-        setError(caught instanceof Error ? caught.message : 'Unable to load purchase history'),
+        setError(caught instanceof Error ? caught.message : 'Unable to load customer history'),
       )
       .finally(() => setHistoryLoading(false));
   }, [historyCustomer]);
@@ -251,7 +252,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                             },
                             (invoice) => setPreviewInvoice(invoice),
                             (customer) => {
-                              setHistoryInvoices([]);
+                              setHistoryEntries([]);
                               setHistoryLoading(true);
                               setHistoryCustomer(customer);
                             },
@@ -308,7 +309,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
       />
       <CustomerHistoryModal
         customer={historyCustomer}
-        invoices={historyInvoices}
+        entries={historyEntries}
         loading={historyLoading}
         onClose={() => setHistoryCustomer(null)}
         onPreview={setPreviewInvoice}
@@ -550,33 +551,42 @@ function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose
 }
 function CustomerHistoryModal({
   customer,
-  invoices,
+  entries,
   loading,
   onClose,
   onPreview,
 }: {
   customer: Customer | null;
-  invoices: Invoice[];
+  entries: CustomerHistoryEntry[];
   loading: boolean;
   onClose: () => void;
   onPreview: (invoice: Invoice) => void;
 }) {
   if (!customer) return null;
-  const purchases = invoices
-    .filter((invoice) => invoice.customerId === customer.id || invoice.customer.id === customer.id)
-    .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-  const total = purchases.reduce((sum, invoice) => sum + Number(invoice.total), 0);
-  const outstanding = purchases.reduce(
-    (sum, invoice) =>
-      sum + Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount),
+  const activity = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const totalSales = activity.reduce(
+    (sum, item) =>
+      sum + (item.type === 'invoice' || item.type === 'pos-sale' ? Number(item.amount ?? 0) : 0),
     0,
+  );
+  const totalPayments = activity.reduce(
+    (sum, item) => sum + (item.type === 'payment' ? Number(item.amount ?? 0) : 0),
+    0,
+  );
+  const totalCredits = activity.reduce(
+    (sum, item) =>
+      sum + (item.type === 'credit-note' || item.type === 'pos-return' ? Number(item.amount ?? 0) : 0),
+    0,
+  );
+  const invoiceRows = activity.filter(
+    (item) => item.type === 'invoice' || item.type === 'payment' || item.type === 'credit-note' || item.type === 'pos-sale' || item.type === 'pos-return' || item.type === 'quotation',
   );
   return (
     <Modal
       open
       wide
-      title={`${customer.displayName} purchase history`}
-      subtitle={customer.billingAddress || customer.email || 'Customer account history'}
+      title={`${customer.displayName} customer history`}
+      subtitle={customer.billingAddress || customer.email || 'Everything tied to this customer'}
       onClose={onClose}
       footer={
         <button className="button button--secondary" onClick={onClose}>
@@ -586,66 +596,71 @@ function CustomerHistoryModal({
     >
       <div className="customer-history">
         {loading ? (
-          <LoadingState label="Loading purchase history…" />
+          <LoadingState label="Loading customer history…" />
         ) : (
           <>
             <div className="customer-history__summary">
               <div>
-                <span>Invoices</span>
-                <strong>{purchases.length}</strong>
+                <span>Activities</span>
+                <strong>{invoiceRows.length}</strong>
               </div>
               <div>
-                <span>Total purchases</span>
-                <strong>{cash(String(total))}</strong>
+                <span>Sales</span>
+                <strong>{cash(String(totalSales))}</strong>
               </div>
               <div>
-                <span>Outstanding</span>
-                <strong>{cash(String(Math.max(0, outstanding)))}</strong>
+                <span>Payments</span>
+                <strong>{cash(String(totalPayments))}</strong>
+              </div>
+              <div>
+                <span>Credits / returns</span>
+                <strong>{cash(String(totalCredits))}</strong>
               </div>
             </div>
             <div className="data-table-wrap">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Invoice</th>
+                    <th>Type</th>
+                    <th>Reference</th>
                     <th>Date</th>
                     <th>Status</th>
-                    <th className="is-right">Total</th>
-                    <th className="is-right">Paid</th>
-                    <th className="is-right">Balance</th>
+                    <th className="is-right">Amount</th>
+                    <th>Notes</th>
                     <th aria-label="Actions" />
                   </tr>
                 </thead>
                 <tbody>
-                  {purchases.map((invoice) => {
-                    const balance =
-                      Number(invoice.total) -
-                      Number(invoice.paidAmount) -
-                      Number(invoice.creditedAmount);
+                  {activity.map((entry) => {
+                    const invoice = entry.invoice ?? null;
                     return (
-                      <tr key={invoice.id}>
-                        <td className="is-primary">{invoice.number}</td>
-                        <td>{day(invoice.issueDate)}</td>
+                      <tr key={entry.id}>
                         <td>
-                          <span className="banking-status">{invoice.status.replace('_', ' ')}</span>
+                          <span className="banking-status">{entry.type.replace('-', ' ')}</span>
                         </td>
-                        <td className="is-right">{cash(invoice.total, invoice.currency)}</td>
-                        <td className="is-right">{cash(invoice.paidAmount, invoice.currency)}</td>
+                        <td className="is-primary">{entry.number || entry.reference || entry.title}</td>
+                        <td>{day(entry.date)}</td>
+                        <td>{entry.status || '—'}</td>
                         <td className="is-right">
-                          {cash(String(Math.max(0, balance)), invoice.currency)}
+                          {entry.amount ? cash(entry.amount, entry.currency || getDefaultCurrency()) : '—'}
                         </td>
+                        <td>{entry.notes || '—'}</td>
                         <td className="is-right">
-                          <button onClick={() => onPreview(invoice)}>
-                            <Eye size={15} /> View
-                          </button>
+                          {invoice ? (
+                            <button onClick={() => onPreview(invoice)}>
+                              <Eye size={15} /> View
+                            </button>
+                          ) : (
+                            '—'
+                          )}
                         </td>
                       </tr>
                     );
                   })}
-                  {!purchases.length && (
+                  {!activity.length && (
                     <tr>
                       <td className="table-empty" colSpan={7}>
-                        No purchases recorded for this customer.
+                        No activity recorded for this customer.
                       </td>
                     </tr>
                   )}

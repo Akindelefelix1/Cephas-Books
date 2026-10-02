@@ -12,7 +12,22 @@ export interface PosSale {
   taxTotal?: string;
   customerSignature?: string | null;
   salesManagerSignature?: string | null;
-  customer?: { id: string; displayName: string } | null;
+  customer?: { id: string; displayName: string; email?: string; phone?: string } | null;
+  receipt?: {
+    organizationName: string;
+    logoUrl?: string;
+    organizationPhone?: string;
+    organizationAddress?: string;
+    organizationWebsite?: string;
+    returnPolicy?: string;
+    branchName?: string;
+    branchAddress?: string;
+    branchPhone?: string;
+    register?: { id: string; code: string; name: string } | null;
+    cashier?: { name: string; email: string } | null;
+    verificationCode: string;
+    digitalUrl: string;
+  };
   items: Array<{
     description: string;
     quantity: string;
@@ -57,6 +72,13 @@ export const posApi = {
   registers: () => authorizedRequest<PosRegister[]>('/pos/registers'),
   branches: () => authorizedRequest<PosBranch[]>('/pos/branches'),
   currentShift: () => authorizedRequest<PosShift | null>('/pos/shifts/current'),
+  receipt: (saleId: string) => authorizedRequest<PosSale>(`/pos/sales/${saleId}/receipt`),
+  recordReprint: (saleId: string) =>
+    authorizedRequest<PosSale>(`/pos/sales/${saleId}/receipt/reprint`, { method: 'POST' }),
+  emailReceipt: (saleId: string) =>
+    authorizedRequest<{ sent: true }>(`/pos/sales/${saleId}/receipt/email`, { method: 'POST' }),
+  smsReceipt: (saleId: string) =>
+    authorizedRequest<{ sent: true }>(`/pos/sales/${saleId}/receipt/sms`, { method: 'POST' }),
   createRegister: (data: object) =>
     authorizedRequest<PosRegister>('/pos/registers', {
       method: 'POST',

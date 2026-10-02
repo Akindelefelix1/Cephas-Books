@@ -176,8 +176,23 @@ export function saveAuthTokens(tokens: AuthTokens, remember: boolean): void {
 export function clearAuthTokens(): void {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+  clearStoredPosCatalogs();
   cacheIdentity = '';
   clearApiCache();
+}
+
+function clearStoredPosCatalogs(): void {
+  for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+    const key = sessionStorage.key(index);
+    if (key?.startsWith('cephas:pos-catalog:')) sessionStorage.removeItem(key);
+  }
+}
+
+export function getAuthCacheIdentity(): string {
+  const tokens = getAuthTokens();
+  if (!tokens) return '';
+  synchronizeCacheIdentity(tokens.accessToken);
+  return cacheIdentity;
 }
 
 export async function logoutSession(): Promise<void> {
@@ -287,6 +302,11 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
 
   if (method !== 'GET') {
     const payload = await performAuthorizedRequest<T>(path, init);
+    if (
+      /^\/operations\/(products|movements|transfers|adjustments)(?:\/|\?|$)/.test(path) ||
+      /^\/pos\/sales\/[^/]+\/(returns|void)(?:\/|\?|$)/.test(path)
+    )
+      clearStoredPosCatalogs();
     clearApiCache();
     return payload;
   }

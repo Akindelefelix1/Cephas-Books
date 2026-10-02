@@ -1,4 +1,4 @@
-import { authorizedRequest } from './auth';
+import { authorizedRequest, getAuthCacheIdentity } from './auth';
 
 export type OperationsView =
   'products' | 'warehouses' | 'stock-movements' | 'stock-adjustments' | 'projects' | 'project-ai';
@@ -127,9 +127,48 @@ const query = (filters: Record<string, string> = {}) =>
 const req = <T>(path: string, method = 'GET', body?: object) =>
   authorizedRequest<T>(path, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
 export const INVENTORY_CHANGED_EVENT = 'cephas:inventory-changed';
+const POS_CATALOG_TTL_MS = 10 * 60 * 1000;
+const posCatalogKey = (warehouseId: string) =>
+  `cephas:pos-catalog:${getAuthCacheIdentity()}:${warehouseId}`;
+const readPosCatalog = (warehouseId: string): Product[] | null => {
+  try {
+    const raw = sessionStorage.getItem(posCatalogKey(warehouseId));
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as { savedAt: number; products: Product[] };
+    if (Date.now() - cached.savedAt > POS_CATALOG_TTL_MS) {
+      sessionStorage.removeItem(posCatalogKey(warehouseId));
+      return null;
+    }
+    return Array.isArray(cached.products) ? cached.products : null;
+  } catch {
+    return null;
+  }
+};
+const savePosCatalog = (warehouseId: string, products: Product[]) => {
+  try {
+    sessionStorage.setItem(
+      posCatalogKey(warehouseId),
+      JSON.stringify({ savedAt: Date.now(), products }),
+    );
+  } catch {
+    // Storage may be unavailable or full; the in-memory request cache still works.
+  }
+};
 export const operationsApi = {
   summary: () => req<OperationsSummary>('/operations/summary'),
   products: (filters = {}) => req<Product[]>(`/operations/products?${query(filters)}`),
+  posProducts: async (warehouseId: string) => {
+    const cached = readPosCatalog(warehouseId);
+    if (cached) return cached;
+    const products = await req<Product[]>(
+      `/operations/products?${query({ status: 'active', warehouseId })}`,
+    );
+    const activeProducts = products.filter((product) => product.isActive);
+    savePosCatalog(warehouseId, activeProducts);
+    return activeProducts;
+  },
+  savePosProducts: (warehouseId: string, products: Product[]) =>
+    savePosCatalog(warehouseId, products),
   product: (id: string) => req<ProductDetails>(`/operations/products/${id}`),
   categories: () => req<ProductCategory[]>('/operations/product-categories'),
   createCategory: (name: string) =>

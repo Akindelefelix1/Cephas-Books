@@ -62,7 +62,12 @@ export function PosPage({
     [search, setSearch] = useState(''),
     [category, setCategory] = useState(''),
     [catalogPage, setCatalogPage] = useState(1),
-    [catalogView, setCatalogView] = useState<'TABLE' | 'CARDS'>('TABLE'),
+    [catalogView, setCatalogView] = useState<'TABLE' | 'CARDS'>(() =>
+      typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches
+        ? 'CARDS'
+        : 'TABLE',
+    ),
+    [pressedProductId, setPressedProductId] = useState<string | null>(null),
     [payments, setPayments] = useState<PaymentInput[]>([{ method: 'CASH', amount: '' }]),
     [splitMode, setSplitMode] = useState(false),
     [setup, setSetup] = useState<'REGISTER' | 'ASSIGN' | 'SHIFT' | 'CUSTOMER' | null>(null),
@@ -116,11 +121,8 @@ export function PosPage({
     const loadProducts = async () => {
       setProductsLoading(true);
       try {
-        const items = await operationsApi.products({
-          status: 'active',
-          warehouseId: register.warehouseId,
-        });
-        if (current) setProducts(items.filter((item) => item.isActive));
+        const items = await operationsApi.posProducts(register.warehouseId);
+        if (current) setProducts(items);
       } catch (requestError) {
         if (current)
           setError(
@@ -207,6 +209,8 @@ export function PosPage({
       return;
     }
     setError('');
+    setPressedProductId(product.id);
+    window.setTimeout(() => setPressedProductId((current) => (current === product.id ? null : current)), 180);
     setCart((current) =>
       current.some((item) => item.id === product.id)
         ? current.map((item) =>
@@ -285,7 +289,7 @@ export function PosPage({
     );
     setBusy(true);
     try {
-      const s = await posApi.complete({
+      const completed = await posApi.complete({
         registerId,
         customerId: customerId || undefined,
         idempotencyKey: crypto.randomUUID(),
@@ -296,9 +300,10 @@ export function PosPage({
         })),
         payments: settledPayments,
       });
+      const s = await posApi.receipt(completed.id);
       setSale(s);
-      setProducts((current) =>
-        current.map((product) => {
+      setProducts((current) => {
+        const updated = current.map((product) => {
           const soldQuantity = soldQuantities.get(product.id);
           return soldQuantity === undefined
             ? product
@@ -306,26 +311,17 @@ export function PosPage({
                 ...product,
                 stockQuantity: String(Math.max(0, Number(product.stockQuantity) - soldQuantity)),
               };
-        }),
-      );
+        });
+        const register = registers.find((item) => item.id === registerId);
+        if (register) operationsApi.savePosProducts(register.warehouseId, updated);
+        return updated;
+      });
       window.dispatchEvent(new Event(INVENTORY_CHANGED_EVENT));
       setRecentSales((current) => [s, ...current.filter((item) => item.id !== s.id)].slice(0, 10));
       setCart([]);
       setPayments([{ method: 'CASH', amount: '' }]);
       setSplitMode(false);
       setCustomerId('');
-      const register = registers.find((item) => item.id === registerId);
-      if (register) {
-        try {
-          const refreshedProducts = await operationsApi.products({
-            status: 'active',
-            warehouseId: register.warehouseId,
-          });
-          setProducts(refreshedProducts.filter((item) => item.isActive));
-        } catch {
-          setError('Sale completed. Product availability will refresh on the next reload.');
-        }
-      }
     } catch (x) {
       setError(x instanceof Error ? x.message : 'Unable to complete sale');
     } finally {
@@ -419,6 +415,8 @@ export function PosPage({
                           type="button"
                           onClick={() => add(product)}
                           disabled={!canAdd(product)}
+                          aria-pressed={pressedProductId === product.id}
+                          className={pressedProductId === product.id ? 'is-pressed' : ''}
                         >
                           Add
                         </button>
@@ -435,7 +433,13 @@ export function PosPage({
               <LoadingState compact label="Loading available products…" />
             ) : (
               pagedProducts.map((product) => (
-                <button key={product.id} onClick={() => add(product)} disabled={!canAdd(product)}>
+                <button
+                  key={product.id}
+                  onClick={() => add(product)}
+                  disabled={!canAdd(product)}
+                  aria-pressed={pressedProductId === product.id}
+                  className={pressedProductId === product.id ? 'is-pressed' : ''}
+                >
                   <strong>{product.name}</strong>
                   <small>{product.sku}</small>
                   <small>

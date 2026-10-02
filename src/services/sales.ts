@@ -75,6 +75,21 @@ export interface CreditNote {
   customer: Customer;
   invoice: Invoice;
 }
+export interface CustomerHistoryEntry {
+  id: string;
+  type: 'invoice' | 'payment' | 'quotation' | 'credit-note' | 'pos-sale' | 'pos-return';
+  title: string;
+  number?: string;
+  reference?: string;
+  amount?: string;
+  status?: string;
+  currency?: string;
+  date: string;
+  customerId?: string;
+  customer?: Customer;
+  invoice?: Invoice | null;
+  notes?: string;
+}
 export interface SalesSummary {
   customers: number;
   openQuotations: number;
@@ -94,7 +109,7 @@ export const salesApi = {
       `/customers?limit=100&search=${encodeURIComponent(search)}`,
     ),
   customerPurchaseHistory: (id: string) =>
-    authorizedRequest<Invoice[]>(`/customers/${id}/purchase-history`),
+    authorizedRequest<CustomerHistoryEntry[]>(`/customers/${id}/purchase-history`),
   createCustomer: (data: Partial<Customer>) =>
     authorizedRequest<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) }),
   updateCustomer: (id: string, data: Partial<Customer>) =>
