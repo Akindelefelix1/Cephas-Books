@@ -97,6 +97,7 @@ export function PosHistoryPage() {
               <th>Date</th>
               <th>Customer</th>
               <th>Payment</th>
+              <th className="is-right">Discount</th>
               <th className="is-right">Total</th>
               <th aria-label="Actions" />
             </tr>
@@ -108,6 +109,7 @@ export function PosHistoryPage() {
                 <td>{new Date(sale.createdAt).toLocaleString()}</td>
                 <td>{sale.customer?.displayName ?? 'Walk-in customer'}</td>
                 <td>{sale.payments.map((payment) => payment.method).join(', ')}</td>
+                <td className="is-right">{money(Number(sale.discountTotal || 0), sale.currency)}</td>
                 <td className="is-right">{money(Number(sale.total), sale.currency)}</td>
                 <td className="is-right">
                   <button
@@ -122,7 +124,7 @@ export function PosHistoryPage() {
             ))}
             {!sales.length && (
               <tr>
-                <td className="table-empty" colSpan={6}>
+                <td className="table-empty" colSpan={7}>
                   No sales match the selected filters.
                 </td>
               </tr>

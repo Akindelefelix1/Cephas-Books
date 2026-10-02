@@ -9,6 +9,8 @@ import {
   ReceiptText,
   Trash2,
   UserPlus,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -35,7 +37,8 @@ const paymentLabel = (method: string) =>
   ] ?? method;
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'CREDIT';
 type PaymentInput = { method: PaymentMethod; amount: string };
-type Line = Product & { quantity: number };
+type Line = Product & { quantity: number; discount: number };
+const CATALOG_PAGE_SIZE = 15;
 export function PosPage({
   canConfigurePos,
   onNavigate,
@@ -57,6 +60,8 @@ export function PosPage({
     [registerId, setRegisterId] = useState(''),
     [customerId, setCustomerId] = useState(''),
     [search, setSearch] = useState(''),
+    [category, setCategory] = useState(''),
+    [catalogPage, setCatalogPage] = useState(1),
     [catalogView, setCatalogView] = useState<'TABLE' | 'CARDS'>('TABLE'),
     [payments, setPayments] = useState<PaymentInput[]>([{ method: 'CASH', amount: '' }]),
     [splitMode, setSplitMode] = useState(false),
@@ -136,15 +141,33 @@ export function PosPage({
     ),
     visible = useMemo(
       () =>
-        products.filter((x) => `${x.name} ${x.sku}`.toLowerCase().includes(search.toLowerCase())),
-      [products, search],
+        products.filter(
+          (x) =>
+            `${x.name} ${x.sku}`.toLowerCase().includes(search.toLowerCase()) &&
+            (!category || (x.category || 'Uncategorised') === category),
+        ),
+      [category, products, search],
+    ),
+    categories = useMemo(
+      () =>
+        [...new Set(products.map((product) => product.category || 'Uncategorised'))].sort((a, b) =>
+          a.localeCompare(b),
+        ),
+      [products],
+    ),
+    catalogPages = Math.max(1, Math.ceil(visible.length / CATALOG_PAGE_SIZE)),
+    pagedProducts = visible.slice(
+      (catalogPage - 1) * CATALOG_PAGE_SIZE,
+      catalogPage * CATALOG_PAGE_SIZE,
     ),
     subtotal = cart.reduce((s, x) => s + Number(x.salePrice) * x.quantity, 0),
+    discountTotal = cart.reduce((s, x) => s + x.discount * x.quantity, 0),
     tax = cart.reduce(
-      (s, x) => s + (Number(x.salePrice) * x.quantity * Number(x.taxRate)) / 100,
+      (s, x) =>
+        s + ((Number(x.salePrice) - x.discount) * x.quantity * Number(x.taxRate)) / 100,
       0,
     ),
-    total = subtotal + tax,
+    total = subtotal - discountTotal + tax,
     paymentRows =
       !splitMode && payments.length === 1
         ? [{ ...payments[0], amount: total > 0 ? String(total) : '' }]
@@ -191,7 +214,7 @@ export function PosPage({
               ? { ...item, quantity: item.quantity + saleStep(product) }
               : item,
           )
-        : [...current, { ...product, quantity: saleStep(product) }],
+        : [...current, { ...product, quantity: saleStep(product), discount: 0 }],
     );
   };
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -266,7 +289,11 @@ export function PosPage({
         registerId,
         customerId: customerId || undefined,
         idempotencyKey: crypto.randomUUID(),
-        items: cart.map((x) => ({ productId: x.id, quantity: x.quantity })),
+        items: cart.map((x) => ({
+          productId: x.id,
+          quantity: x.quantity,
+          discount: x.discount,
+        })),
         payments: settledPayments,
       });
       setSale(s);
@@ -313,13 +340,33 @@ export function PosPage({
           <input
             placeholder="Scan barcode or search product"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCatalogPage(1);
+            }}
           />
         </label>
         <div className="pos-catalog__toolbar">
-          <small>
-            {registerId ? 'Stock for selected register' : 'Select a register to see stock'}
-          </small>
+          <div className="pos-catalog__filters">
+            <small>
+              {registerId ? 'Stock for selected register' : 'Select a register to see stock'}
+            </small>
+            <select
+              aria-label="Product category"
+              value={category}
+              onChange={(event) => {
+                setCategory(event.target.value);
+                setCatalogPage(1);
+              }}
+            >
+              <option value="">All categories</option>
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="pos-view-toggle" aria-label="Product display">
             <button
               type="button"
@@ -359,7 +406,7 @@ export function PosPage({
                     </td>
                   </tr>
                 ) : (
-                  visible.map((product) => (
+                  pagedProducts.map((product) => (
                     <tr key={product.id}>
                       <td>
                         <strong>{product.name}</strong>
@@ -387,7 +434,7 @@ export function PosPage({
             {productsLoading ? (
               <LoadingState compact label="Loading available products…" />
             ) : (
-              visible.map((product) => (
+              pagedProducts.map((product) => (
                 <button key={product.id} onClick={() => add(product)} disabled={!canAdd(product)}>
                   <strong>{product.name}</strong>
                   <small>{product.sku}</small>
@@ -400,6 +447,39 @@ export function PosPage({
                 </button>
               ))
             )}
+          </div>
+        )}
+        {!productsLoading && visible.length > 0 && (
+          <div className="table-pagination pos-catalog__pagination">
+            <p>
+              Showing{' '}
+              <strong>
+                {(catalogPage - 1) * CATALOG_PAGE_SIZE + 1}–
+                {Math.min(catalogPage * CATALOG_PAGE_SIZE, visible.length)}
+              </strong>{' '}
+              of {visible.length}
+            </p>
+            <div>
+              <button
+                type="button"
+                aria-label="Previous product page"
+                disabled={catalogPage === 1}
+                onClick={() => setCatalogPage((page) => page - 1)}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span>
+                Page {catalogPage} of {catalogPages}
+              </span>
+              <button
+                type="button"
+                aria-label="Next product page"
+                disabled={catalogPage >= catalogPages}
+                onClick={() => setCatalogPage((page) => page + 1)}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         )}
       </section>
@@ -477,6 +557,7 @@ export function PosPage({
                 );
                 setBranchId(nextBranchId);
                 setRegisterId(nextRegisters.length === 1 ? nextRegisters[0].id : '');
+                setCatalogPage(1);
                 setShift(null);
                 setProducts([]);
                 setCart([]);
@@ -498,6 +579,7 @@ export function PosPage({
               disabled={!branchId}
               onChange={(e) => {
                 setRegisterId(e.target.value);
+                setCatalogPage(1);
                 setShift(null);
                 setCart([]);
                 setError('');
@@ -594,7 +676,32 @@ export function PosPage({
                 <Plus size={13} />
               </button>
             </div>
-            <b>{money(Number(x.salePrice) * x.quantity)}</b>
+            <label className="pos-line-discount">
+              <span>Discount / unit</span>
+              <input
+                aria-label={`${x.name} discount per unit`}
+                type="number"
+                min="0"
+                max={Number(x.salePrice)}
+                step=".01"
+                value={x.discount}
+                onChange={(event) => {
+                  const next = Math.max(
+                    0,
+                    Math.min(Number(x.salePrice), Number(event.target.value || 0)),
+                  );
+                  setCart((current) =>
+                    current.map((item) =>
+                      item.id === x.id ? { ...item, discount: next } : item,
+                    ),
+                  );
+                }}
+              />
+            </label>
+            <b>
+              {money((Number(x.salePrice) - x.discount) * x.quantity)}
+              {x.discount > 0 && <small>Saved {money(x.discount * x.quantity)}</small>}
+            </b>
             <button onClick={() => setCart((c) => c.filter((y) => y.id !== x.id))}>
               <Trash2 size={14} />
             </button>
@@ -604,6 +711,11 @@ export function PosPage({
           <span>
             Subtotal <b>{money(subtotal)}</b>
           </span>
+          {discountTotal > 0 && (
+            <span>
+              Discount <b>−{money(discountTotal)}</b>
+            </span>
+          )}
           <span>
             Tax <b>{money(tax)}</b>
           </span>

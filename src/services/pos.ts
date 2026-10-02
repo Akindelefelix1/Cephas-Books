@@ -8,11 +8,18 @@ export interface PosSale {
   changeAmount: string;
   createdAt: string;
   subtotal?: string;
+  discountTotal?: string;
   taxTotal?: string;
   customerSignature?: string | null;
   salesManagerSignature?: string | null;
   customer?: { id: string; displayName: string } | null;
-  items: Array<{ description: string; quantity: string; unitPrice: string; lineTotal: string }>;
+  items: Array<{
+    description: string;
+    quantity: string;
+    unitPrice: string;
+    discount: string;
+    lineTotal: string;
+  }>;
   payments: Array<{ method: string; amount: string; reference?: string }>;
 }
 export interface PosRegister {

@@ -20,10 +20,11 @@ const escapeHtml = (value: string) =>
 
 function receiptHtml(sale: PosSale, salesperson: string, download: boolean) {
   const rows = sale.items
-    .map(
-      (item) =>
-        `<tr><td>${escapeHtml(item.description)}</td><td class="number">${escapeHtml(item.quantity)}</td><td class="number">${money(Number(item.unitPrice), sale.currency)}</td><td class="number">${money(Number(item.lineTotal), sale.currency)}</td></tr>`,
-    )
+    .map((item) => {
+      const discountPerUnit = Number(item.discount || 0) / Number(item.quantity || 1);
+      const soldPrice = Number(item.unitPrice) - discountPerUnit;
+      return `<tr><td>${escapeHtml(item.description)}</td><td class="number">${escapeHtml(item.quantity)}</td><td class="number">${money(Number(item.unitPrice), sale.currency)}</td><td class="number">${money(discountPerUnit, sale.currency)}</td><td class="number">${money(soldPrice, sale.currency)}</td><td class="number">${money(Number(item.lineTotal), sale.currency)}</td></tr>`;
+    })
     .join('');
   const signature = (label: string, value?: string | null) =>
     value
@@ -31,7 +32,7 @@ function receiptHtml(sale: PosSale, salesperson: string, download: boolean) {
       : '';
   return `<!doctype html><html><head><meta charset="utf-8"><title>${download ? 'Download' : 'Print'} ${escapeHtml(sale.receiptNumber)}</title><style>
     *{box-sizing:border-box}body{font:14px Arial,sans-serif;color:#172033;max-width:720px;margin:32px auto;padding:0 16px}header{text-align:center;padding-bottom:16px;border-bottom:1px dashed #dce2ec}h1{font-size:22px;margin:0 0 8px}p{margin:5px 0;color:#667085}.meta{margin-top:12px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:10px 8px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:12px;color:#667085;text-transform:uppercase}.number{text-align:right;white-space:nowrap}.total{margin:14px 0 0;padding:12px 8px;border-top:2px solid #172033;display:flex;justify-content:space-between;font-size:18px;font-weight:700}.settlement{padding:0 8px;display:flex;justify-content:space-between}.thanks{text-align:center;margin:24px 0}.signatures{display:flex;gap:36px;margin-top:32px}.signature{flex:1;min-width:0;text-align:center}.signature img{display:block;width:100%;height:70px;object-fit:contain;border-bottom:1px solid #667085}.signature span{display:block;margin-top:7px;color:#667085;font-size:12px}@media print{body{margin:0 auto;padding:0}button{display:none}}
-    </style></head><body><header><h1>Cephas Books</h1><p>Sales receipt</p><div class="meta"><p>${escapeHtml(sale.receiptNumber)} · ${escapeHtml(new Date(sale.createdAt).toLocaleString())}</p>${sale.customer ? `<p>Customer: ${escapeHtml(sale.customer.displayName)}</p>` : ''}<p>Salesperson: ${escapeHtml(salesperson || '—')}</p></div></header><table><thead><tr><th>Item</th><th class="number">Quantity</th><th class="number">Unit price</th><th class="number">Total price</th></tr></thead><tbody>${rows}</tbody></table><div class="total"><span>Total</span><span>${money(Number(sale.total), sale.currency)}</span></div><p class="settlement"><span>Paid</span><strong>${money(Number(sale.paidAmount), sale.currency)}</strong></p><p class="settlement"><span>Change</span><strong>${money(Number(sale.changeAmount), sale.currency)}</strong></p><p class="thanks">Thank you for your business.</p><div class="signatures">${signature('Customer', sale.customerSignature)}${signature('Sales manager', sale.salesManagerSignature)}</div></body></html>`;
+    </style></head><body><header><h1>Cephas Books</h1><p>Sales receipt</p><div class="meta"><p>${escapeHtml(sale.receiptNumber)} · ${escapeHtml(new Date(sale.createdAt).toLocaleString())}</p>${sale.customer ? `<p>Customer: ${escapeHtml(sale.customer.displayName)}</p>` : ''}<p>Salesperson: ${escapeHtml(salesperson || '—')}</p></div></header><table><thead><tr><th>Item</th><th class="number">Qty</th><th class="number">Original</th><th class="number">Discount</th><th class="number">Sold at</th><th class="number">Total</th></tr></thead><tbody>${rows}</tbody></table>${Number(sale.discountTotal || 0) > 0 ? `<p class="settlement"><span>Discount</span><strong>-${money(Number(sale.discountTotal), sale.currency)}</strong></p>` : ''}<div class="total"><span>Total</span><span>${money(Number(sale.total), sale.currency)}</span></div><p class="settlement"><span>Paid</span><strong>${money(Number(sale.paidAmount), sale.currency)}</strong></p><p class="settlement"><span>Change</span><strong>${money(Number(sale.changeAmount), sale.currency)}</strong></p><p class="thanks">Thank you for your business.</p><div class="signatures">${signature('Customer', sale.customerSignature)}${signature('Sales manager', sale.salesManagerSignature)}</div></body></html>`;
 }
 
 export function SalesReceipt({
@@ -96,22 +97,35 @@ export function SalesReceipt({
             <tr>
               <th>Item</th>
               <th className="is-right">Quantity</th>
-              <th className="is-right">Unit price</th>
-              <th className="is-right">Total price</th>
+              <th className="is-right">Original</th>
+              <th className="is-right">Discount / unit</th>
+              <th className="is-right">Sold at</th>
+              <th className="is-right">Total</th>
             </tr>
           </thead>
           <tbody>
-            {sale.items.map((item, index) => (
-              <tr key={`${item.description}-${index}`}>
+            {sale.items.map((item, index) => {
+              const discountPerUnit = Number(item.discount || 0) / Number(item.quantity || 1);
+              return <tr key={`${item.description}-${index}`}>
                 <td>{item.description}</td>
                 <td className="is-right">{item.quantity}</td>
                 <td className="is-right">{money(Number(item.unitPrice), sale.currency)}</td>
+                <td className="is-right">{money(discountPerUnit, sale.currency)}</td>
+                <td className="is-right">
+                  {money(Number(item.unitPrice) - discountPerUnit, sale.currency)}
+                </td>
                 <td className="is-right">{money(Number(item.lineTotal), sale.currency)}</td>
-              </tr>
-            ))}
+              </tr>;
+            })}
           </tbody>
         </table>
       </div>
+      {Number(sale.discountTotal || 0) > 0 && (
+        <div className="receipt-card__settlement">
+          <span>Discount</span>
+          <strong>−{money(Number(sale.discountTotal), sale.currency)}</strong>
+        </div>
+      )}
       <div className="receipt-card__total">
         <span>Total</span>
         <strong>{money(Number(sale.total), sale.currency)}</strong>
