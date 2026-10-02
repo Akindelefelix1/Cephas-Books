@@ -41,6 +41,12 @@ type Branch = {
 };
 type Region = { id: string; stateId: string; name: string; managerIds: string[] };
 type LocationState = { id: string; name: string; managerIds: string[] };
+type LocationHierarchy = {
+  levels: 2 | 3;
+  topLabel: string;
+  middleLabel: string;
+  locationLabel: string;
+};
 type Currency = { code: string; name: string; symbol: string; rate: string; active: boolean };
 type Integration = { id: string; connected: boolean };
 type Security = Record<string, boolean>;
@@ -99,6 +105,8 @@ const objectValue = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 const arrayValue = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+const pluralize = (label: string, count?: number) =>
+  count === 1 ? label : label.endsWith('s') ? label : label.endsWith('y') ? `${label.slice(0, -1)}ies` : `${label}s`;
 
 export function OrganizationSettingsPage({
   view,
@@ -258,6 +266,15 @@ export function OrganizationSettingsPage({
     );
 
   const structure = objectValue(admin.settings.branches);
+  const storedHierarchy = objectValue(structure.hierarchy);
+  const hierarchy: LocationHierarchy = {
+    levels: storedHierarchy.levels === 2 ? 2 : 3,
+    topLabel: typeof storedHierarchy.topLabel === 'string' ? storedHierarchy.topLabel : 'State',
+    middleLabel:
+      typeof storedHierarchy.middleLabel === 'string' ? storedHierarchy.middleLabel : 'Region',
+    locationLabel:
+      typeof storedHierarchy.locationLabel === 'string' ? storedHierarchy.locationLabel : 'Branch',
+  };
   const states = arrayValue<LocationState>(structure.states);
   const regions = arrayValue<Region>(structure.regions);
   const storedBranches = arrayValue<Branch | Omit<Branch, 'id' | 'regionId' | 'managerIds'>>(
@@ -386,8 +403,12 @@ export function OrganizationSettingsPage({
         <section className="panel settings-api-panel">
           <header className="settings-heading">
             <div>
-              <h2>Centres and branches</h2>
-              <p>State → Region → Branch hierarchy with scoped management access.</p>
+              <h2>Locations and operating units</h2>
+              <p>
+                {[hierarchy.topLabel, hierarchy.levels === 3 ? hierarchy.middleLabel : null, hierarchy.locationLabel]
+                  .filter(Boolean)
+                  .join(' → ')} hierarchy with scoped management access.
+              </p>
             </div>
             {canManage && (
               <button
@@ -397,21 +418,59 @@ export function OrganizationSettingsPage({
                   setDialog('state');
                 }}
               >
-                <Plus /> Create state
+                <Plus /> Create {hierarchy.topLabel.toLowerCase()}
               </button>
             )}
           </header>
+          <form className="location-configuration" onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            void saveSection('branches', {
+              hierarchy: {
+                levels: Number(form.get('levels')) === 2 ? 2 : 3,
+                topLabel: String(form.get('topLabel')),
+                middleLabel: String(form.get('middleLabel')),
+                locationLabel: String(form.get('locationLabel')),
+              },
+              states,
+              regions,
+              items: branches,
+            }, 'Location hierarchy updated');
+          }}>
+            <label>Structure
+              <select name="levels" defaultValue={hierarchy.levels} disabled={!canManage || regions.length > 0 || branches.length > 0}>
+                <option value="2">Two levels</option><option value="3">Three levels</option>
+              </select>
+              {(regions.length > 0 || branches.length > 0) && <input type="hidden" name="levels" value={hierarchy.levels} />}
+              {(regions.length > 0 || branches.length > 0) && <small>Level count is locked after locations are added.</small>}
+            </label>
+            <label>Level 1 name
+              <select name="topLabel" defaultValue={hierarchy.topLabel} disabled={!canManage}>
+                {['State', 'Region', 'Zone', 'Province', 'Division'].map((label) => <option key={label}>{label}</option>)}
+              </select>
+            </label>
+            {hierarchy.levels === 3 ? <label>Level 2 name
+              <select name="middleLabel" defaultValue={hierarchy.middleLabel} disabled={!canManage}>
+                {['State', 'Region', 'Area', 'District', 'Zone'].map((label) => <option key={label}>{label}</option>)}
+              </select>
+            </label> : <input type="hidden" name="middleLabel" value={hierarchy.middleLabel} />}
+            <label>Operating unit name
+              <select name="locationLabel" defaultValue={hierarchy.locationLabel} disabled={!canManage}>
+                {['Branch', 'Centre', 'Warehouse', 'Store', 'Outlet', 'Office'].map((label) => <option key={label}>{label}</option>)}
+              </select>
+            </label>
+            {canManage && <button className="button button--secondary" disabled={busy}>Save structure</button>}
+          </form>
           <div className="location-levels" aria-label="Organisation levels">
             <span>
-              <b>1</b> States <small>{states.length}</small>
+              <b>1</b> {pluralize(hierarchy.topLabel)} <small>{states.length}</small>
             </span>
             <ChevronRight />
+            {hierarchy.levels === 3 && <><span>
+              <b>2</b> {pluralize(hierarchy.middleLabel)} <small>{regions.length}</small>
+            </span><ChevronRight /></>}
             <span>
-              <b>2</b> Regions <small>{regions.length}</small>
-            </span>
-            <ChevronRight />
-            <span>
-              <b>3</b> Branches <small>{branches.length}</small>
+              <b>{hierarchy.levels}</b> {pluralize(hierarchy.locationLabel)} <small>{branches.length}</small>
             </span>
           </div>
           {legacyBranches.length > 0 && (
@@ -435,6 +494,9 @@ export function OrganizationSettingsPage({
               <div className="location-tree">
                 {states.map((state) => {
                   const stateRegions = regions.filter((region) => region.stateId === state.id);
+                  const directLocations = hierarchy.levels === 2
+                    ? branches.filter((branch) => branch.regionId === state.id)
+                    : [];
                   return (
                     <article className="location-state" key={state.id}>
                       <div
@@ -450,13 +512,12 @@ export function OrganizationSettingsPage({
                           <div>
                             <strong>{state.name}</strong>
                             <small>
-                              {stateRegions.length} region{stateRegions.length === 1 ? '' : 's'} ·{' '}
-                              {
+                              {hierarchy.levels === 3 ? `${stateRegions.length} ${pluralize(hierarchy.middleLabel.toLowerCase(), stateRegions.length)} · ` : ''}
+                              {hierarchy.levels === 2 ? directLocations.length :
                                 branches.filter((branch) =>
                                   stateRegions.some((region) => region.id === branch.regionId),
-                                ).length
-                              }{' '}
-                              branches
+                                ).length}{' '}
+                              {pluralize(hierarchy.locationLabel.toLowerCase(), hierarchy.levels === 2 ? directLocations.length : undefined)}
                             </small>
                           </div>
                         </button>
@@ -466,10 +527,10 @@ export function OrganizationSettingsPage({
                               onClick={() => {
                                 setParentLocationId(state.id);
                                 setEditingLocationId(null);
-                                setDialog('region');
+                                setDialog(hierarchy.levels === 3 ? 'region' : 'branch');
                               }}
                             >
-                              <Plus /> Region
+                              <Plus /> {hierarchy.levels === 3 ? hierarchy.middleLabel : hierarchy.locationLabel}
                             </button>
                             <button
                               aria-label={`Edit ${state.name}`}
@@ -484,7 +545,15 @@ export function OrganizationSettingsPage({
                         )}
                       </div>
                       <div className="location-children">
-                        {stateRegions.map((region) => {
+                        {hierarchy.levels === 2 && directLocations.map((branch) => (
+                          <div className={`location-node location-node--branch ${selectedLocation?.type === 'branch' && selectedLocation.id === branch.id ? 'selected' : ''}`} key={branch.id}>
+                            <button className="location-node__main" onClick={() => setSelectedLocation({ type: 'branch', id: branch.id })}>
+                              <span><Building2 /></span><div><strong>{branch.name}</strong><small>{branch.address}</small></div><Badge>{branch.status}</Badge>
+                            </button>
+                            {canManage && <button className="row-action" aria-label={`Edit ${branch.name}`} onClick={() => { setEditingLocationId(branch.id); setDialog('branch'); }}><MoreHorizontal /></button>}
+                          </div>
+                        ))}
+                        {hierarchy.levels === 3 && stateRegions.map((region) => {
                           const regionBranches = branches.filter(
                             (branch) => branch.regionId === region.id,
                           );
@@ -505,8 +574,7 @@ export function OrganizationSettingsPage({
                                   <div>
                                     <strong>{region.name}</strong>
                                     <small>
-                                      {regionBranches.length} branch
-                                      {regionBranches.length === 1 ? '' : 'es'}
+                                      {regionBranches.length} {pluralize(hierarchy.locationLabel.toLowerCase(), regionBranches.length)}
                                     </small>
                                   </div>
                                 </button>
@@ -519,7 +587,7 @@ export function OrganizationSettingsPage({
                                         setDialog('branch');
                                       }}
                                     >
-                                      <Plus /> Branch
+                                      <Plus /> {hierarchy.locationLabel}
                                     </button>
                                     <button
                                       aria-label={`Edit ${region.name}`}
@@ -583,10 +651,11 @@ export function OrganizationSettingsPage({
                 regions={regions}
                 branches={branches}
                 members={members}
+                hierarchy={hierarchy}
               />
             </div>
           ) : (
-            <Empty text="No states have been added yet." />
+            <Empty text={`No ${pluralize(hierarchy.topLabel.toLowerCase())} have been added yet.`} />
           )}
         </section>
       )}
@@ -906,6 +975,7 @@ export function OrganizationSettingsPage({
         customRoles={customRoles}
         states={states}
         regions={regions}
+        hierarchy={hierarchy}
         editingState={states.find((item) => item.id === editingLocationId)}
         editingRegion={regions.find((item) => item.id === editingLocationId)}
         editingBranch={branches.find((item) => item.id === editingLocationId)}
@@ -924,6 +994,7 @@ export function OrganizationSettingsPage({
             void saveSection(
               'branches',
               {
+                hierarchy,
                 states: [
                   ...states.filter((item) => item.id !== editingLocationId),
                   { id, name: String(form.get('name')), managerIds },
@@ -937,6 +1008,7 @@ export function OrganizationSettingsPage({
             void saveSection(
               'branches',
               {
+                hierarchy,
                 states,
                 regions: [
                   ...regions.filter((item) => item.id !== editingLocationId),
@@ -955,6 +1027,7 @@ export function OrganizationSettingsPage({
             void saveSection(
               'branches',
               {
+                hierarchy,
                 states,
                 regions,
                 items: [
@@ -1496,12 +1569,14 @@ function LocationDetails({
   regions,
   branches,
   members,
+  hierarchy,
 }: {
   selected: { type: 'state' | 'region' | 'branch'; id: string } | null;
   states: LocationState[];
   regions: Region[];
   branches: Branch[];
   members: OrganizationMember[];
+  hierarchy: LocationHierarchy;
 }) {
   const [activity, setActivity] = useState<LocationActivity | null>(null);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -1529,7 +1604,7 @@ function LocationDetails({
         <MapPin />
         <strong>Select a location</strong>
         <p>
-          Choose a state, region, or branch to inspect its structure, managers, and scoped business
+          Choose a location to inspect its structure, managers, and scoped business
           activity.
         </p>
       </aside>
@@ -1543,7 +1618,9 @@ function LocationDetails({
   if (!location) return null;
   const regionIds =
     selected.type === 'state'
-      ? regions.filter((item) => item.stateId === selected.id).map((item) => item.id)
+      ? hierarchy.levels === 2
+        ? [selected.id]
+        : regions.filter((item) => item.stateId === selected.id).map((item) => item.id)
       : selected.type === 'region'
         ? [selected.id]
         : [];
@@ -1558,7 +1635,7 @@ function LocationDetails({
     <aside className="location-details location-details--active">
       <span className="location-details__level">
         Level {selected.type === 'state' ? '1' : selected.type === 'region' ? '2' : '3'} ·{' '}
-        {selected.type}
+        {selected.type === 'state' ? hierarchy.topLabel : selected.type === 'region' ? hierarchy.middleLabel : hierarchy.locationLabel}
       </span>
       <h3>{location.name}</h3>
       {selected.type === 'branch' && (
@@ -1580,7 +1657,7 @@ function LocationDetails({
       <div className="location-details__stats">
         <span>
           <b>{scopedBranches.length}</b>
-          <small>Branches</small>
+          <small>{pluralize(hierarchy.locationLabel)}</small>
         </span>
         <span>
           <b>{managers.length}</b>
@@ -1715,6 +1792,7 @@ function CreateDialog({
   customRoles,
   states,
   regions,
+  hierarchy,
   editingState,
   editingRegion,
   editingBranch,
@@ -1730,6 +1808,7 @@ function CreateDialog({
   customRoles: CustomRole[];
   states: LocationState[];
   regions: Region[];
+  hierarchy: LocationHierarchy;
   editingState?: LocationState;
   editingRegion?: Region;
   editingBranch?: Branch;
@@ -1746,16 +1825,16 @@ function CreateDialog({
       title={
         dialog === 'state'
           ? editingState
-            ? 'Edit state'
-            : 'Create state'
+            ? `Edit ${hierarchy.topLabel.toLowerCase()}`
+            : `Create ${hierarchy.topLabel.toLowerCase()}`
           : dialog === 'region'
             ? editingRegion
-              ? 'Edit region'
-              : 'Create region'
+              ? `Edit ${hierarchy.middleLabel.toLowerCase()}`
+              : `Create ${hierarchy.middleLabel.toLowerCase()}`
             : dialog === 'branch'
               ? editingBranch
-                ? 'Edit branch'
-                : 'Add branch'
+                ? `Edit ${hierarchy.locationLabel.toLowerCase()}`
+                : `Add ${hierarchy.locationLabel.toLowerCase()}`
               : dialog === 'currency'
                 ? editingCurrency
                   ? 'Edit currency'
@@ -1785,7 +1864,7 @@ function CreateDialog({
           <>
             {dialog === 'region' && (
               <label className="full">
-                State
+                {hierarchy.topLabel}
                 <select
                   name="stateId"
                   defaultValue={editingRegion?.stateId || parentLocationId || ''}
@@ -1801,23 +1880,25 @@ function CreateDialog({
             )}
             {dialog === 'branch' && (
               <label className="full">
-                Region
+                {hierarchy.levels === 2 ? hierarchy.topLabel : hierarchy.middleLabel}
                 <select
                   name="regionId"
                   defaultValue={editingBranch?.regionId || parentLocationId || ''}
                   required
                 >
-                  {regions.map((region) => (
-                    <option value={region.id} key={region.id}>
-                      {states.find((state) => state.id === region.stateId)?.name} / {region.name}
-                    </option>
-                  ))}
+                  {hierarchy.levels === 2
+                    ? states.map((state) => <option value={state.id} key={state.id}>{state.name}</option>)
+                    : regions.map((region) => (
+                      <option value={region.id} key={region.id}>
+                        {states.find((state) => state.id === region.stateId)?.name} / {region.name}
+                      </option>
+                    ))}
                 </select>
               </label>
             )}
             {dialog !== 'branch' && (
               <label className="full">
-                {dialog === 'state' ? 'State' : 'Region'} name
+                {dialog === 'state' ? hierarchy.topLabel : hierarchy.middleLabel} name
                 <input
                   name="name"
                   defaultValue={dialog === 'state' ? editingState?.name : editingRegion?.name}
@@ -1831,7 +1912,7 @@ function CreateDialog({
         {dialog === 'branch' && (
           <>
             <label>
-              Branch name
+              {hierarchy.locationLabel} name
               <input name="name" defaultValue={editingBranch?.name} required autoFocus />
             </label>
             <label>
