@@ -1596,6 +1596,118 @@
   }
 }
 
+/* Shared mobile overflow and interaction safeguards. */
+@media (max-width: 600px) {
+  .page-content,
+  .page-content > *,
+  .page-header,
+  .page-header > *,
+  .panel,
+  .register-panel,
+  .modal,
+  .modal__body {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .page-header__actions .button {
+    min-height: 44px;
+    flex: 1 1 calc(50% - 5px);
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .modal__header > div,
+  .panel-header > div,
+  .banking-alert,
+  .form-error,
+  .form-success {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .modal__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .modal__footer .button {
+    min-width: 0;
+    flex: 1 1 130px;
+    justify-content: center;
+  }
+
+  .banking-filters,
+  .filter-grid,
+  .report-controls,
+  .form-grid {
+    width: 100%;
+    min-width: 0;
+  }
+  .banking-filters > *,
+  .filter-grid > *,
+  .report-controls > *,
+  .form-grid > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .pos-payment__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
+  }
+  .pos-customer > div {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .pos-customer .button {
+    min-width: 44px;
+  }
+
+  .table-pagination {
+    height: auto;
+    min-height: 55px;
+  }
+  .table-pagination > div {
+    align-items: center;
+    gap: 6px;
+  }
+  .table-pagination button {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .topbar-settings-button {
+    display: none;
+  }
+  .topbar {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+  .global-search {
+    min-width: 0;
+    padding-inline: 9px;
+  }
+  .page-header__actions {
+    flex-direction: column;
+  }
+  .page-header__actions .button {
+    width: 100%;
+    flex-basis: auto;
+  }
+  .pos-payment__row {
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+  .pos-payment__row select {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
