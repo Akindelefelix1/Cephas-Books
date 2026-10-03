@@ -21,7 +21,13 @@ import {
   type Product,
   type Warehouse,
 } from '@/services/operations';
-import { posApi, type PosBranch, type PosRegister, type PosSale, type PosShift } from '@/services/pos';
+import {
+  posApi,
+  type PosBranch,
+  type PosRegister,
+  type PosSale,
+  type PosShift,
+} from '@/services/pos';
 import { salesApi, type Customer } from '@/services/sales';
 import { organizationApi, type OrganizationMember } from '@/services/organization';
 import { getDefaultCurrency } from '@/utils/currency';
@@ -80,9 +86,7 @@ export function PosPage({
     void Promise.all([
       salesApi.customers(),
       posApi.registers(),
-      canConfigurePos
-        ? operationsApi.warehouses({ status: 'active' })
-        : Promise.resolve([]),
+      canConfigurePos ? operationsApi.warehouses({ status: 'active' }) : Promise.resolve([]),
       posApi.currentShift(),
       posApi.sales({ limit: '10' }),
       canConfigurePos ? organizationApi.users() : Promise.resolve([]),
@@ -102,7 +106,8 @@ export function PosPage({
           : [];
         setBranchId(initialBranchId);
         setRegisterId(
-          s?.registerId || (branchRegisters.length === 1 ? branchRegisters[0].id : ''),
+          s?.registerId ||
+            (!canConfigurePos || branchRegisters.length === 1 ? branchRegisters[0]?.id || '' : ''),
         );
         setRecentSales(recent.data);
         setStaff(members.filter((member) => member.user.isActive));
@@ -165,8 +170,7 @@ export function PosPage({
     subtotal = cart.reduce((s, x) => s + Number(x.salePrice) * x.quantity, 0),
     discountTotal = cart.reduce((s, x) => s + x.discount * x.quantity, 0),
     tax = cart.reduce(
-      (s, x) =>
-        s + ((Number(x.salePrice) - x.discount) * x.quantity * Number(x.taxRate)) / 100,
+      (s, x) => s + ((Number(x.salePrice) - x.discount) * x.quantity * Number(x.taxRate)) / 100,
       0,
     ),
     total = subtotal - discountTotal + tax,
@@ -210,7 +214,10 @@ export function PosPage({
     }
     setError('');
     setPressedProductId(product.id);
-    window.setTimeout(() => setPressedProductId((current) => (current === product.id ? null : current)), 180);
+    window.setTimeout(
+      () => setPressedProductId((current) => (current === product.id ? null : current)),
+      180,
+    );
     setCart((current) =>
       current.some((item) => item.id === product.id)
         ? current.map((item) =>
@@ -563,7 +570,9 @@ export function PosPage({
                   (register) => register.branchId === nextBranchId,
                 );
                 setBranchId(nextBranchId);
-                setRegisterId(nextRegisters.length === 1 ? nextRegisters[0].id : '');
+                setRegisterId(
+                  !canConfigurePos || nextRegisters.length === 1 ? nextRegisters[0]?.id || '' : '',
+                );
                 setCatalogPage(1);
                 setShift(null);
                 setProducts([]);
@@ -579,35 +588,40 @@ export function PosPage({
               ))}
             </select>
           </div>
-          <div>
-            <select
-              aria-label="Register"
-              value={registerId}
-              disabled={!branchId}
-              onChange={(e) => {
-                setRegisterId(e.target.value);
-                setCatalogPage(1);
-                setShift(null);
-                setCart([]);
-                setError('');
-              }}
-            >
-              <option value="">Select register</option>
-              {availableRegisters.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.code} — {r.name}
-                  {r.assignedStaff
-                    ? ` · ${[r.assignedStaff.firstName, r.assignedStaff.lastName].filter(Boolean).join(' ') || r.assignedStaff.email}`
-                    : ' · Staff not assigned'}
-                </option>
-              ))}
-            </select>
-            {!availableRegisters.length && canConfigurePos && (
-              <button className="button button--secondary" onClick={() => setSetup('REGISTER')}>
-                Set up
-              </button>
-            )}
-          </div>
+          {canConfigurePos && (
+            <div>
+              <select
+                aria-label="Register"
+                value={registerId}
+                disabled={!branchId}
+                onChange={(e) => {
+                  setRegisterId(e.target.value);
+                  setCatalogPage(1);
+                  setShift(null);
+                  setCart([]);
+                  setError('');
+                }}
+              >
+                <option value="">Select register</option>
+                {availableRegisters.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.code} — {r.name}
+                    {r.assignedStaff
+                      ? ` · ${[r.assignedStaff.firstName, r.assignedStaff.lastName].filter(Boolean).join(' ') || r.assignedStaff.email}`
+                      : ' · Staff not assigned'}
+                  </option>
+                ))}
+              </select>
+              {!availableRegisters.length && (
+                <button className="button button--secondary" onClick={() => setSetup('REGISTER')}>
+                  Set up
+                </button>
+              )}
+            </div>
+          )}
+          {!canConfigurePos && branchId && !availableRegisters.length && (
+            <small className="pos-helper">No POS register is configured for this branch.</small>
+          )}
           {registerId && !shift && (
             <>
               {canConfigurePos && (
@@ -618,7 +632,9 @@ export function PosPage({
               <button className="button button--secondary" onClick={() => setSetup('SHIFT')}>
                 Open shift (optional)
               </button>
-              <small className="pos-helper">Otherwise, a zero-cash shift opens automatically with the first sale.</small>
+              <small className="pos-helper">
+                Otherwise, a zero-cash shift opens automatically with the first sale.
+              </small>
             </>
           )}
           {shift && <small className="pos-status">Shift open on {shift.register.code}</small>}
@@ -699,9 +715,7 @@ export function PosPage({
                     Math.min(Number(x.salePrice), Number(event.target.value || 0)),
                   );
                   setCart((current) =>
-                    current.map((item) =>
-                      item.id === x.id ? { ...item, discount: next } : item,
-                    ),
+                    current.map((item) => (item.id === x.id ? { ...item, discount: next } : item)),
                   );
                 }}
               />
@@ -816,7 +830,13 @@ export function PosPage({
           Pay {money(total)}
         </button>
         {sale && (
-          <Modal open={true} onClose={() => setSale(null)} title="Sale completed" footer={null} wide>
+          <Modal
+            open={true}
+            onClose={() => setSale(null)}
+            title="Sale completed"
+            footer={null}
+            wide
+          >
             <SalesReceipt
               key={sale.id}
               sale={sale}
@@ -838,9 +858,9 @@ export function PosPage({
             ? 'Set up register'
             : setup === 'ASSIGN'
               ? 'Assign register staff'
-            : setup === 'SHIFT'
-              ? 'Open cashier shift'
-              : 'Add customer'
+              : setup === 'SHIFT'
+                ? 'Open cashier shift'
+                : 'Add customer'
         }
         onClose={() => setSetup(null)}
         footer={null}

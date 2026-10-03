@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
+  BarChart3,
   Download,
   Eye,
   LayoutGrid,
@@ -31,6 +32,14 @@ import {
 } from '@/services/operations';
 
 type Row = Product | Warehouse | StockMovement | StockAdjustment | Project;
+type InventoryMonth = {
+  key: string;
+  label: string;
+  totalUnits: number;
+  inventoryValue: number;
+  highest: { name: string; quantity: number } | null;
+  lowest: { name: string; quantity: number } | null;
+};
 const money = (value: string | number, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value));
 const quantity = (value: string | number) =>
@@ -67,6 +76,10 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState('');
   const [restockOpen, setRestockOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [inventoryMonths, setInventoryMonths] = useState<InventoryMonth[]>([]);
+  const [analyticsError, setAnalyticsError] = useState('');
 
   const load = useCallback(async () => {
     if (view === 'project-ai') {
@@ -189,6 +202,21 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       setActionBusy('');
     }
   };
+  const openInventoryAnalytics = async () => {
+    setAnalyticsOpen(true);
+    setAnalyticsLoading(true);
+    setAnalyticsError('');
+    try {
+      const movements = await operationsApi.movements();
+      setInventoryMonths(buildInventoryMonths(products, movements));
+    } catch (caught) {
+      setAnalyticsError(
+        caught instanceof Error ? caught.message : 'Unable to load inventory analytics',
+      );
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
   if (view === 'project-ai') return <ProjectAiPage canEdit={canEdit} />;
   const action = {
     products: 'New item',
@@ -218,6 +246,14 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
           <p>Manage {titles[view].toLowerCase()} with controlled, traceable operational records.</p>
         </div>
         <div className="page-header__actions">
+          {view === 'products' && (
+            <button
+              className="button button--secondary"
+              onClick={() => void openInventoryAnalytics()}
+            >
+              <BarChart3 size={17} /> Monthly stock insights
+            </button>
+          )}
           <button className="button button--secondary" onClick={exportCsv}>
             <Download size={17} /> Export CSV
           </button>
@@ -454,8 +490,132 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
         }}
         submit={(data) => void restock(data)}
       />
+      <Modal
+        open={analyticsOpen}
+        wide
+        title="Monthly stock insights"
+        subtitle="Month-end stock levels and inventory value for the latest 12 months."
+        onClose={() => setAnalyticsOpen(false)}
+        footer={
+          <button className="button button--secondary" onClick={() => setAnalyticsOpen(false)}>
+            Close
+          </button>
+        }
+      >
+        {analyticsError ? (
+          <div className="banking-alert">{analyticsError}</div>
+        ) : analyticsLoading ? (
+          <LoadingState label="Calculating monthly inventory…" />
+        ) : inventoryMonths.length ? (
+          <div className="data-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Total units</th>
+                  <th>Inventory value</th>
+                  <th>Highest stock</th>
+                  <th>Lowest stock</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryMonths.map((month) => (
+                  <tr key={month.key}>
+                    <td>
+                      <strong>{month.label}</strong>
+                    </td>
+                    <td>{quantity(month.totalUnits)}</td>
+                    <td>{money(month.inventoryValue, summary?.baseCurrency)}</td>
+                    <td>
+                      {month.highest
+                        ? `${month.highest.name} · ${quantity(month.highest.quantity)}`
+                        : '—'}
+                    </td>
+                    <td>
+                      {month.lowest
+                        ? `${month.lowest.name} · ${quantity(month.lowest.quantity)}`
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="table-empty">No stock movement history is available yet.</div>
+        )}
+      </Modal>
     </>
   );
+}
+
+function buildInventoryMonths(products: Product[], movements: StockMovement[]): InventoryMonth[] {
+  if (!movements.length) return [];
+  const productMap = new Map<string, Product>();
+  products.forEach((product) => productMap.set(product.id, product));
+  movements.forEach((movement) => productMap.set(movement.product.id, movement.product));
+  const ordered = [...movements].sort(
+    (left, right) => new Date(left.movementDate).getTime() - new Date(right.movementDate).getTime(),
+  );
+  const first = new Date(ordered[0].movementDate);
+  const today = new Date();
+  const firstMonth = new Date(first.getFullYear(), first.getMonth(), 1);
+  const earliestVisible = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+  const start = firstMonth > earliestVisible ? firstMonth : earliestVisible;
+  const quantities = new Map<string, number>();
+  let movementIndex = 0;
+  const rows: InventoryMonth[] = [];
+
+  for (let month = new Date(start); month <= today; month.setMonth(month.getMonth() + 1)) {
+    const calendarMonthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 1);
+    const periodEnd =
+      month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth()
+        ? new Date(today.getTime() + 1)
+        : calendarMonthEnd;
+    while (
+      movementIndex < ordered.length &&
+      new Date(ordered[movementIndex].movementDate) < periodEnd
+    ) {
+      const movement = ordered[movementIndex];
+      const signedQuantity = ['ISSUE', 'TRANSFER_OUT'].includes(movement.type)
+        ? -Number(movement.quantity)
+        : Number(movement.quantity);
+      quantities.set(
+        movement.product.id,
+        (quantities.get(movement.product.id) || 0) + signedQuantity,
+      );
+      movementIndex += 1;
+    }
+    const stockedProducts = [...productMap.values()]
+      .filter(
+        (product) => product.type === 'PRODUCT' && new Date(product.createdAt || 0) < periodEnd,
+      )
+      .map((product) => ({
+        name: product.name,
+        quantity: Math.max(0, quantities.get(product.id) || 0),
+        salePrice: Number(product.salePrice),
+      }));
+    const ranked = [...stockedProducts].sort(
+      (left, right) => right.quantity - left.quantity || left.name.localeCompare(right.name),
+    );
+    rows.push({
+      key: `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`,
+      label: month.toLocaleDateString('en-NG', { month: 'long', year: 'numeric' }),
+      totalUnits: stockedProducts.reduce((sum, product) => sum + product.quantity, 0),
+      inventoryValue: stockedProducts.reduce(
+        (sum, product) => sum + product.quantity * product.salePrice,
+        0,
+      ),
+      highest: ranked[0] ? { name: ranked[0].name, quantity: ranked[0].quantity } : null,
+      lowest: ranked.length
+        ? {
+            name: ranked[ranked.length - 1].name,
+            quantity: ranked[ranked.length - 1].quantity,
+          }
+        : null,
+    });
+  }
+  return rows.reverse();
 }
 
 function columns(view: OperationsView) {
