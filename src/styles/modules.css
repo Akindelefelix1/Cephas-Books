@@ -785,8 +785,68 @@
   justify-content: center;
 }
 @media (max-width: 560px) {
+  .receipt-card {
+    max-width: 100%;
+    padding-inline: 0;
+    overflow: hidden;
+  }
+  .sales-receipt-paper {
+    width: 100%;
+    max-width: 100%;
+    margin: 10px 0;
+  }
+  .sales-receipt-paper .invoice-paper__accent {
+    top: -150px;
+    width: 620px;
+    height: 620px;
+  }
+  .sales-receipt-paper .invoice-paper__content {
+    width: calc(100% - 20px);
+    min-height: 0;
+    margin: 10px auto;
+    padding: 20px 14px;
+  }
+  .sales-receipt-paper .invoice-paper__header {
+    gap: 18px;
+    padding-top: 18px;
+  }
+  .sales-receipt-paper .invoice-paper__header h1 {
+    max-width: 120px;
+    padding-top: 7px;
+    font-size: 1.2rem;
+    line-height: 1.05;
+    text-align: right;
+  }
+  .sales-receipt-paper .invoice-paper__parties {
+    gap: 16px;
+    margin: 28px -14px 18px;
+    padding: 16px 14px;
+  }
+  .sales-receipt-paper__table {
+    max-width: 100%;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+  .sales-receipt-paper table {
+    min-width: 540px;
+  }
+  .sales-receipt-paper .invoice-paper__footer {
+    gap: 16px;
+    margin-top: 22px;
+  }
+  .sales-receipt-paper .invoice-paper__bottom-line {
+    margin-top: 30px;
+  }
   .receipt-card__signatures {
     grid-template-columns: 1fr;
+  }
+  .receipt-card__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .receipt-card__actions .button {
+    width: 100%;
+    min-width: 0;
   }
 }
 .pos-history-filters {
@@ -867,8 +927,12 @@
   height: 285px;
   overflow: visible;
 }
-.pos-sales-analytics:has(.pos-sales-chart) {
+.pos-sales-chart-scroll {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
 }
 .pos-sales-chart__month {
   display: grid;
@@ -970,7 +1034,30 @@
 }
 @media (max-width: 520px) {
   .pos-sales-analytics__summary {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pos-sales-analytics {
+    padding: 15px;
+  }
+  .pos-sales-chart {
+    grid-template-columns: repeat(12, 52px);
+    gap: 7px;
+    min-width: max-content;
+    height: 215px;
+  }
+  .pos-sales-chart__month {
+    grid-template-rows: 23px 1fr auto auto;
+    gap: 3px;
+  }
+  .pos-sales-chart__track {
+    min-height: 125px;
+  }
+  .pos-sales-chart__value,
+  .pos-sales-chart__month > small {
+    font-size: 0.56rem;
+  }
+  .pos-sales-chart__month > strong {
+    font-size: 0.68rem;
   }
 }
 .pos-cart-lines {

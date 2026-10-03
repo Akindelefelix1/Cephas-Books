@@ -152,29 +152,31 @@ export function PosHistoryPage({ canReprint = false }: { canReprint?: boolean })
         ) : analyticsLoading ? (
           <p className="pos-sales-analytics__empty">Loading annual sales…</p>
         ) : (
-          <div
-            className="pos-sales-chart"
-            role="img"
-            aria-label={`Monthly POS sales chart for ${analyticsYear}`}
-          >
-            {monthlySales.map((month) => (
-              <div className="pos-sales-chart__month" key={month.month}>
-                <div className="pos-sales-chart__value">{money(month.total)}</div>
-                <div className="pos-sales-chart__track">
-                  <div
-                    className="pos-sales-chart__bar"
-                    style={{
-                      height: `${month.total ? Math.max(7, (month.total / maximumMonthlyTotal) * 100) : 0}%`,
-                    }}
-                    title={`${month.label}: ${money(month.total)} from ${month.transactions} transactions`}
-                  />
+          <div className="pos-sales-chart-scroll">
+            <div
+              className="pos-sales-chart"
+              role="img"
+              aria-label={`Monthly POS sales chart for ${analyticsYear}`}
+            >
+              {monthlySales.map((month) => (
+                <div className="pos-sales-chart__month" key={month.month}>
+                  <div className="pos-sales-chart__value">{money(month.total)}</div>
+                  <div className="pos-sales-chart__track">
+                    <div
+                      className="pos-sales-chart__bar"
+                      style={{
+                        height: `${month.total ? Math.max(7, (month.total / maximumMonthlyTotal) * 100) : 0}%`,
+                      }}
+                      title={`${month.label}: ${money(month.total)} from ${month.transactions} transactions`}
+                    />
+                  </div>
+                  <strong>{month.label}</strong>
+                  <small>
+                    {month.transactions} sale{month.transactions === 1 ? '' : 's'}
+                  </small>
                 </div>
-                <strong>{month.label}</strong>
-                <small>
-                  {month.transactions} sale{month.transactions === 1 ? '' : 's'}
-                </small>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </section>
