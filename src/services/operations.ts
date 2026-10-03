@@ -115,6 +115,10 @@ export interface OperationsSummary {
   outOfStock: number;
   activeProjects: number;
 }
+export interface ProductPage {
+  data: Product[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
 export interface ProjectPlan {
   name: string;
   objective: string;
@@ -157,6 +161,7 @@ const savePosCatalog = (warehouseId: string, products: Product[]) => {
 export const operationsApi = {
   summary: () => req<OperationsSummary>('/operations/summary'),
   products: (filters = {}) => req<Product[]>(`/operations/products?${query(filters)}`),
+  productsPage: (filters = {}) => req<ProductPage>(`/operations/products-page?${query(filters)}`),
   posProducts: async (warehouseId: string) => {
     const cached = readPosCatalog(warehouseId);
     if (cached) return cached;

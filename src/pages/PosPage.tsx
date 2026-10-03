@@ -354,9 +354,6 @@ export function PosPage({
         </label>
         <div className="pos-catalog__toolbar">
           <div className="pos-catalog__filters">
-            <small>
-              {registerId ? 'Stock for selected register' : 'Select a register to see stock'}
-            </small>
             <select
               aria-label="Product category"
               value={category}

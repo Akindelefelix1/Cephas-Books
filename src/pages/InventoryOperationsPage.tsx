@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
   BarChart3,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Eye,
   LayoutGrid,
@@ -65,6 +67,8 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [productPage, setProductPage] = useState(1);
+  const [productMeta, setProductMeta] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -91,7 +95,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
     try {
       const [s, p, w, c] = await Promise.all([
         operationsApi.summary(),
-        operationsApi.products(),
+        view === 'products' ? Promise.resolve([]) : operationsApi.products(),
         operationsApi.warehouses(),
         operationsApi.categories(),
       ]);
@@ -99,9 +103,21 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       setProducts(p.filter((x) => x.isActive && x.type === 'PRODUCT'));
       setWarehouses(w.filter((x) => x.isActive));
       setCategories(c);
-      if (view === 'products')
-        setRows(await operationsApi.products({ search, status, category: categoryFilter }));
-      else if (view === 'warehouses') setRows(await operationsApi.warehouses({ search, status }));
+      if (view === 'products') {
+        const result = await operationsApi.productsPage({
+          search,
+          status,
+          category: categoryFilter,
+          page: String(productPage),
+          limit: '15',
+        });
+        setRows(result.data);
+        setProducts(
+          result.data.filter((product) => product.isActive && product.type === 'PRODUCT'),
+        );
+        setProductMeta(result.meta);
+        if (result.meta.page !== productPage) setProductPage(result.meta.page);
+      } else if (view === 'warehouses') setRows(await operationsApi.warehouses({ search, status }));
       else if (view === 'stock-movements')
         setRows(await operationsApi.movements({ search, type: status }));
       else if (view === 'stock-adjustments')
@@ -113,7 +129,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
     } finally {
       setLoading(false);
     }
-  }, [view, search, status, categoryFilter]);
+  }, [view, search, status, categoryFilter, productPage]);
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 200);
     return () => window.clearTimeout(timer);
@@ -207,8 +223,11 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
     setAnalyticsLoading(true);
     setAnalyticsError('');
     try {
-      const movements = await operationsApi.movements();
-      setInventoryMonths(buildInventoryMonths(products, movements));
+      const [allProducts, movements] = await Promise.all([
+        operationsApi.products(),
+        operationsApi.movements(),
+      ]);
+      setInventoryMonths(buildInventoryMonths(allProducts, movements));
     } catch (caught) {
       setAnalyticsError(
         caught instanceof Error ? caught.message : 'Unable to load inventory analytics',
@@ -226,18 +245,34 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
     projects: 'New project',
     'project-ai': '',
   }[view];
-  const exportCsv = () =>
+  const exportRows = (items: Row[]) =>
     downloadText(
       `${view}.csv`,
       [
         columns(view).join(','),
-        ...rows.map((row) =>
+        ...items.map((row) =>
           values(view, row, summary?.baseCurrency)
             .map((x) => `"${String(x).replace(/"/g, '""')}"`)
             .join(','),
         ),
       ].join('\n'),
     );
+  const exportCsv = async () => {
+    if (view !== 'products') return exportRows(rows);
+    try {
+      setBusy(true);
+      const allProducts = await operationsApi.products({
+        search,
+        status,
+        category: categoryFilter,
+      });
+      exportRows(allProducts);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to export products');
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <>
       <div className="page-header">
@@ -254,7 +289,11 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
               <BarChart3 size={17} /> Monthly stock insights
             </button>
           )}
-          <button className="button button--secondary" onClick={exportCsv}>
+          <button
+            className="button button--secondary"
+            onClick={() => void exportCsv()}
+            disabled={busy}
+          >
             <Download size={17} /> Export CSV
           </button>
           {canEdit && (
@@ -301,9 +340,19 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
             aria-label="Search"
             placeholder={`Search ${titles[view].toLowerCase()}`}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setProductPage(1);
+              setSearch(e.target.value);
+            }}
           />
-          <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select
+            aria-label="Status"
+            value={status}
+            onChange={(e) => {
+              setProductPage(1);
+              setStatus(e.target.value);
+            }}
+          >
             <option value="">All statuses</option>
             {statusOptions(view).map((x) => (
               <option key={x} value={x}>
@@ -315,7 +364,10 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
             <select
               aria-label="Category"
               value={categoryFilter}
-              onChange={(event) => setCategoryFilter(event.target.value)}
+              onChange={(event) => {
+                setProductPage(1);
+                setCategoryFilter(event.target.value);
+              }}
             >
               <option value="">All categories</option>
               {categories.map((category) => (
@@ -420,6 +472,37 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+        {!loading && view === 'products' && productMeta.total > 0 && (
+          <div className="table-pagination">
+            <p>
+              Showing{' '}
+              <strong>
+                {(productMeta.page - 1) * productMeta.limit + 1}–
+                {Math.min(productMeta.page * productMeta.limit, productMeta.total)}
+              </strong>{' '}
+              of {productMeta.total}
+            </p>
+            <div>
+              <button
+                aria-label="Previous page"
+                disabled={productMeta.page === 1}
+                onClick={() => setProductPage((page) => page - 1)}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span>
+                Page {productMeta.page} of {productMeta.totalPages}
+              </span>
+              <button
+                aria-label="Next page"
+                disabled={productMeta.page >= productMeta.totalPages}
+                onClick={() => setProductPage((page) => page + 1)}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         )}
       </section>
