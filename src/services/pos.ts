@@ -2,6 +2,7 @@ import { authorizedRequest } from './auth';
 export interface PosSale {
   id: string;
   receiptNumber: string;
+  status: 'COMPLETED' | 'VOIDED' | 'HELD' | 'REFUNDED';
   currency: string;
   total: string;
   paidAmount: string;
@@ -29,13 +30,30 @@ export interface PosSale {
     digitalUrl: string;
   };
   items: Array<{
+    id?: string;
+    productId?: string;
     description: string;
     quantity: string;
     unitPrice: string;
     discount: string;
     lineTotal: string;
+    product?: { allowFractionalSale: boolean };
   }>;
-  payments: Array<{ method: string; amount: string; reference?: string }>;
+  payments: Array<{
+    id?: string;
+    method: string;
+    status?: 'PENDING' | 'APPROVED' | 'DECLINED' | 'REVERSED';
+    amount: string;
+    reference?: string;
+  }>;
+  returns?: Array<{
+    id: string;
+    productId: string;
+    quantity: string;
+    amount: string;
+    reason: string;
+    createdAt: string;
+  }>;
 }
 export interface PosRegister {
   id: string;
@@ -85,6 +103,24 @@ export interface PosShift {
   openingCash: string;
   register: PosRegister;
 }
+export interface PosShiftCloseResult {
+  id: string;
+  status: 'CLOSED';
+  openingCash: string;
+  closingCash: string;
+  expectedCash: string;
+  variance: string;
+  closedAt: string;
+}
+export interface PosAuditEntry {
+  id: string;
+  actorId?: string | null;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
 export const posApi = {
   sales: (filters: Record<string, string> = {}) => {
     const query = new URLSearchParams(filters).toString();
@@ -96,6 +132,30 @@ export const posApi = {
   registers: () => authorizedRequest<PosRegister[]>('/pos/registers'),
   branches: () => authorizedRequest<PosBranch[]>('/pos/branches'),
   currentShift: () => authorizedRequest<PosShift | null>('/pos/shifts/current'),
+  closeShift: (id: string, data: { closingCash: number; notes?: string }) =>
+    authorizedRequest<PosShiftCloseResult>(`/pos/shifts/${id}/close`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  returnItem: (saleId: string, data: { productId: string; quantity: number; reason: string }) =>
+    authorizedRequest<{
+      id: string;
+      productId: string;
+      quantity: string;
+      amount: string;
+      reason: string;
+      createdAt: string;
+    }>(`/pos/sales/${saleId}/returns`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  voidSale: (saleId: string, reason: string) =>
+    authorizedRequest<{ id: string; status: 'VOIDED' }>(`/pos/sales/${saleId}/void`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  audit: (saleId: string) => authorizedRequest<PosAuditEntry[]>(`/pos/sales/${saleId}/audit`),
+  auditLog: () => authorizedRequest<PosAuditEntry[]>('/pos/audit'),
   receipt: (saleId: string) => authorizedRequest<PosSale>(`/pos/sales/${saleId}/receipt`),
   recordReprint: (saleId: string) =>
     authorizedRequest<PosSale>(`/pos/sales/${saleId}/receipt/reprint`, { method: 'POST' }),

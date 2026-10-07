@@ -245,6 +245,18 @@ export function App() {
             (!identity.customRoleId && ['OWNER', 'ADMIN'].includes(identity.role)) ||
             identity.permissions.includes('sales.manage')
           }
+          canReturn={
+            (!identity.customRoleId && ['OWNER', 'ADMIN'].includes(identity.role)) ||
+            identity.permissions.includes('sales.manage')
+          }
+          canVoid={
+            (!identity.customRoleId && ['OWNER', 'ADMIN'].includes(identity.role)) ||
+            identity.permissions.includes('sales.manage')
+          }
+          canViewAudit={
+            (!identity.customRoleId && ['OWNER', 'ADMIN'].includes(identity.role)) ||
+            identity.permissions.includes('sales.manage')
+          }
         />
       );
     if (

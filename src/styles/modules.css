@@ -628,6 +628,151 @@
   font-weight: 700;
   font-size: 0.7rem;
 }
+.pos-shift-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pos-shift-summary {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #cdebdc;
+  border-radius: 8px;
+  background: #f1fbf6;
+  color: #087a4d;
+  font-size: 0.68rem;
+}
+.pos-history-void-filter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.pos-sale-management {
+  display: grid;
+  gap: 16px;
+}
+.pos-sale-management__summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pos-sale-management__summary > span:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: #667085;
+}
+.pos-sale-actions {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e8ebf0;
+  border-radius: 8px;
+}
+.pos-sale-actions > .form-grid {
+  flex-basis: 100%;
+}
+.pos-sale-actions .button--danger {
+  color: #b42318;
+  border-color: #f1b8b4;
+}
+.pos-action-form textarea {
+  min-height: 76px;
+}
+.pos-sale-returns,
+.pos-sale-audit {
+  padding: 12px;
+  border: 1px solid #e8ebf0;
+  border-radius: 8px;
+}
+.pos-sale-returns h3,
+.pos-sale-audit h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 9px;
+  font-size: 0.76rem;
+}
+.pos-sale-returns p,
+.pos-sale-audit li,
+.pos-sale-audit > p {
+  margin: 6px 0;
+  font-size: 0.68rem;
+}
+.pos-sale-audit ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.pos-sale-audit li {
+  display: grid;
+  gap: 3px;
+  padding-top: 8px;
+  border-top: 1px solid #edf0f4;
+}
+.pos-sale-audit time,
+.pos-sale-audit small {
+  color: #7f8798;
+  font-size: 0.62rem;
+}
+.pos-sale-audit li p {
+  margin: 2px 0;
+}
+.pos-audit-log {
+  padding: 16px 18px;
+}
+.pos-audit-log > header {
+  margin-bottom: 12px;
+}
+.pos-audit-log h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+}
+.pos-audit-log header small,
+.pos-audit-log > p {
+  color: #7f8798;
+  font-size: 0.66rem;
+}
+.pos-audit-log__list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.pos-audit-log__list article {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 1.2fr 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid #edf0f4;
+  font-size: 0.66rem;
+}
+.pos-audit-log__list article > span,
+.pos-audit-log__list time {
+  color: #7f8798;
+}
+.pos-void-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff4ed;
+  color: #9a3412;
+  font-size: 0.72rem;
+}
 .pos-receipt {
   position: fixed;
   right: 24px;

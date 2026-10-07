@@ -1663,6 +1663,16 @@
   .pos-register-card__details {
     grid-template-columns: minmax(0, 1fr);
   }
+  .pos-history-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pos-sale-management__summary {
+    align-items: flex-start;
+  }
+  .pos-audit-log__list article {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
   .pos-register-management > header {
     align-items: flex-start;
   }

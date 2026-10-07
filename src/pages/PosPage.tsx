@@ -28,6 +28,7 @@ import {
   type PosBranch,
   type PosRegister,
   type PosSale,
+  type PosShiftCloseResult,
   type PosShift,
 } from '@/services/pos';
 import { salesApi, type Customer } from '@/services/sales';
@@ -80,10 +81,11 @@ export function PosPage({
     [pressedProductId, setPressedProductId] = useState<string | null>(null),
     [payments, setPayments] = useState<PaymentInput[]>([{ method: 'CASH', amount: '' }]),
     [splitMode, setSplitMode] = useState(false),
-    [setup, setSetup] = useState<'REGISTER' | 'EDIT' | 'ASSIGN' | 'SHIFT' | 'CUSTOMER' | null>(
-      null,
-    ),
+    [setup, setSetup] = useState<
+      'REGISTER' | 'EDIT' | 'ASSIGN' | 'SHIFT' | 'CLOSE_SHIFT' | 'CUSTOMER' | null
+    >(null),
     [editingRegister, setEditingRegister] = useState<PosRegister | null>(null),
+    [shiftCloseResult, setShiftCloseResult] = useState<PosShiftCloseResult | null>(null),
     [error, setError] = useState(''),
     [productsLoading, setProductsLoading] = useState(true),
     [busy, setBusy] = useState(false),
@@ -241,6 +243,7 @@ export function PosPage({
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     setBusy(true);
+    setError('');
     try {
       if (setup === 'REGISTER' || setup === 'EDIT') {
         const registerData = {
@@ -294,6 +297,15 @@ export function PosPage({
           openingCash: Number(f.get('openingCash') || 0),
         });
         setShift(s);
+        setShiftCloseResult(null);
+        setSetup(null);
+      } else if (setup === 'CLOSE_SHIFT' && shift) {
+        const result = await posApi.closeShift(shift.id, {
+          closingCash: Number(f.get('closingCash') || 0),
+          notes: String(f.get('notes') || '').trim() || undefined,
+        });
+        setShiftCloseResult(result);
+        setShift(null);
         setSetup(null);
       } else {
         const c = await salesApi.createCustomer({
@@ -808,7 +820,26 @@ export function PosPage({
               </small>
             </>
           )}
-          {shift && <small className="pos-status">Shift open on {shift.register.code}</small>}
+            {shift && (
+              <div className="pos-shift-status">
+                <small className="pos-status">Shift open on {shift.register.code}</small>
+                <button
+                  type="button"
+                  className="button button--secondary button--small"
+                  onClick={() => setSetup('CLOSE_SHIFT')}
+                >
+                  Close shift
+                </button>
+              </div>
+            )}
+            {shiftCloseResult && (
+              <div className="pos-shift-summary" role="status">
+                <strong>Shift closed</strong>
+                <span>Expected cash: {money(Number(shiftCloseResult.expectedCash))}</span>
+                <span>Counted cash: {money(Number(shiftCloseResult.closingCash))}</span>
+                <span>Variance: {money(Number(shiftCloseResult.variance))}</span>
+              </div>
+            )}
           <div>
             <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
               <option value="">Walk-in customer</option>
@@ -1038,6 +1069,8 @@ export function PosPage({
                 ? 'Assign register staff'
                 : setup === 'SHIFT'
                   ? 'Open cashier shift'
+                  : setup === 'CLOSE_SHIFT'
+                    ? 'Close cashier shift'
                   : 'Add customer'
         }
         onClose={() => {
@@ -1197,6 +1230,17 @@ export function PosPage({
               Opening cash
               <input name="openingCash" type="number" min="0" defaultValue="0" required />
             </label>
+          ) : setup === 'CLOSE_SHIFT' ? (
+            <>
+              <label className="full">
+                Counted closing cash
+                <input name="closingCash" type="number" min="0" step="0.01" required />
+              </label>
+              <label className="full">
+                Notes
+                <textarea name="notes" maxLength={1000} />
+              </label>
+            </>
           ) : (
             <>
               <label className="full">
@@ -1209,9 +1253,16 @@ export function PosPage({
               </label>
             </>
           )}
+          {error && <p className="form-error full">{error}</p>}
           <div className="form-actions full">
             <button className="button" disabled={busy}>
-              {busy ? 'Saving…' : setup === 'SHIFT' ? 'Open shift' : 'Save'}
+              {busy
+                ? 'Saving…'
+                : setup === 'SHIFT'
+                  ? 'Open shift'
+                  : setup === 'CLOSE_SHIFT'
+                    ? 'Close shift'
+                    : 'Save'}
             </button>
           </div>
         </form>
