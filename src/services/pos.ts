@@ -42,15 +42,38 @@ export interface PosRegister {
   code: string;
   name: string;
   warehouseId: string;
-  assignedStaffId?: string;
+  warehouse?: { id: string; code: string; name: string };
+  assignedStaffId?: string | null;
   branchId?: string;
+  defaultCashAccountId?: string | null;
+  defaultCardAccountId?: string | null;
+  defaultBankAccountId?: string | null;
+  terminalId?: string | null;
+  isActive: boolean;
   assignedStaff?: {
     id: string;
     email: string;
     firstName?: string;
     lastName?: string;
   } | null;
+  shifts?: Array<{
+    id: string;
+    cashier: { id: string; email: string; firstName?: string; lastName?: string };
+    openedAt: string;
+  }>;
 }
+export type PosRegisterWrite = {
+  code: string;
+  name: string;
+  warehouseId: string;
+  assignedStaffId: string;
+  branchId: string;
+  defaultCashAccountId?: string | null;
+  defaultCardAccountId?: string | null;
+  defaultBankAccountId?: string | null;
+  terminalId?: string | null;
+};
+export type PosRegisterUpdate = Partial<PosRegisterWrite> & { isActive?: boolean };
 export interface PosBranch {
   id: string;
   name: string;
@@ -65,9 +88,10 @@ export interface PosShift {
 export const posApi = {
   sales: (filters: Record<string, string> = {}) => {
     const query = new URLSearchParams(filters).toString();
-    return authorizedRequest<{ data: PosSale[]; meta: { page: number; limit: number; total: number; totalPages: number } }>(
-      `/pos/sales${query ? `?${query}` : ''}`,
-    );
+    return authorizedRequest<{
+      data: PosSale[];
+      meta: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/pos/sales${query ? `?${query}` : ''}`);
   },
   registers: () => authorizedRequest<PosRegister[]>('/pos/registers'),
   branches: () => authorizedRequest<PosBranch[]>('/pos/branches'),
@@ -79,9 +103,14 @@ export const posApi = {
     authorizedRequest<{ sent: true }>(`/pos/sales/${saleId}/receipt/email`, { method: 'POST' }),
   smsReceipt: (saleId: string) =>
     authorizedRequest<{ sent: true }>(`/pos/sales/${saleId}/receipt/sms`, { method: 'POST' }),
-  createRegister: (data: object) =>
+  createRegister: (data: PosRegisterWrite) =>
     authorizedRequest<PosRegister>('/pos/registers', {
       method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateRegister: (id: string, data: PosRegisterUpdate) =>
+    authorizedRequest<PosRegister>(`/pos/registers/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     }),
   assignRegisterStaff: (id: string, assignedStaffId: string, branchId: string) =>

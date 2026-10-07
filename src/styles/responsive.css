@@ -1659,6 +1659,19 @@
   .pos-payment__row {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
   }
+  .pos-register-grid,
+  .pos-register-card__details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pos-register-management > header {
+    align-items: flex-start;
+  }
+  .pos-register-card__heading {
+    flex-wrap: wrap;
+  }
+  .pos-register-card__actions {
+    flex-wrap: wrap;
+  }
   .pos-customer > div {
     grid-template-columns: minmax(0, 1fr) auto;
   }

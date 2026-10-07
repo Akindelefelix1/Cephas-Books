@@ -403,6 +403,88 @@
     'recent recent';
   gap: 18px;
 }
+.pos-page {
+  display: grid;
+  gap: 18px;
+}
+.pos-register-management {
+  padding: 18px;
+}
+.pos-register-management > header,
+.pos-register-card__heading,
+.pos-register-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pos-register-management > header {
+  margin-bottom: 16px;
+}
+.pos-register-management h2 {
+  margin: 0 0 4px;
+  font-size: 0.92rem;
+}
+.pos-register-management > header small,
+.pos-register-card__heading small {
+  color: #7f8798;
+  font-size: 0.68rem;
+}
+.pos-register-management > header .button,
+.pos-register-card__actions .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.pos-register-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.pos-register-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e8ebf0;
+  border-radius: 10px;
+}
+.pos-register-card__heading {
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.pos-register-card__heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.pos-register-card__heading strong {
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+}
+.pos-register-card__details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px 14px;
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+.pos-register-card__details span {
+  display: grid;
+  gap: 3px;
+}
+.pos-register-card__details small {
+  color: #7f8798;
+  font-size: 0.62rem;
+}
+.pos-register-card__actions {
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.pos-register-empty {
+  margin: 0;
+  color: #7f8798;
+  font-size: 0.72rem;
+}
 .pos-catalog {
   grid-area: catalog;
 }

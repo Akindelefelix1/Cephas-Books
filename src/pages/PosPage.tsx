@@ -11,6 +11,8 @@ import {
   UserPlus,
   ChevronLeft,
   ChevronRight,
+  Pencil,
+  Power,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -30,6 +32,7 @@ import {
 } from '@/services/pos';
 import { salesApi, type Customer } from '@/services/sales';
 import { organizationApi, type OrganizationMember } from '@/services/organization';
+import { bankingApi, type BankAccount } from '@/services/banking';
 import { getDefaultCurrency } from '@/utils/currency';
 const money = (v: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(v);
@@ -60,6 +63,7 @@ export function PosPage({
     [warehouses, setWarehouses] = useState<Warehouse[]>([]),
     [branches, setBranches] = useState<PosBranch[]>([]),
     [staff, setStaff] = useState<OrganizationMember[]>([]),
+    [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]),
     [shift, setShift] = useState<PosShift | null>(null),
     [cart, setCart] = useState<Line[]>([]),
     [branchId, setBranchId] = useState(''),
@@ -76,7 +80,10 @@ export function PosPage({
     [pressedProductId, setPressedProductId] = useState<string | null>(null),
     [payments, setPayments] = useState<PaymentInput[]>([{ method: 'CASH', amount: '' }]),
     [splitMode, setSplitMode] = useState(false),
-    [setup, setSetup] = useState<'REGISTER' | 'ASSIGN' | 'SHIFT' | 'CUSTOMER' | null>(null),
+    [setup, setSetup] = useState<'REGISTER' | 'EDIT' | 'ASSIGN' | 'SHIFT' | 'CUSTOMER' | null>(
+      null,
+    ),
+    [editingRegister, setEditingRegister] = useState<PosRegister | null>(null),
     [error, setError] = useState(''),
     [productsLoading, setProductsLoading] = useState(true),
     [busy, setBusy] = useState(false),
@@ -91,8 +98,9 @@ export function PosPage({
       posApi.sales({ limit: '10' }),
       canConfigurePos ? organizationApi.users() : Promise.resolve([]),
       posApi.branches(),
+      canConfigurePos ? bankingApi.accounts() : Promise.resolve([]),
     ])
-      .then(([c, r, w, s, recent, members, accessibleBranches]) => {
+      .then(([c, r, w, s, recent, members, accessibleBranches, accounts]) => {
         setCustomers(c.data.filter((x) => x.isActive));
         setRegisters(r);
         setWarehouses(w);
@@ -102,7 +110,7 @@ export function PosPage({
           shiftRegister?.branchId ||
           (accessibleBranches.length === 1 ? accessibleBranches[0].id : '');
         const branchRegisters = initialBranchId
-          ? r.filter((register) => register.branchId === initialBranchId)
+          ? r.filter((register) => register.branchId === initialBranchId && register.isActive)
           : [];
         setBranchId(initialBranchId);
         setRegisterId(
@@ -112,6 +120,7 @@ export function PosPage({
         setRecentSales(recent.data);
         setStaff(members.filter((member) => member.user.isActive));
         setBranches(accessibleBranches);
+        setBankAccounts(accounts);
         if (!r.length) setProductsLoading(false);
       })
       .catch((e) => {
@@ -143,7 +152,7 @@ export function PosPage({
     };
   }, [registerId, registers]);
   const availableRegisters = useMemo(
-      () => registers.filter((register) => register.branchId === branchId),
+      () => registers.filter((register) => register.branchId === branchId && register.isActive),
       [branchId, registers],
     ),
     visible = useMemo(
@@ -233,17 +242,40 @@ export function PosPage({
     const f = new FormData(e.currentTarget);
     setBusy(true);
     try {
-      if (setup === 'REGISTER') {
-        const r = await posApi.createRegister({
-          code: f.get('code'),
-          name: f.get('name'),
-          warehouseId: f.get('warehouseId'),
-          assignedStaffId: f.get('assignedStaffId'),
-          branchId: f.get('branchId'),
-        });
-        setRegisters((x) => [...x, r]);
-        setBranchId(r.branchId || '');
-        setRegisterId(r.id);
+      if (setup === 'REGISTER' || setup === 'EDIT') {
+        const registerData = {
+          code: String(f.get('code') || ''),
+          name: String(f.get('name') || ''),
+          warehouseId: String(f.get('warehouseId') || ''),
+          assignedStaffId: String(f.get('assignedStaffId') || ''),
+          branchId: String(f.get('branchId') || ''),
+          terminalId: String(f.get('terminalId') || '') || null,
+          defaultCashAccountId: String(f.get('defaultCashAccountId') || '') || null,
+          defaultCardAccountId: String(f.get('defaultCardAccountId') || '') || null,
+          defaultBankAccountId: String(f.get('defaultBankAccountId') || '') || null,
+        };
+        const saved =
+          setup === 'REGISTER'
+            ? await posApi.createRegister(registerData)
+            : editingRegister
+              ? await posApi.updateRegister(editingRegister.id, registerData)
+              : null;
+        if (!saved) throw new Error('Select a register to edit');
+        setRegisters((current) =>
+          setup === 'REGISTER'
+            ? [...current, saved]
+            : current.map((register) => (register.id === saved.id ? saved : register)),
+        );
+        if (setup === 'REGISTER') {
+          setBranchId(saved.branchId || '');
+          setRegisterId(saved.id);
+        } else if (registerId === saved.id && !saved.isActive) {
+          setRegisterId('');
+          setShift(null);
+          setCart([]);
+          setProducts([]);
+        }
+        setEditingRegister(null);
         setSetup(null);
       } else if (setup === 'ASSIGN') {
         const updated = await posApi.assignRegisterStaff(
@@ -338,7 +370,145 @@ export function PosPage({
       setBusy(false);
     }
   };
+  const toggleRegisterStatus = async (register: PosRegister) => {
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await posApi.updateRegister(register.id, { isActive: !register.isActive });
+      setRegisters((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      if (!updated.isActive && registerId === updated.id) {
+        setRegisterId('');
+        setShift(null);
+        setCart([]);
+        setProducts([]);
+      }
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : 'Unable to update register status',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
+    <div className="pos-page">
+      {canConfigurePos && (
+        <section className="panel pos-register-management">
+          <header>
+            <div>
+              <h2>Register management</h2>
+              <small>Configure devices, payment accounts, assignments, and availability.</small>
+            </div>
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                setEditingRegister(null);
+                setSetup('REGISTER');
+              }}
+            >
+              <Plus size={15} /> Add register
+            </button>
+          </header>
+          {registers.length ? (
+            <div className="pos-register-grid">
+              {registers.map((register) => {
+                const cashier = register.shifts?.[0]?.cashier;
+                const displayName = (person?: {
+                  firstName?: string;
+                  lastName?: string;
+                  email?: string;
+                }) =>
+                  person
+                    ? [person.firstName, person.lastName].filter(Boolean).join(' ') ||
+                      person.email ||
+                      'Unknown'
+                    : 'Not assigned';
+                return (
+                  <article className="pos-register-card" key={register.id}>
+                    <div className="pos-register-card__heading">
+                      <div>
+                        <strong>
+                          {register.code} · {register.name}
+                        </strong>
+                        <small>
+                          {branches.find((branch) => branch.id === register.branchId)?.name ||
+                            'Branch unavailable'}
+                          {' · '}
+                          {register.warehouse?.name ||
+                            warehouses.find((warehouse) => warehouse.id === register.warehouseId)
+                              ?.name ||
+                            'Warehouse unavailable'}
+                        </small>
+                      </div>
+                      <span
+                        className={`badge ${register.isActive ? 'badge--success' : 'badge--danger'}`}
+                      >
+                        <i /> {register.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="pos-register-card__details">
+                      <span>
+                        <small>Primary staff</small>
+                        {displayName(register.assignedStaff || undefined)}
+                      </span>
+                      <span>
+                        <small>Terminal / device</small>
+                        {register.terminalId || 'Not assigned'}
+                      </span>
+                      <span>
+                        <small>Current cashier</small>
+                        {cashier ? displayName(cashier) : 'No open shift'}
+                      </span>
+                      <span>
+                        <small>Cash account</small>
+                        {bankAccounts.find(
+                          (account) => account.id === register.defaultCashAccountId,
+                        )?.name || 'Not set'}
+                      </span>
+                      <span>
+                        <small>Card account</small>
+                        {bankAccounts.find(
+                          (account) => account.id === register.defaultCardAccountId,
+                        )?.name || 'Not set'}
+                      </span>
+                      <span>
+                        <small>Bank / transfer account</small>
+                        {bankAccounts.find(
+                          (account) => account.id === register.defaultBankAccountId,
+                        )?.name || 'Not set'}
+                      </span>
+                    </div>
+                    <div className="pos-register-card__actions">
+                      <button
+                        type="button"
+                        className="button button--secondary button--small"
+                        onClick={() => {
+                          setEditingRegister(register);
+                          setSetup('EDIT');
+                        }}
+                      >
+                        <Pencil size={14} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="button button--secondary button--small"
+                        disabled={busy}
+                        onClick={() => void toggleRegisterStatus(register)}
+                      >
+                        <Power size={14} /> {register.isActive ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="pos-register-empty">No registers yet. Add one to get started.</p>
+          )}
+        </section>
+      )}
+      {error && canConfigurePos && <p className="form-error">{error}</p>}
     <div className="pos-layout">
       <section className="panel pos-catalog" aria-busy={productsLoading}>
         <label className="pos-search">
@@ -415,7 +585,9 @@ export function PosPage({
                         <strong>{product.name}</strong>
                       </td>
                       <td>{product.sku}</td>
-                      <td>{product.type === 'SERVICE' ? '—' : quantity(product.stockQuantity)}</td>
+                        <td>
+                          {product.type === 'SERVICE' ? '—' : quantity(product.stockQuantity)}
+                        </td>
                       <td>{money(Number(product.salePrice))}</td>
                       <td>
                         <button
@@ -564,11 +736,13 @@ export function PosPage({
               onChange={(event) => {
                 const nextBranchId = event.target.value;
                 const nextRegisters = registers.filter(
-                  (register) => register.branchId === nextBranchId,
+                    (register) => register.branchId === nextBranchId && register.isActive,
                 );
                 setBranchId(nextBranchId);
                 setRegisterId(
-                  !canConfigurePos || nextRegisters.length === 1 ? nextRegisters[0]?.id || '' : '',
+                    !canConfigurePos || nextRegisters.length === 1
+                      ? nextRegisters[0]?.id || ''
+                      : '',
                 );
                 setCatalogPage(1);
                 setShift(null);
@@ -712,7 +886,9 @@ export function PosPage({
                     Math.min(Number(x.salePrice), Number(event.target.value || 0)),
                   );
                   setCart((current) =>
-                    current.map((item) => (item.id === x.id ? { ...item, discount: next } : item)),
+                      current.map((item) =>
+                        item.id === x.id ? { ...item, discount: next } : item,
+                      ),
                   );
                 }}
               />
@@ -799,7 +975,9 @@ export function PosPage({
                   type="button"
                   aria-label={`Remove payment ${index + 1}`}
                   onClick={() =>
-                    setPayments((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                      setPayments((current) =>
+                        current.filter((_, itemIndex) => itemIndex !== index),
+                      )
                   }
                 >
                   <Trash2 size={14} />
@@ -848,34 +1026,44 @@ export function PosPage({
           </Modal>
         )}
       </section>
+    </div>
       <Modal
         open={!!setup}
         title={
           setup === 'REGISTER'
             ? 'Set up register'
-            : setup === 'ASSIGN'
-              ? 'Assign register staff'
-              : setup === 'SHIFT'
-                ? 'Open cashier shift'
-                : 'Add customer'
+            : setup === 'EDIT'
+              ? 'Edit register'
+              : setup === 'ASSIGN'
+                ? 'Assign register staff'
+                : setup === 'SHIFT'
+                  ? 'Open cashier shift'
+                  : 'Add customer'
         }
-        onClose={() => setSetup(null)}
+        onClose={() => {
+          setSetup(null);
+          setEditingRegister(null);
+        }}
         footer={null}
       >
         <form className="form-grid" onSubmit={(e) => void submit(e)}>
-          {setup === 'REGISTER' ? (
+          {setup === 'REGISTER' || setup === 'EDIT' ? (
             <>
               <label>
                 Register code
-                <input name="code" required />
+                <input name="code" required defaultValue={editingRegister?.code || ''} />
               </label>
               <label>
                 Name
-                <input name="name" required />
+                <input name="name" required defaultValue={editingRegister?.name || ''} />
               </label>
               <label className="full">
                 Assigned staff
-                <select name="assignedStaffId" required defaultValue="">
+                <select
+                  name="assignedStaffId"
+                  required
+                  defaultValue={editingRegister?.assignedStaffId || ''}
+                >
                   <option value="" disabled>
                     Select existing staff
                   </option>
@@ -891,7 +1079,7 @@ export function PosPage({
               </label>
               <label className="full">
                 Branch
-                <select name="branchId" required defaultValue="">
+                <select name="branchId" required defaultValue={editingRegister?.branchId || ''}>
                   <option value="" disabled>
                     Select branch
                   </option>
@@ -907,12 +1095,67 @@ export function PosPage({
                 <select
                   name="warehouseId"
                   required
-                  defaultValue={warehouses.find((warehouse) => warehouse.isDefault)?.id || ''}
+                  defaultValue={
+                    editingRegister?.warehouseId ||
+                    warehouses.find((warehouse) => warehouse.isDefault)?.id ||
+                    ''
+                  }
                 >
                   <option value="">Select warehouse</option>
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.code} — {w.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="full">
+                Terminal / device ID
+                <input
+                  name="terminalId"
+                  maxLength={128}
+                  placeholder="Serial number or device label"
+                  defaultValue={editingRegister?.terminalId || ''}
+                />
+              </label>
+              <label className="full">
+                Default cash account
+                <select
+                  name="defaultCashAccountId"
+                  defaultValue={editingRegister?.defaultCashAccountId || ''}
+                >
+                  <option value="">No default</option>
+                  {bankAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} · {account.accountType}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="full">
+                Default card account
+                <select
+                  name="defaultCardAccountId"
+                  defaultValue={editingRegister?.defaultCardAccountId || ''}
+                >
+                  <option value="">No default</option>
+                  {bankAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} · {account.accountType}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="full">
+                Default bank / transfer account
+                <select
+                  name="defaultBankAccountId"
+                  defaultValue={editingRegister?.defaultBankAccountId || ''}
+                >
+                  <option value="">No default</option>
+                  {bankAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} · {account.accountType}
                     </option>
                   ))}
                 </select>
