@@ -7,6 +7,7 @@ import {
   ReceiptText,
   Settings,
   ShoppingCart,
+  ShoppingBag,
 } from 'lucide-react';
 import type { NavItem } from '@/types/app';
 
@@ -64,6 +65,21 @@ export const primaryNavigation: NavItem[] = [
       { id: 'budgets', label: 'Budgeting' },
       { id: 'tax', label: 'Tax' },
       { id: 'payroll', label: 'Payroll' },
+    ],
+  },
+  {
+    id: 'commerce-group',
+    label: 'Commerce',
+    icon: ShoppingBag,
+    children: [
+      { id: 'commerce-dashboard', label: 'Dashboard' },
+      { id: 'sales-channels', label: 'Sales channels' },
+      { id: 'channel-orders', label: 'Channel orders' },
+      { id: 'fulfillment', label: 'Fulfillment' },
+      { id: 'payouts', label: 'Payouts' },
+      { id: 'product-channel-mapping', label: 'Product/channel mapping' },
+      { id: 'commerce-analytics', label: 'Commerce analytics' },
+      { id: 'commerce-settings', label: 'Commerce settings' },
     ],
   },
   {

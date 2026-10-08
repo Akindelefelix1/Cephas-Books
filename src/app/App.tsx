@@ -51,6 +51,8 @@ import {
 import { onboardingApi } from '@/services/onboarding';
 import { can, canAccessRoute } from '@/utils/permissions';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { CommercePage } from '@/pages/CommercePage';
+import type { CommerceView } from '@/services/commerce';
 
 const marketingViews = ['platform', 'solutions', 'pricing', 'security', 'resources'] as const;
 const authViews = ['login', 'register', 'forgot', 'mfa'] as const;
@@ -272,6 +274,28 @@ export function App() {
               'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables'
           }
           role={roleFor('sales.manage')}
+        />
+      );
+    if (
+      [
+        'commerce-dashboard',
+        'sales-channels',
+        'channel-orders',
+        'fulfillment',
+        'payouts',
+        'product-channel-mapping',
+        'commerce-analytics',
+        'commerce-settings',
+      ].includes(active)
+    )
+      return (
+        <CommercePage
+          key={active}
+          view={active as CommerceView}
+          canManage={
+            (!identity.customRoleId && ['OWNER', 'ADMIN'].includes(identity.role)) ||
+            identity.permissions.includes('inventory.manage')
+          }
         />
       );
     if (
