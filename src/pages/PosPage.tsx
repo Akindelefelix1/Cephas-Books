@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Pencil,
   Power,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -82,7 +83,7 @@ export function PosPage({
     [payments, setPayments] = useState<PaymentInput[]>([{ method: 'CASH', amount: '' }]),
     [splitMode, setSplitMode] = useState(false),
     [setup, setSetup] = useState<
-      'REGISTER' | 'EDIT' | 'ASSIGN' | 'SHIFT' | 'CLOSE_SHIFT' | 'CUSTOMER' | null
+      'REGISTER' | 'EDIT' | 'ASSIGN' | 'HANDOVER' | 'SHIFT' | 'CLOSE_SHIFT' | 'CUSTOMER' | null
     >(null),
     [editingRegister, setEditingRegister] = useState<PosRegister | null>(null),
     [shiftCloseResult, setShiftCloseResult] = useState<PosShiftCloseResult | null>(null),
@@ -291,6 +292,19 @@ export function PosPage({
         );
         setBranchId(updated.branchId || '');
         setSetup(null);
+      } else if (setup === 'HANDOVER' && editingRegister) {
+        const updated = await posApi.handoverRegister(editingRegister.id, {
+          assignedStaffId: String(f.get('assignedStaffId')),
+          branchId: String(f.get('branchId')),
+          closingCash: Number(f.get('closingCash') || 0),
+          notes: String(f.get('notes') || '').trim() || undefined,
+        });
+        setRegisters((current) =>
+          current.map((register) => (register.id === updated.id ? updated : register)),
+        );
+        if (shift?.registerId === updated.id) setShift(null);
+        setEditingRegister(null);
+        setSetup(null);
       } else if (setup === 'SHIFT') {
         const s = await posApi.openShift({
           registerId,
@@ -496,6 +510,17 @@ export function PosPage({
                         type="button"
                         className="button button--secondary button--small"
                         onClick={() => {
+                          setError('');
+                          setEditingRegister(register);
+                          setSetup('HANDOVER');
+                        }}
+                      >
+                        <ArrowRightLeft size={14} /> Switch cashier
+                      </button>
+                      <button
+                        type="button"
+                        className="button button--secondary button--small"
+                        onClick={() => {
                           setEditingRegister(register);
                           setSetup('EDIT');
                         }}
@@ -521,305 +546,305 @@ export function PosPage({
         </section>
       )}
       {error && canConfigurePos && <p className="form-error">{error}</p>}
-    <div className="pos-layout">
-      <section className="panel pos-catalog" aria-busy={productsLoading}>
-        <label className="pos-search">
-          <Search size={18} />
-          <input
-            placeholder="Scan barcode or search product"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCatalogPage(1);
-            }}
-          />
-        </label>
-        <div className="pos-catalog__toolbar">
-          <div className="pos-catalog__filters">
-            <select
-              aria-label="Product category"
-              value={category}
-              onChange={(event) => {
-                setCategory(event.target.value);
+      <div className="pos-layout">
+        <section className="panel pos-catalog" aria-busy={productsLoading}>
+          <label className="pos-search">
+            <Search size={18} />
+            <input
+              placeholder="Scan barcode or search product"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
                 setCatalogPage(1);
               }}
-            >
-              <option value="">All categories</option>
-              {categories.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+            />
+          </label>
+          <div className="pos-catalog__toolbar">
+            <div className="pos-catalog__filters">
+              <select
+                aria-label="Product category"
+                value={category}
+                onChange={(event) => {
+                  setCategory(event.target.value);
+                  setCatalogPage(1);
+                }}
+              >
+                <option value="">All categories</option>
+                {categories.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="pos-view-toggle" aria-label="Product display">
+              <button
+                type="button"
+                className={catalogView === 'TABLE' ? 'active' : ''}
+                onClick={() => setCatalogView('TABLE')}
+                aria-label="Table view"
+              >
+                <List size={16} />
+              </button>
+              <button
+                type="button"
+                className={catalogView === 'CARDS' ? 'active' : ''}
+                onClick={() => setCatalogView('CARDS')}
+                aria-label="Card view"
+              >
+                <LayoutGrid size={16} />
+              </button>
+            </div>
           </div>
-          <div className="pos-view-toggle" aria-label="Product display">
-            <button
-              type="button"
-              className={catalogView === 'TABLE' ? 'active' : ''}
-              onClick={() => setCatalogView('TABLE')}
-              aria-label="Table view"
-            >
-              <List size={16} />
-            </button>
-            <button
-              type="button"
-              className={catalogView === 'CARDS' ? 'active' : ''}
-              onClick={() => setCatalogView('CARDS')}
-              aria-label="Card view"
-            >
-              <LayoutGrid size={16} />
-            </button>
-          </div>
-        </div>
-        {catalogView === 'TABLE' ? (
-          <div className="pos-product-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>SKU</th>
-                  <th>Available</th>
-                  <th>Price</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {productsLoading ? (
+          {catalogView === 'TABLE' ? (
+            <div className="pos-product-table">
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan={5}>
-                      <LoadingState compact label="Loading available products…" />
-                    </td>
+                    <th>Item</th>
+                    <th>SKU</th>
+                    <th>Available</th>
+                    <th>Price</th>
+                    <th />
                   </tr>
-                ) : (
-                  pagedProducts.map((product) => (
-                    <tr key={product.id}>
-                      <td>
-                        <strong>{product.name}</strong>
+                </thead>
+                <tbody>
+                  {productsLoading ? (
+                    <tr>
+                      <td colSpan={5}>
+                        <LoadingState compact label="Loading available products…" />
                       </td>
-                      <td>{product.sku}</td>
+                    </tr>
+                  ) : (
+                    pagedProducts.map((product) => (
+                      <tr key={product.id}>
+                        <td>
+                          <strong>{product.name}</strong>
+                        </td>
+                        <td>{product.sku}</td>
                         <td>
                           {product.type === 'SERVICE' ? '—' : quantity(product.stockQuantity)}
                         </td>
-                      <td>{money(Number(product.salePrice))}</td>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => add(product)}
-                          disabled={!canAdd(product)}
-                          aria-pressed={pressedProductId === product.id}
-                          className={pressedProductId === product.id ? 'is-pressed' : ''}
-                        >
-                          Add
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        <td>{money(Number(product.salePrice))}</td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => add(product)}
+                            disabled={!canAdd(product)}
+                            aria-pressed={pressedProductId === product.id}
+                            className={pressedProductId === product.id ? 'is-pressed' : ''}
+                          >
+                            Add
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="pos-products">
+              {productsLoading ? (
+                <LoadingState compact label="Loading available products…" />
+              ) : (
+                pagedProducts.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => add(product)}
+                    disabled={!canAdd(product)}
+                    aria-pressed={pressedProductId === product.id}
+                    className={pressedProductId === product.id ? 'is-pressed' : ''}
+                  >
+                    <strong>{product.name}</strong>
+                    <small>{product.sku}</small>
+                    <small>
+                      {product.type === 'SERVICE'
+                        ? 'Service'
+                        : `${quantity(product.stockQuantity)} available`}
+                    </small>
+                    <b>{money(Number(product.salePrice))}</b>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+          {!productsLoading && visible.length > 0 && (
+            <div className="table-pagination pos-catalog__pagination">
+              <p>
+                Showing{' '}
+                <strong>
+                  {(catalogPage - 1) * CATALOG_PAGE_SIZE + 1}–
+                  {Math.min(catalogPage * CATALOG_PAGE_SIZE, visible.length)}
+                </strong>{' '}
+                of {visible.length}
+              </p>
+              <div>
+                <button
+                  type="button"
+                  aria-label="Previous product page"
+                  disabled={catalogPage === 1}
+                  onClick={() => setCatalogPage((page) => page - 1)}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span>
+                  Page {catalogPage} of {catalogPages}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next product page"
+                  disabled={catalogPage >= catalogPages}
+                  onClick={() => setCatalogPage((page) => page + 1)}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+        <section className="panel pos-recent-sales">
+          <header>
+            <div>
+              <h2>Recent sales</h2>
+              <small>Latest 10 completed POS transactions</small>
+            </div>
+            <button type="button" onClick={() => onNavigate('pos-history')}>
+              View history
+            </button>
+          </header>
+          <div className="pos-recent-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Receipt</th>
+                  <th>Date</th>
+                  <th>Customer</th>
+                  <th className="is-right">Total</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {recentSales.map((recentSale) => (
+                  <tr key={recentSale.id}>
+                    <td>
+                      <strong>{recentSale.receiptNumber}</strong>
+                    </td>
+                    <td>{new Date(recentSale.createdAt).toLocaleDateString()}</td>
+                    <td>{recentSale.customer?.displayName ?? 'Walk-in customer'}</td>
+                    <td className="is-right">
+                      <strong>{money(Number(recentSale.total))}</strong>
+                    </td>
+                    <td className="is-right">
+                      <button
+                        type="button"
+                        className="button button--secondary button--small"
+                        onClick={() => setSale(recentSale)}
+                      >
+                        <ReceiptText size={15} /> View receipt
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!recentSales.length && (
+                  <tr>
+                    <td className="pos-empty" colSpan={5}>
+                      No completed sales yet.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
-        ) : (
-          <div className="pos-products">
-            {productsLoading ? (
-              <LoadingState compact label="Loading available products…" />
-            ) : (
-              pagedProducts.map((product) => (
-                <button
-                  key={product.id}
-                  onClick={() => add(product)}
-                  disabled={!canAdd(product)}
-                  aria-pressed={pressedProductId === product.id}
-                  className={pressedProductId === product.id ? 'is-pressed' : ''}
-                >
-                  <strong>{product.name}</strong>
-                  <small>{product.sku}</small>
-                  <small>
-                    {product.type === 'SERVICE'
-                      ? 'Service'
-                      : `${quantity(product.stockQuantity)} available`}
-                  </small>
-                  <b>{money(Number(product.salePrice))}</b>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-        {!productsLoading && visible.length > 0 && (
-          <div className="table-pagination pos-catalog__pagination">
-            <p>
-              Showing{' '}
-              <strong>
-                {(catalogPage - 1) * CATALOG_PAGE_SIZE + 1}–
-                {Math.min(catalogPage * CATALOG_PAGE_SIZE, visible.length)}
-              </strong>{' '}
-              of {visible.length}
-            </p>
+        </section>
+        <section className="panel pos-cart">
+          <header>
+            <h2>
+              <ShoppingCart size={18} /> New sale
+            </h2>
+            <button onClick={() => setCart([])}>Clear</button>
+          </header>
+          <div className="pos-customer">
             <div>
-              <button
-                type="button"
-                aria-label="Previous product page"
-                disabled={catalogPage === 1}
-                onClick={() => setCatalogPage((page) => page - 1)}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span>
-                Page {catalogPage} of {catalogPages}
-              </span>
-              <button
-                type="button"
-                aria-label="Next product page"
-                disabled={catalogPage >= catalogPages}
-                onClick={() => setCatalogPage((page) => page + 1)}
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-      <section className="panel pos-recent-sales">
-        <header>
-          <div>
-            <h2>Recent sales</h2>
-            <small>Latest 10 completed POS transactions</small>
-          </div>
-          <button type="button" onClick={() => onNavigate('pos-history')}>
-            View history
-          </button>
-        </header>
-        <div className="pos-recent-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Receipt</th>
-                <th>Date</th>
-                <th>Customer</th>
-                <th className="is-right">Total</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {recentSales.map((recentSale) => (
-                <tr key={recentSale.id}>
-                  <td>
-                    <strong>{recentSale.receiptNumber}</strong>
-                  </td>
-                  <td>{new Date(recentSale.createdAt).toLocaleDateString()}</td>
-                  <td>{recentSale.customer?.displayName ?? 'Walk-in customer'}</td>
-                  <td className="is-right">
-                    <strong>{money(Number(recentSale.total))}</strong>
-                  </td>
-                  <td className="is-right">
-                    <button
-                      type="button"
-                      className="button button--secondary button--small"
-                      onClick={() => setSale(recentSale)}
-                    >
-                      <ReceiptText size={15} /> View receipt
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!recentSales.length && (
-                <tr>
-                  <td className="pos-empty" colSpan={5}>
-                    No completed sales yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      <section className="panel pos-cart">
-        <header>
-          <h2>
-            <ShoppingCart size={18} /> New sale
-          </h2>
-          <button onClick={() => setCart([])}>Clear</button>
-        </header>
-        <div className="pos-customer">
-          <div>
-            <select
-              aria-label="Branch"
-              value={branchId}
-              disabled={Boolean(shift)}
-              onChange={(event) => {
-                const nextBranchId = event.target.value;
-                const nextRegisters = registers.filter(
+              <select
+                aria-label="Branch"
+                value={branchId}
+                disabled={Boolean(shift)}
+                onChange={(event) => {
+                  const nextBranchId = event.target.value;
+                  const nextRegisters = registers.filter(
                     (register) => register.branchId === nextBranchId && register.isActive,
-                );
-                setBranchId(nextBranchId);
-                setRegisterId(
+                  );
+                  setBranchId(nextBranchId);
+                  setRegisterId(
                     !canConfigurePos || nextRegisters.length === 1
                       ? nextRegisters[0]?.id || ''
                       : '',
-                );
-                setCatalogPage(1);
-                setShift(null);
-                setProducts([]);
-                setCart([]);
-                setError('');
-              }}
-            >
-              <option value="">Select branch</option>
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          {canConfigurePos && (
-            <div>
-              <select
-                aria-label="Register"
-                value={registerId}
-                disabled={!branchId}
-                onChange={(e) => {
-                  setRegisterId(e.target.value);
+                  );
                   setCatalogPage(1);
                   setShift(null);
+                  setProducts([]);
                   setCart([]);
                   setError('');
                 }}
               >
-                <option value="">Select register</option>
-                {availableRegisters.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.code} — {r.name}
-                    {r.assignedStaff
-                      ? ` · ${[r.assignedStaff.firstName, r.assignedStaff.lastName].filter(Boolean).join(' ') || r.assignedStaff.email}`
-                      : ' · Staff not assigned'}
+                <option value="">Select branch</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
                   </option>
                 ))}
               </select>
-              {!availableRegisters.length && (
-                <button className="button button--secondary" onClick={() => setSetup('REGISTER')}>
-                  Set up
-                </button>
-              )}
             </div>
-          )}
-          {!canConfigurePos && branchId && !availableRegisters.length && (
-            <small className="pos-helper">No POS register is configured for this branch.</small>
-          )}
-          {registerId && !shift && (
-            <>
-              {canConfigurePos && (
-                <button className="button button--secondary" onClick={() => setSetup('ASSIGN')}>
-                  Assign staff
+            {canConfigurePos && (
+              <div>
+                <select
+                  aria-label="Register"
+                  value={registerId}
+                  disabled={!branchId}
+                  onChange={(e) => {
+                    setRegisterId(e.target.value);
+                    setCatalogPage(1);
+                    setShift(null);
+                    setCart([]);
+                    setError('');
+                  }}
+                >
+                  <option value="">Select register</option>
+                  {availableRegisters.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.code} — {r.name}
+                      {r.assignedStaff
+                        ? ` · ${[r.assignedStaff.firstName, r.assignedStaff.lastName].filter(Boolean).join(' ') || r.assignedStaff.email}`
+                        : ' · Staff not assigned'}
+                    </option>
+                  ))}
+                </select>
+                {!availableRegisters.length && (
+                  <button className="button button--secondary" onClick={() => setSetup('REGISTER')}>
+                    Set up
+                  </button>
+                )}
+              </div>
+            )}
+            {!canConfigurePos && branchId && !availableRegisters.length && (
+              <small className="pos-helper">No POS register is configured for this branch.</small>
+            )}
+            {registerId && !shift && (
+              <>
+                {canConfigurePos && (
+                  <button className="button button--secondary" onClick={() => setSetup('ASSIGN')}>
+                    Assign staff
+                  </button>
+                )}
+                <button className="button button--secondary" onClick={() => setSetup('SHIFT')}>
+                  Open shift (optional)
                 </button>
-              )}
-              <button className="button button--secondary" onClick={() => setSetup('SHIFT')}>
-                Open shift (optional)
-              </button>
-              <small className="pos-helper">
-                Otherwise, a zero-cash shift opens automatically with the first sale.
-              </small>
-            </>
-          )}
+                <small className="pos-helper">
+                  Otherwise, a zero-cash shift opens automatically with the first sale.
+                </small>
+              </>
+            )}
             {shift && (
               <div className="pos-shift-status">
                 <small className="pos-status">Shift open on {shift.register.code}</small>
@@ -840,224 +865,224 @@ export function PosPage({
                 <span>Variance: {money(Number(shiftCloseResult.variance))}</span>
               </div>
             )}
-          <div>
-            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">Walk-in customer</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.displayName}
-                </option>
-              ))}
-            </select>
-            <button className="button button--secondary" onClick={() => setSetup('CUSTOMER')}>
-              <UserPlus size={15} /> New
-            </button>
-          </div>
-        </div>
-        {cart.map((x) => (
-          <div className="pos-cart-lines" key={x.id}>
-            <span>
-              {x.name}
-              <small>
-                {x.type === 'SERVICE'
-                  ? 'Service'
-                  : `${quantity(x.stockQuantity)} ${productUnit(x.unit)} available`}
-              </small>
-            </span>
-            <div className="pos-qty">
-              <button
-                disabled={x.quantity <= saleStep(x)}
-                onClick={() => updateCartQuantity(x, x.quantity - saleStep(x))}
-                aria-label={`Reduce ${x.name} quantity by ${saleStep(x)}`}
-              >
-                <Minus size={13} />
-              </button>
-              <input
-                key={`${x.id}-${x.quantity}`}
-                aria-label={`${x.name} quantity`}
-                type="number"
-                min={saleStep(x)}
-                max={Number.isFinite(available(x)) ? available(x) : undefined}
-                step={saleStep(x)}
-                defaultValue={x.quantity}
-                onBlur={(event) => {
-                  if (!updateCartQuantity(x, Number(event.currentTarget.value))) {
-                    setError(
-                      x.allowFractionalSale
-                        ? `${x.name} must be sold in half-unit increments.`
-                        : `${x.name} must be sold in whole units.`,
-                    );
-                    event.currentTarget.value = String(x.quantity);
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') event.currentTarget.blur();
-                }}
-              />
-              <button
-                disabled={x.quantity + saleStep(x) > available(x)}
-                onClick={() => updateCartQuantity(x, x.quantity + saleStep(x))}
-                aria-label={`Increase ${x.name} quantity by ${saleStep(x)}`}
-              >
-                <Plus size={13} />
+            <div>
+              <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+                <option value="">Walk-in customer</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.displayName}
+                  </option>
+                ))}
+              </select>
+              <button className="button button--secondary" onClick={() => setSetup('CUSTOMER')}>
+                <UserPlus size={15} /> New
               </button>
             </div>
-            <label className="pos-line-discount">
-              <span>Discount / unit</span>
-              <input
-                aria-label={`${x.name} discount per unit`}
-                type="number"
-                min="0"
-                max={Number(x.salePrice)}
-                step=".01"
-                value={x.discount}
-                onChange={(event) => {
-                  const next = Math.max(
-                    0,
-                    Math.min(Number(x.salePrice), Number(event.target.value || 0)),
-                  );
-                  setCart((current) =>
+          </div>
+          {cart.map((x) => (
+            <div className="pos-cart-lines" key={x.id}>
+              <span>
+                {x.name}
+                <small>
+                  {x.type === 'SERVICE'
+                    ? 'Service'
+                    : `${quantity(x.stockQuantity)} ${productUnit(x.unit)} available`}
+                </small>
+              </span>
+              <div className="pos-qty">
+                <button
+                  disabled={x.quantity <= saleStep(x)}
+                  onClick={() => updateCartQuantity(x, x.quantity - saleStep(x))}
+                  aria-label={`Reduce ${x.name} quantity by ${saleStep(x)}`}
+                >
+                  <Minus size={13} />
+                </button>
+                <input
+                  key={`${x.id}-${x.quantity}`}
+                  aria-label={`${x.name} quantity`}
+                  type="number"
+                  min={saleStep(x)}
+                  max={Number.isFinite(available(x)) ? available(x) : undefined}
+                  step={saleStep(x)}
+                  defaultValue={x.quantity}
+                  onBlur={(event) => {
+                    if (!updateCartQuantity(x, Number(event.currentTarget.value))) {
+                      setError(
+                        x.allowFractionalSale
+                          ? `${x.name} must be sold in half-unit increments.`
+                          : `${x.name} must be sold in whole units.`,
+                      );
+                      event.currentTarget.value = String(x.quantity);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.currentTarget.blur();
+                  }}
+                />
+                <button
+                  disabled={x.quantity + saleStep(x) > available(x)}
+                  onClick={() => updateCartQuantity(x, x.quantity + saleStep(x))}
+                  aria-label={`Increase ${x.name} quantity by ${saleStep(x)}`}
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
+              <label className="pos-line-discount">
+                <span>Discount / unit</span>
+                <input
+                  aria-label={`${x.name} discount per unit`}
+                  type="number"
+                  min="0"
+                  max={Number(x.salePrice)}
+                  step=".01"
+                  value={x.discount}
+                  onChange={(event) => {
+                    const next = Math.max(
+                      0,
+                      Math.min(Number(x.salePrice), Number(event.target.value || 0)),
+                    );
+                    setCart((current) =>
                       current.map((item) =>
                         item.id === x.id ? { ...item, discount: next } : item,
                       ),
-                  );
-                }}
-              />
-            </label>
-            <b>
-              {money((Number(x.salePrice) - x.discount) * x.quantity)}
-              {x.discount > 0 && <small>Saved {money(x.discount * x.quantity)}</small>}
-            </b>
-            <button onClick={() => setCart((c) => c.filter((y) => y.id !== x.id))}>
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-        <div className="pos-summary">
-          <span>
-            Subtotal <b>{money(subtotal)}</b>
-          </span>
-          {discountTotal > 0 && (
+                    );
+                  }}
+                />
+              </label>
+              <b>
+                {money((Number(x.salePrice) - x.discount) * x.quantity)}
+                {x.discount > 0 && <small>Saved {money(x.discount * x.quantity)}</small>}
+              </b>
+              <button onClick={() => setCart((c) => c.filter((y) => y.id !== x.id))}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          <div className="pos-summary">
             <span>
-              Discount <b>−{money(discountTotal)}</b>
+              Subtotal <b>{money(subtotal)}</b>
             </span>
-          )}
-          <span>
-            Tax <b>{money(tax)}</b>
-          </span>
-          <strong>
-            Total <b>{money(total)}</b>
-          </strong>
-        </div>
-        <div className="pos-payment">
-          <div className="pos-payment__heading">
-            <strong>Payment</strong>
-            <button
-              type="button"
-              onClick={() => {
-                setSplitMode(true);
-                setPayments((current) => [
-                  ...current.map((payment) => ({ ...payment, amount: '' })),
-                  { method: 'CASH', amount: '' },
-                ]);
-              }}
-            >
-              + Split payment
-            </button>
+            {discountTotal > 0 && (
+              <span>
+                Discount <b>−{money(discountTotal)}</b>
+              </span>
+            )}
+            <span>
+              Tax <b>{money(tax)}</b>
+            </span>
+            <strong>
+              Total <b>{money(total)}</b>
+            </strong>
           </div>
-          {paymentRows.map((payment, index) => (
-            <div className="pos-payment__row" key={index}>
-              <select
-                aria-label={`Payment method ${index + 1}`}
-                value={payment.method}
-                onChange={(event) =>
-                  setPayments((current) =>
-                    current.map((item, itemIndex) =>
-                      itemIndex === index
-                        ? { ...item, method: event.target.value as PaymentMethod }
-                        : item,
-                    ),
-                  )
-                }
+          <div className="pos-payment">
+            <div className="pos-payment__heading">
+              <strong>Payment</strong>
+              <button
+                type="button"
+                onClick={() => {
+                  setSplitMode(true);
+                  setPayments((current) => [
+                    ...current.map((payment) => ({ ...payment, amount: '' })),
+                    { method: 'CASH', amount: '' },
+                  ]);
+                }}
               >
-                <option value="CASH">Cash</option>
-                <option value="CARD">POS / Card</option>
-                <option value="TRANSFER">Bank transfer</option>
-                <option value="CREDIT">Customer credit</option>
-              </select>
-              <input
-                aria-label={`${paymentLabel(payment.method)} amount`}
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Amount"
-                value={payment.amount}
-                onChange={(event) =>
-                  setPayments((current) =>
-                    current.map((item, itemIndex) =>
-                      itemIndex === index ? { ...item, amount: event.target.value } : item,
-                    ),
-                  )
-                }
-              />
-              {payments.length > 1 && (
-                <button
-                  className="pos-payment__remove"
-                  type="button"
-                  aria-label={`Remove payment ${index + 1}`}
-                  onClick={() =>
+                + Split payment
+              </button>
+            </div>
+            {paymentRows.map((payment, index) => (
+              <div className="pos-payment__row" key={index}>
+                <select
+                  aria-label={`Payment method ${index + 1}`}
+                  value={payment.method}
+                  onChange={(event) =>
+                    setPayments((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, method: event.target.value as PaymentMethod }
+                          : item,
+                      ),
+                    )
+                  }
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="CARD">POS / Card</option>
+                  <option value="TRANSFER">Bank transfer</option>
+                  <option value="CREDIT">Customer credit</option>
+                </select>
+                <input
+                  aria-label={`${paymentLabel(payment.method)} amount`}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Amount"
+                  value={payment.amount}
+                  onChange={(event) =>
+                    setPayments((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, amount: event.target.value } : item,
+                      ),
+                    )
+                  }
+                />
+                {payments.length > 1 && (
+                  <button
+                    className="pos-payment__remove"
+                    type="button"
+                    aria-label={`Remove payment ${index + 1}`}
+                    onClick={() =>
                       setPayments((current) =>
                         current.filter((_, itemIndex) => itemIndex !== index),
                       )
-                  }
-                >
-                  <Trash2 size={14} />
-                </button>
+                    }
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <div className="pos-payment__totals">
+              <span>
+                Paid <b>{money(paid)}</b>
+              </span>
+              {remaining > 0 ? (
+                <span>
+                  Outstanding <b>{money(remaining)}</b>
+                </span>
+              ) : (
+                <span>
+                  Change <b>{money(change)}</b>
+                </span>
               )}
             </div>
-          ))}
-          <div className="pos-payment__totals">
-            <span>
-              Paid <b>{money(paid)}</b>
-            </span>
-            {remaining > 0 ? (
-              <span>
-                Outstanding <b>{money(remaining)}</b>
-              </span>
-            ) : (
-              <span>
-                Change <b>{money(change)}</b>
-              </span>
-            )}
           </div>
-        </div>
-        {error && <p className="form-error">{error}</p>}
-        <button className="button pos-pay" onClick={() => void complete()} disabled={busy}>
-          Pay {money(total)}
-        </button>
-        {sale && (
-          <Modal
-            open={true}
-            onClose={() => setSale(null)}
-            title="Sale completed"
-            footer={null}
-            wide
-          >
-            <SalesReceipt
-              key={sale.id}
-              sale={sale}
-              salesperson={salesperson}
-              onSaleChange={(updatedSale) => {
-                setSale(updatedSale);
-                setRecentSales((current) =>
-                  current.map((recent) => (recent.id === updatedSale.id ? updatedSale : recent)),
-                );
-              }}
-            />
-          </Modal>
-        )}
-      </section>
-    </div>
+          {error && <p className="form-error">{error}</p>}
+          <button className="button pos-pay" onClick={() => void complete()} disabled={busy}>
+            Pay {money(total)}
+          </button>
+          {sale && (
+            <Modal
+              open={true}
+              onClose={() => setSale(null)}
+              title="Sale completed"
+              footer={null}
+              wide
+            >
+              <SalesReceipt
+                key={sale.id}
+                sale={sale}
+                salesperson={salesperson}
+                onSaleChange={(updatedSale) => {
+                  setSale(updatedSale);
+                  setRecentSales((current) =>
+                    current.map((recent) => (recent.id === updatedSale.id ? updatedSale : recent)),
+                  );
+                }}
+              />
+            </Modal>
+          )}
+        </section>
+      </div>
       <Modal
         open={!!setup}
         title={
@@ -1067,11 +1092,13 @@ export function PosPage({
               ? 'Edit register'
               : setup === 'ASSIGN'
                 ? 'Assign register staff'
-                : setup === 'SHIFT'
-                  ? 'Open cashier shift'
-                  : setup === 'CLOSE_SHIFT'
-                    ? 'Close cashier shift'
-                  : 'Add customer'
+                : setup === 'HANDOVER'
+                  ? 'Switch cashier'
+                  : setup === 'SHIFT'
+                    ? 'Open cashier shift'
+                    : setup === 'CLOSE_SHIFT'
+                      ? 'Close cashier shift'
+                      : 'Add customer'
         }
         onClose={() => {
           setSetup(null);
@@ -1225,6 +1252,65 @@ export function PosPage({
                 </select>
               </label>
             </>
+          ) : setup === 'HANDOVER' ? (
+            <>
+              <p className="full pos-helper">
+                {editingRegister?.shifts?.[0]
+                  ? 'This closes the current cashier shift, records the cash variance, and assigns the register to the selected staff member.'
+                  : 'This register has no open shift. The selected staff member will become its primary cashier.'}
+              </p>
+              <label className="full">
+                New cashier
+                <select
+                  name="assignedStaffId"
+                  required
+                  defaultValue={editingRegister?.assignedStaffId || ''}
+                >
+                  <option value="" disabled>
+                    Select existing staff
+                  </option>
+                  {staff.map((member) => (
+                    <option key={member.user.id} value={member.user.id}>
+                      {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
+                        member.user.email}{' '}
+                      — {member.role}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="full">
+                Branch
+                <select name="branchId" required defaultValue={editingRegister?.branchId || ''}>
+                  <option value="" disabled>
+                    Select branch
+                  </option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {editingRegister?.shifts?.[0] && (
+                <>
+                  <label className="full">
+                    Counted closing cash
+                    <input
+                      name="closingCash"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      defaultValue="0"
+                      required
+                    />
+                  </label>
+                  <label className="full">
+                    Handover notes
+                    <textarea name="notes" maxLength={1000} />
+                  </label>
+                </>
+              )}
+            </>
           ) : setup === 'SHIFT' ? (
             <label className="full">
               Opening cash
@@ -1262,7 +1348,9 @@ export function PosPage({
                   ? 'Open shift'
                   : setup === 'CLOSE_SHIFT'
                     ? 'Close shift'
-                    : 'Save'}
+                    : setup === 'HANDOVER'
+                      ? 'Switch cashier'
+                      : 'Save'}
             </button>
           </div>
         </form>

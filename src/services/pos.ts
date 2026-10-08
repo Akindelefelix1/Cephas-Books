@@ -178,6 +178,14 @@ export const posApi = {
       method: 'PATCH',
       body: JSON.stringify({ assignedStaffId, branchId }),
     }),
+  handoverRegister: (
+    id: string,
+    data: { assignedStaffId: string; branchId: string; closingCash: number; notes?: string },
+  ) =>
+    authorizedRequest<PosRegister>(`/pos/registers/${id}/handover`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   openShift: (data: object) =>
     authorizedRequest<PosShift>('/pos/shifts', { method: 'POST', body: JSON.stringify(data) }),
   complete: (data: object) =>
