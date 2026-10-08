@@ -74,34 +74,34 @@ export function CommercePage({ view, canManage }: { view: CommerceView; canManag
   const [branches, setBranches] = useState<PosBranch[]>([]);
   const [editing, setEditing] = useState<CommerceChannel | null>(null);
   const [channelModal, setChannelModal] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(view !== 'commerce-settings');
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    void Promise.all([
-      commerceApi.summary(),
-      commerceApi.channels(),
-      commerceApi.orders(),
-      commerceApi.catalog(),
-      operationsApi.warehouses({ status: 'active' }),
-      posApi.branches(),
-    ])
-      .then(
-        ([nextSummary, nextChannels, nextOrders, nextCatalog, nextWarehouses, nextBranches]) => {
-          setSummary(nextSummary);
-          setChannels(nextChannels);
-          setOrders(nextOrders);
-          setCatalog(nextCatalog);
-          setWarehouses(nextWarehouses);
-          setBranches(nextBranches);
-        },
-      )
+    const requests: Array<Promise<void>> = [];
+    if (view === 'commerce-dashboard')
+      requests.push(commerceApi.summary().then((result) => setSummary(result)));
+    if (view === 'sales-channels') {
+      requests.push(commerceApi.channels().then((result) => setChannels(result)));
+      requests.push(
+        operationsApi.warehouses({ status: 'active' }).then((result) => setWarehouses(result)),
+      );
+      requests.push(posApi.branches().then((result) => setBranches(result)));
+    }
+    if (['channel-orders', 'commerce-analytics'].includes(view))
+      requests.push(commerceApi.orders().then((result) => setOrders(result)));
+    if (view === 'product-channel-mapping') {
+      requests.push(commerceApi.catalog().then((result) => setCatalog(result)));
+      requests.push(commerceApi.channels().then((result) => setChannels(result)));
+    }
+    if (!requests.length) return;
+    void Promise.all(requests)
       .catch((caught: unknown) => {
         setError(caught instanceof Error ? caught.message : 'Unable to load Commerce');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [view]);
 
   const sourceTotals = useMemo(() => {
     const totals = new Map<string, { orders: number; revenue: number }>();
@@ -120,7 +120,7 @@ export function CommercePage({ view, canManage }: { view: CommerceView; canManag
     const data = {
       name: String(form.get('name') || '').trim(),
       type: String(form.get('type')) as CommerceChannel['type'],
-      branchId: String(form.get('branchId') || '') || undefined,
+      branchId: String(form.get('branchId') || '') || null,
       warehouseId: String(form.get('warehouseId')),
       syncInventory: form.get('syncInventory') === 'on',
       syncOrders: form.get('syncOrders') === 'on',

@@ -43,7 +43,7 @@ const routePermissions: Record<string, string> = {
   fulfillment: 'inventory.view',
   payouts: 'banking.view',
   'product-channel-mapping': 'inventory.view',
-  'commerce-analytics': 'reports.view',
+  'commerce-analytics': 'sales.view',
   'commerce-settings': 'settings.manage',
   reports: 'reports.view',
   'custom-reports': 'reports.view',

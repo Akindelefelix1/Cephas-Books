@@ -43,7 +43,7 @@ export interface CommerceChannel {
 export type CommerceChannelWrite = Pick<
   CommerceChannel,
   'name' | 'type' | 'warehouseId' | 'syncInventory' | 'syncOrders' | 'syncCustomers'
-> & { branchId?: string; status?: 'ACTIVE' | 'PAUSED' };
+> & { branchId?: string | null; status?: 'ACTIVE' | 'PAUSED' };
 
 export interface CommerceOrder {
   id: string;
