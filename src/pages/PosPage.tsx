@@ -294,9 +294,8 @@ export function PosPage({
           String(f.get('assignedStaffId')),
           String(f.get('branchId')),
         );
-        setRegisters((current) =>
-          current.map((register) => (register.id === updated.id ? updated : register)),
-        );
+        const refreshedRegisters = await posApi.registers();
+        setRegisters(refreshedRegisters);
         setBranchId(updated.branchId || '');
         setSetup(null);
       } else if (setup === 'HANDOVER' && editingRegister) {
@@ -545,17 +544,19 @@ export function PosPage({
                           </span>
                         </div>
                         <div className="pos-register-card__actions">
-                          <button
-                            type="button"
-                            className="button button--secondary button--small"
-                            onClick={() => {
-                              setError('');
-                              setEditingRegister(register);
-                              setSetup('HANDOVER');
-                            }}
-                          >
-                            <ArrowRightLeft size={14} /> Switch cashier
-                          </button>
+                          {cashier && (
+                            <button
+                              type="button"
+                              className="button button--secondary button--small"
+                              onClick={() => {
+                                setError('');
+                                setEditingRegister(register);
+                                setSetup('HANDOVER');
+                              }}
+                            >
+                              <ArrowRightLeft size={14} /> Switch cashier
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="button button--secondary button--small"
@@ -1309,21 +1310,19 @@ export function PosPage({
               </p>
               <label className="full">
                 New cashier
-                <select
-                  name="assignedStaffId"
-                  required
-                  defaultValue={editingRegister?.assignedStaffId || ''}
-                >
+                <select name="assignedStaffId" required defaultValue="">
                   <option value="" disabled>
                     Select existing staff
                   </option>
-                  {staff.map((member) => (
-                    <option key={member.user.id} value={member.user.id}>
-                      {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
-                        member.user.email}{' '}
-                      — {member.role}
-                    </option>
-                  ))}
+                  {staff
+                    .filter((member) => member.user.id !== editingRegister?.shifts?.[0]?.cashier.id)
+                    .map((member) => (
+                      <option key={member.user.id} value={member.user.id}>
+                        {[member.user.firstName, member.user.lastName].filter(Boolean).join(' ') ||
+                          member.user.email}{' '}
+                        — {member.role}
+                      </option>
+                    ))}
                 </select>
               </label>
               <label className="full">
