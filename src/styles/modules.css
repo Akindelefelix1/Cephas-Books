@@ -437,6 +437,17 @@
   justify-content: center;
   gap: 6px;
 }
+.pos-register-management__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pos-register-management__toggle svg {
+  transition: transform 0.2s ease;
+}
+.pos-register-management__toggle svg.is-expanded {
+  transform: rotate(180deg);
+}
 .pos-register-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -475,6 +486,21 @@
 .pos-register-card__details small {
   color: #7f8798;
   font-size: 0.62rem;
+}
+.pos-current-cashier {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #087a4d;
+  font-weight: 700;
+}
+.pos-current-cashier i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #10a66a;
+  box-shadow: 0 0 0 3px #e3f8ee;
 }
 .pos-register-card__actions {
   justify-content: flex-end;

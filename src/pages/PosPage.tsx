@@ -14,6 +14,7 @@ import {
   Pencil,
   Power,
   ArrowRightLeft,
+  ChevronDown,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -36,6 +37,7 @@ import { salesApi, type Customer } from '@/services/sales';
 import { organizationApi, type OrganizationMember } from '@/services/organization';
 import { bankingApi, type BankAccount } from '@/services/banking';
 import { getDefaultCurrency } from '@/utils/currency';
+import { confirmAction } from '@/utils/actions';
 const money = (v: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(v);
 const quantity = (value: string | number) =>
@@ -74,6 +76,7 @@ export function PosPage({
     [search, setSearch] = useState(''),
     [category, setCategory] = useState(''),
     [catalogPage, setCatalogPage] = useState(1),
+    [registerManagementExpanded, setRegisterManagementExpanded] = useState(true),
     [catalogView, setCatalogView] = useState<'TABLE' | 'CARDS'>(() =>
       typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches
         ? 'CARDS'
@@ -307,6 +310,12 @@ export function PosPage({
           current.map((register) => (register.id === updated.id ? updated : register)),
         );
         if (shift?.registerId === updated.id) setShift(null);
+        const nextCashierName = updated.assignedStaff
+          ? [updated.assignedStaff.firstName, updated.assignedStaff.lastName]
+              .filter(Boolean)
+              .join(' ') || updated.assignedStaff.email
+          : 'the selected cashier';
+        confirmAction(`Register ${updated.code} was switched to ${nextCashierName}.`);
         setEditingRegister(null);
         setSetup(null);
       } else if (setup === 'SHIFT') {
@@ -429,123 +438,151 @@ export function PosPage({
               <h2>Register management</h2>
               <small>Configure devices, payment accounts, assignments, and availability.</small>
             </div>
-            <button
-              type="button"
-              className="button"
-              onClick={() => {
-                setEditingRegister(null);
-                setSetup('REGISTER');
-              }}
-            >
-              <Plus size={15} /> Add register
-            </button>
-          </header>
-          {registers.length ? (
-            <div className="pos-register-grid">
-              {registers.map((register) => {
-                const cashier = register.shifts?.[0]?.cashier;
-                const displayName = (person?: {
-                  firstName?: string;
-                  lastName?: string;
-                  email?: string;
-                }) =>
-                  person
-                    ? [person.firstName, person.lastName].filter(Boolean).join(' ') ||
-                      person.email ||
-                      'Unknown'
-                    : 'Not assigned';
-                return (
-                  <article className="pos-register-card" key={register.id}>
-                    <div className="pos-register-card__heading">
-                      <div>
-                        <strong>
-                          {register.code} · {register.name}
-                        </strong>
-                        <small>
-                          {branches.find((branch) => branch.id === register.branchId)?.name ||
-                            'Branch unavailable'}
-                          {' · '}
-                          {register.warehouse?.name ||
-                            warehouses.find((warehouse) => warehouse.id === register.warehouseId)
-                              ?.name ||
-                            'Warehouse unavailable'}
-                        </small>
-                      </div>
-                      <span
-                        className={`badge ${register.isActive ? 'badge--success' : 'badge--danger'}`}
-                      >
-                        <i /> {register.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                    <div className="pos-register-card__details">
-                      <span>
-                        <small>Primary staff</small>
-                        {displayName(register.assignedStaff || undefined)}
-                      </span>
-                      <span>
-                        <small>Terminal / device</small>
-                        {register.terminalId || 'Not assigned'}
-                      </span>
-                      <span>
-                        <small>Current cashier</small>
-                        {cashier ? displayName(cashier) : 'No open shift'}
-                      </span>
-                      <span>
-                        <small>Cash account</small>
-                        {bankAccounts.find(
-                          (account) => account.id === register.defaultCashAccountId,
-                        )?.name || 'Not set'}
-                      </span>
-                      <span>
-                        <small>Card account</small>
-                        {bankAccounts.find(
-                          (account) => account.id === register.defaultCardAccountId,
-                        )?.name || 'Not set'}
-                      </span>
-                      <span>
-                        <small>Bank / transfer account</small>
-                        {bankAccounts.find(
-                          (account) => account.id === register.defaultBankAccountId,
-                        )?.name || 'Not set'}
-                      </span>
-                    </div>
-                    <div className="pos-register-card__actions">
-                      <button
-                        type="button"
-                        className="button button--secondary button--small"
-                        onClick={() => {
-                          setError('');
-                          setEditingRegister(register);
-                          setSetup('HANDOVER');
-                        }}
-                      >
-                        <ArrowRightLeft size={14} /> Switch cashier
-                      </button>
-                      <button
-                        type="button"
-                        className="button button--secondary button--small"
-                        onClick={() => {
-                          setEditingRegister(register);
-                          setSetup('EDIT');
-                        }}
-                      >
-                        <Pencil size={14} /> Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="button button--secondary button--small"
-                        disabled={busy}
-                        onClick={() => void toggleRegisterStatus(register)}
-                      >
-                        <Power size={14} /> {register.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
+            <div className="pos-register-management__header-actions">
+              {registerManagementExpanded && (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => {
+                    setEditingRegister(null);
+                    setSetup('REGISTER');
+                  }}
+                >
+                  <Plus size={15} /> Set up register
+                </button>
+              )}
+              <button
+                type="button"
+                className="button button--secondary pos-register-management__toggle"
+                aria-expanded={registerManagementExpanded}
+                aria-controls="pos-register-management-content"
+                onClick={() => setRegisterManagementExpanded((expanded) => !expanded)}
+              >
+                <ChevronDown
+                  size={16}
+                  className={registerManagementExpanded ? 'is-expanded' : ''}
+                />
+                {registerManagementExpanded ? 'Hide' : 'Show'}
+              </button>
             </div>
-          ) : (
-            <p className="pos-register-empty">No registers yet. Add one to get started.</p>
+          </header>
+          {registerManagementExpanded && (
+            <div id="pos-register-management-content">
+              {registers.length ? (
+                <div className="pos-register-grid">
+                  {registers.map((register) => {
+                    const cashier = register.shifts?.[0]?.cashier;
+                    const displayName = (person?: {
+                      firstName?: string;
+                      lastName?: string;
+                      email?: string;
+                    }) =>
+                      person
+                        ? [person.firstName, person.lastName].filter(Boolean).join(' ') ||
+                          person.email ||
+                          'Unknown'
+                        : 'Not assigned';
+                    return (
+                      <article className="pos-register-card" key={register.id}>
+                        <div className="pos-register-card__heading">
+                          <div>
+                            <strong>
+                              {register.code} · {register.name}
+                            </strong>
+                            <small>
+                              {branches.find((branch) => branch.id === register.branchId)?.name ||
+                                'Branch unavailable'}
+                              {' · '}
+                              {register.warehouse?.name ||
+                                warehouses.find(
+                                  (warehouse) => warehouse.id === register.warehouseId,
+                                )?.name ||
+                                'Warehouse unavailable'}
+                            </small>
+                          </div>
+                          <span
+                            className={`badge ${register.isActive ? 'badge--success' : 'badge--danger'}`}
+                          >
+                            <i /> {register.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className="pos-register-card__details">
+                          <span>
+                            <small>Primary staff</small>
+                            {displayName(register.assignedStaff || undefined)}
+                          </span>
+                          <span>
+                            <small>Terminal / device</small>
+                            {register.terminalId || 'Not assigned'}
+                          </span>
+                          <span>
+                            <small>{cashier ? 'Active cashier' : 'Current cashier'}</small>
+                            {cashier ? (
+                              <strong className="pos-current-cashier">
+                                <i aria-hidden="true" /> {displayName(cashier)}
+                              </strong>
+                            ) : (
+                              'No open shift'
+                            )}
+                          </span>
+                          <span>
+                            <small>Cash account</small>
+                            {bankAccounts.find(
+                              (account) => account.id === register.defaultCashAccountId,
+                            )?.name || 'Not set'}
+                          </span>
+                          <span>
+                            <small>Card account</small>
+                            {bankAccounts.find(
+                              (account) => account.id === register.defaultCardAccountId,
+                            )?.name || 'Not set'}
+                          </span>
+                          <span>
+                            <small>Bank / transfer account</small>
+                            {bankAccounts.find(
+                              (account) => account.id === register.defaultBankAccountId,
+                            )?.name || 'Not set'}
+                          </span>
+                        </div>
+                        <div className="pos-register-card__actions">
+                          <button
+                            type="button"
+                            className="button button--secondary button--small"
+                            onClick={() => {
+                              setError('');
+                              setEditingRegister(register);
+                              setSetup('HANDOVER');
+                            }}
+                          >
+                            <ArrowRightLeft size={14} /> Switch cashier
+                          </button>
+                          <button
+                            type="button"
+                            className="button button--secondary button--small"
+                            onClick={() => {
+                              setEditingRegister(register);
+                              setSetup('EDIT');
+                            }}
+                          >
+                            <Pencil size={14} /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="button button--secondary button--small"
+                            disabled={busy}
+                            onClick={() => void toggleRegisterStatus(register)}
+                          >
+                            <Power size={14} /> {register.isActive ? 'Deactivate' : 'Activate'}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="pos-register-empty">No registers yet. Set one up to get started.</p>
+              )}
+            </div>
           )}
         </section>
       )}
