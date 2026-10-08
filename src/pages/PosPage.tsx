@@ -154,18 +154,22 @@ export function PosPage({
       current = false;
     };
   }, [registerId, registers]);
-  const availableRegisters = useMemo(
+  const selectedRegister = registers.find((register) => register.id === registerId),
+    isProductsLoading = productsLoading && Boolean(selectedRegister),
+    availableRegisters = useMemo(
       () => registers.filter((register) => register.branchId === branchId && register.isActive),
       [branchId, registers],
     ),
     visible = useMemo(
       () =>
-        products.filter(
-          (x) =>
-            `${x.name} ${x.sku}`.toLowerCase().includes(search.toLowerCase()) &&
-            (!category || (x.category || 'Uncategorised') === category),
-        ),
-      [category, products, search],
+        selectedRegister
+          ? products.filter(
+              (x) =>
+                `${x.name} ${x.sku}`.toLowerCase().includes(search.toLowerCase()) &&
+                (!category || (x.category || 'Uncategorised') === category),
+            )
+          : [],
+      [category, products, search, selectedRegister],
     ),
     categories = useMemo(
       () =>
@@ -547,7 +551,7 @@ export function PosPage({
       )}
       {error && canConfigurePos && <p className="form-error">{error}</p>}
       <div className="pos-layout">
-        <section className="panel pos-catalog" aria-busy={productsLoading}>
+        <section className="panel pos-catalog" aria-busy={isProductsLoading}>
           <label className="pos-search">
             <Search size={18} />
             <input
@@ -609,7 +613,7 @@ export function PosPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {productsLoading ? (
+                  {isProductsLoading ? (
                     <tr>
                       <td colSpan={5}>
                         <LoadingState compact label="Loading available products…" />
@@ -645,7 +649,7 @@ export function PosPage({
             </div>
           ) : (
             <div className="pos-products">
-              {productsLoading ? (
+              {isProductsLoading ? (
                 <LoadingState compact label="Loading available products…" />
               ) : (
                 pagedProducts.map((product) => (
@@ -669,7 +673,14 @@ export function PosPage({
               )}
             </div>
           )}
-          {!productsLoading && visible.length > 0 && (
+          {!isProductsLoading && !visible.length && (
+            <p className="pos-empty">
+              {registerId
+                ? 'No available products were found for this register warehouse.'
+                : 'Select a register to load its available products.'}
+            </p>
+          )}
+          {!isProductsLoading && visible.length > 0 && (
             <div className="table-pagination pos-catalog__pagination">
               <p>
                 Showing{' '}
