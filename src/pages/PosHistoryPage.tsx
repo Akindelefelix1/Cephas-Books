@@ -45,8 +45,6 @@ export function PosHistoryPage({
   const [filters, setFilters] = useState({ search: '', from: '', to: '', customerId: '' });
   const [selectedSale, setSelectedSale] = useState<PosSale | null>(null);
   const [auditEntries, setAuditEntries] = useState<PosAuditEntry[]>([]);
-  const [recentAudit, setRecentAudit] = useState<PosAuditEntry[]>([]);
-  const [recentAuditLoading, setRecentAuditLoading] = useState(canViewAudit);
   const [auditLoading, setAuditLoading] = useState(false);
   const [includeVoided, setIncludeVoided] = useState(false);
   const [returnItemId, setReturnItemId] = useState('');
@@ -62,16 +60,6 @@ export function PosHistoryPage({
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState('');
   const [error, setError] = useState('');
-  useEffect(() => {
-    if (!canViewAudit) return;
-    void posApi
-      .auditLog()
-      .then(setRecentAudit)
-      .catch((caught) =>
-        setError(caught instanceof Error ? caught.message : 'Unable to load POS audit events'),
-      )
-      .finally(() => setRecentAuditLoading(false));
-  }, [canViewAudit]);
   useEffect(() => {
     void salesApi
       .customers()
@@ -164,11 +152,7 @@ export function PosHistoryPage({
         ? current.map((sale) => (sale.id === refreshed.id ? refreshed : sale))
         : current.filter((sale) => sale.id !== refreshed.id),
     );
-    if (canViewAudit) {
-      const [entries, recent] = await Promise.all([posApi.audit(saleId), posApi.auditLog()]);
-      setAuditEntries(entries);
-      setRecentAudit(recent);
-    }
+    if (canViewAudit) setAuditEntries(await posApi.audit(saleId));
   };
   const submitReturn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -321,7 +305,9 @@ export function PosHistoryPage({
             >
               {monthlySales.map((month) => (
                 <div className="pos-sales-chart__month" key={month.month}>
-                  <div className="pos-sales-chart__value">{money(month.total)}</div>
+                  <div className="pos-sales-chart__value">
+                    {month.total > 0 ? money(month.total) : ''}
+                  </div>
                   <div className="pos-sales-chart__track">
                     <div
                       className="pos-sales-chart__bar"
@@ -381,42 +367,9 @@ export function PosHistoryPage({
           </select>
         </label>
       </section>
-      {canViewAudit && (
-        <section className="panel pos-audit-log">
-          <header>
-            <div>
-              <h2>
-                <Activity size={17} /> Recent POS audit events
-              </h2>
-              <small>Latest register, shift, receipt, return, and sale activity.</small>
-            </div>
-          </header>
-          {recentAuditLoading ? (
-            <p>Loading POS audit events…</p>
-          ) : recentAudit.length ? (
-            <div className="pos-audit-log__list">
-              {recentAudit.map((entry) => (
-                <article key={entry.id}>
-                  <strong>{entry.action.replaceAll('_', ' ')}</strong>
-                  <span>
-                    {entry.entityType}
-                    {entry.entityId ? ` · ${entry.entityId}` : ''}
-                  </span>
-                  {typeof entry.metadata?.reason === 'string' && (
-                    <span>Reason: {entry.metadata.reason}</span>
-                  )}
-                  <time>{new Date(entry.createdAt).toLocaleString()}</time>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p>No POS audit events recorded yet.</p>
-          )}
-        </section>
-      )}
       {error && <p className="form-error">{error}</p>}
       <section className="panel pos-history-table data-table-wrap">
-        <table className="data-table">
+        <table className="data-table pos-history-table__desktop">
           <thead>
             <tr>
               <th>Receipt</th>
@@ -466,6 +419,49 @@ export function PosHistoryPage({
             )}
           </tbody>
         </table>
+        <div className="pos-history-cards">
+          {sales.map((sale) => (
+            <article className="pos-history-card" key={sale.id}>
+              <header>
+                <div>
+                  <strong>{sale.receiptNumber}</strong>
+                  <time>{new Date(sale.createdAt).toLocaleString()}</time>
+                </div>
+                <span className={`badge ${sale.status === 'VOIDED' ? 'badge--danger' : 'badge--success'}`}>
+                  <i /> {sale.status}
+                </span>
+              </header>
+              <dl>
+                <div>
+                  <dt>Customer</dt>
+                  <dd>{sale.customer?.displayName ?? 'Walk-in customer'}</dd>
+                </div>
+                <div>
+                  <dt>Payment</dt>
+                  <dd>{sale.payments.map((payment) => paymentLabel(payment.method)).join(', ')}</dd>
+                </div>
+                <div>
+                  <dt>Discount</dt>
+                  <dd>{money(Number(sale.discountTotal || 0), sale.currency)}</dd>
+                </div>
+                <div>
+                  <dt>Total</dt>
+                  <dd className="pos-history-card__total">
+                    {money(Number(sale.total), sale.currency)}
+                  </dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => openSale(sale)}
+              >
+                <ReceiptText size={16} /> View receipt
+              </button>
+            </article>
+          ))}
+          {!sales.length && <p className="pos-history-cards__empty">No sales match these filters.</p>}
+        </div>
         <div className="table-pagination">
           <p>
             Showing{' '}

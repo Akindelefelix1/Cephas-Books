@@ -752,43 +752,6 @@
 .pos-sale-audit li p {
   margin: 2px 0;
 }
-.pos-audit-log {
-  padding: 16px 18px;
-}
-.pos-audit-log > header {
-  margin-bottom: 12px;
-}
-.pos-audit-log h2 {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 0 4px;
-  font-size: 0.82rem;
-}
-.pos-audit-log header small,
-.pos-audit-log > p {
-  color: #7f8798;
-  font-size: 0.66rem;
-}
-.pos-audit-log__list {
-  display: grid;
-  gap: 8px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-.pos-audit-log__list article {
-  display: grid;
-  grid-template-columns: minmax(140px, 1fr) 1.2fr 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-top: 1px solid #edf0f4;
-  font-size: 0.66rem;
-}
-.pos-audit-log__list article > span,
-.pos-audit-log__list time {
-  color: #7f8798;
-}
 .pos-void-notice {
   display: flex;
   align-items: flex-start;
@@ -1108,18 +1071,26 @@
   gap: 12px;
   padding: 18px;
   margin-bottom: 16px;
+  align-items: end;
+}
+.pos-history-filters > label,
+.pos-history-filters input,
+.pos-history-filters select {
+  width: 100%;
+  min-width: 0;
 }
 .pos-sales-analytics {
-  padding: 22px;
+  padding: 18px 20px 16px;
   margin-bottom: 16px;
   overflow: hidden;
+  border-radius: 16px;
 }
 .pos-sales-analytics__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
 }
 .pos-sales-analytics__header h2 {
   display: flex;
@@ -1144,20 +1115,29 @@
 .pos-sales-analytics__header select {
   min-width: 105px;
 }
+.pos-sales-analytics__header .pos-history-void-filter {
+  white-space: nowrap;
+}
+.pos-sales-analytics__header .pos-history-void-filter input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #244de5;
+}
 .pos-sales-analytics__summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 24px;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 .pos-sales-analytics__summary article {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   min-width: 0;
-  padding: 14px;
+  padding: 9px 12px;
   border: 1px solid #e4e9f1;
-  border-radius: 10px;
+  border-radius: 11px;
   background: #f9fbff;
 }
 .pos-sales-analytics__summary small,
@@ -1168,7 +1148,7 @@
 .pos-sales-analytics__summary strong {
   overflow: hidden;
   color: #101828;
-  font-size: 1.05rem;
+  font-size: 0.96rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1177,7 +1157,7 @@
   grid-template-columns: repeat(12, minmax(62px, 1fr));
   gap: 10px;
   min-width: 850px;
-  height: 285px;
+  height: 190px;
   overflow: visible;
 }
 .pos-sales-chart-scroll {
@@ -1189,8 +1169,8 @@
 }
 .pos-sales-chart__month {
   display: grid;
-  grid-template-rows: 28px 1fr auto auto;
-  gap: 5px;
+  grid-template-rows: 18px 1fr auto auto;
+  gap: 4px;
   min-width: 0;
   text-align: center;
 }
@@ -1206,29 +1186,34 @@
 .pos-sales-chart__track {
   display: flex;
   align-items: flex-end;
-  min-height: 180px;
+  min-height: 108px;
   overflow: hidden;
-  border-radius: 8px 8px 3px 3px;
-  background: #f1f4f9;
+  border-bottom: 1px solid #e4e9f1;
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(to top, #f7f8fc 1px, transparent 1px);
 }
 .pos-sales-chart__bar {
-  width: 100%;
+  width: min(72%, 42px);
+  margin-inline: auto;
   min-height: 0;
-  border-radius: 8px 8px 3px 3px;
-  background: linear-gradient(180deg, #315fe9 0%, #173bd1 100%);
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, #6c8bff 0%, #3158e7 100%);
   transition:
     height 220ms ease,
-    filter 150ms ease;
+    filter 150ms ease,
+    box-shadow 150ms ease;
 }
 .pos-sales-chart__bar:hover {
-  filter: brightness(1.12);
+  filter: brightness(1.04);
+  box-shadow: 0 5px 12px rgb(49 88 231 / 24%);
 }
 .pos-sales-chart__month > strong {
-  font-size: 0.75rem;
+  color: #344054;
+  font-size: 0.7rem;
 }
 .pos-sales-chart__month > small {
   color: #667085;
-  font-size: 0.64rem;
+  font-size: 0.59rem;
 }
 .pos-sales-analytics__empty {
   display: grid;
@@ -1260,6 +1245,75 @@
   border: 0;
   padding-left: 0;
 }
+.pos-history-cards {
+  display: none;
+}
+.pos-history-card {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #e4e9f1;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 5px 16px rgb(25 42 75 / 4%);
+}
+.pos-history-card > header,
+.pos-history-card > header > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pos-history-card > header > div {
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.pos-history-card > header strong {
+  color: #19243a;
+  font-size: 0.85rem;
+}
+.pos-history-card time {
+  color: #7b8496;
+  font-size: 0.68rem;
+}
+.pos-history-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px 10px;
+  margin: 15px 0;
+  padding: 13px 0;
+  border-block: 1px solid #edf0f4;
+}
+.pos-history-card dl > div {
+  min-width: 0;
+}
+.pos-history-card dt {
+  margin-bottom: 4px;
+  color: #7b8496;
+  font-size: 0.65rem;
+}
+.pos-history-card dd {
+  margin: 0;
+  color: #344054;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.pos-history-card dd.pos-history-card__total {
+  color: #172c8b;
+  font-size: 0.95rem;
+  font-weight: 750;
+}
+.pos-history-card > .button {
+  width: 100%;
+  min-height: 42px;
+  justify-content: center;
+}
+.pos-history-cards__empty {
+  margin: 0;
+  padding: 24px 12px;
+  color: #667085;
+  text-align: center;
+}
 @media (max-width: 850px) {
   .pos-layout {
     grid-template-columns: 1fr;
@@ -1272,7 +1326,10 @@
     grid-template-columns: repeat(2, 1fr);
   }
   .pos-history-filters {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pos-history-filters > label:first-child {
+    grid-column: 1 / -1;
   }
   .pos-sales-analytics__header {
     align-items: stretch;
@@ -1285,25 +1342,31 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (max-width: 520px) {
+@media (max-width: 600px) {
   .pos-sales-analytics__summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .pos-sales-analytics {
-    padding: 15px;
+    padding: 14px;
+    border-radius: 14px;
+  }
+  .pos-history-filters {
+    padding: 14px;
+    gap: 12px 10px;
+    border-radius: 14px;
   }
   .pos-sales-chart {
     grid-template-columns: repeat(12, 52px);
     gap: 7px;
     min-width: max-content;
-    height: 215px;
+    height: 172px;
   }
   .pos-sales-chart__month {
-    grid-template-rows: 23px 1fr auto auto;
+    grid-template-rows: 16px 1fr auto auto;
     gap: 3px;
   }
   .pos-sales-chart__track {
-    min-height: 125px;
+    min-height: 95px;
   }
   .pos-sales-chart__value,
   .pos-sales-chart__month > small {
@@ -1311,6 +1374,24 @@
   }
   .pos-sales-chart__month > strong {
     font-size: 0.68rem;
+  }
+  .pos-sales-chart__track {
+    min-height: 95px;
+  }
+  .pos-history-table {
+    padding: 12px;
+    overflow: visible;
+    border-radius: 14px;
+  }
+  .pos-history-table__desktop {
+    display: none;
+  }
+  .pos-history-cards {
+    display: grid;
+    gap: 10px;
+  }
+  .pos-history-card {
+    padding: 13px;
   }
 }
 .pos-cart-lines {

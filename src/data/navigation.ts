@@ -39,6 +39,19 @@ export const primaryNavigation: NavItem[] = [
     ],
   },
   {
+    id: 'operations-group',
+    label: 'Inventory & operations',
+    icon: FolderKanban,
+    children: [
+      { id: 'products', label: 'Products & services' },
+      { id: 'warehouses', label: 'Warehouses' },
+      { id: 'stock-movements', label: 'Stock movements' },
+      { id: 'stock-adjustments', label: 'Adjustments' },
+      { id: 'projects', label: 'Projects' },
+      { id: 'project-ai', label: 'Project management AI' },
+    ],
+  },
+  {
     id: 'spending-group',
     label: 'Purchases & spending',
     icon: ReceiptText,
@@ -80,19 +93,6 @@ export const primaryNavigation: NavItem[] = [
       { id: 'product-channel-mapping', label: 'Product/channel mapping' },
       { id: 'commerce-analytics', label: 'Commerce analytics' },
       { id: 'commerce-settings', label: 'Commerce settings' },
-    ],
-  },
-  {
-    id: 'operations-group',
-    label: 'Inventory & operations',
-    icon: FolderKanban,
-    children: [
-      { id: 'products', label: 'Products & services' },
-      { id: 'warehouses', label: 'Warehouses' },
-      { id: 'stock-movements', label: 'Stock movements' },
-      { id: 'stock-adjustments', label: 'Adjustments' },
-      { id: 'projects', label: 'Projects' },
-      { id: 'project-ai', label: 'Project management AI' },
     ],
   },
 ];
