@@ -51,11 +51,11 @@ export function AuthPage({
     },
     forgot: {
       title: 'Reset your password',
-      subtitle: 'Enter your work email and weâ€™ll send a secure reset link.',
+      subtitle: 'Enter your email and we’ll send you a link to reset your password.',
       button: 'Send reset link',
     },
     mfa: {
-      title: 'Verify itâ€™s you',
+      title: 'Verify your identity',
       subtitle: 'Enter the six-digit code from your authenticator app.',
       button: 'Verify and continue',
     },
@@ -173,7 +173,7 @@ export function AuthPage({
         </button>
         <div>
           <div className="auth-quote">
-            â€œCephas gives our finance team a single source of truth across four branches.â€
+            “Cephas helps our finance team keep track of money across all four branches.”
           </div>
           <div className="quote-author">
             <span>AO</span>
@@ -185,7 +185,7 @@ export function AuthPage({
         </div>
         <p>
           <ShieldCheck size={16} />
-          Bank-grade security Â· NDPR aligned
+          Strong security · Designed to meet NDPR requirements
         </p>
       </aside>
       <main>
@@ -207,7 +207,7 @@ export function AuthPage({
                   confirmAction('Microsoft sign-in requires an authentication provider')
                 }
               >
-                â–¦&nbsp; Microsoft
+                M&nbsp; Microsoft
               </button>
             </div>
           )}
@@ -514,7 +514,7 @@ const setupSteps = [
 const setupHeadings = [
   [
     'Tell us about your business',
-    'Weâ€™ll use this to personalise your chart of accounts and reports.',
+    'We’ll tailor your accounts and reports to your business.',
   ],
   [
     'Set your financial foundations',
@@ -933,7 +933,7 @@ function SetupFields({ step, data }: { step: number; data: SetupData }) {
           <textarea
             name="departments"
             defaultValue={data.departments}
-            placeholder="Finance, Sales, Operations â€” separate with commas"
+            placeholder="Finance, Sales, Operations — separate with commas"
           />
         </label>
         <label>

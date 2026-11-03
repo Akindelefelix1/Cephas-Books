@@ -648,32 +648,32 @@
     grid-template-columns: 1fr;
   }
   .marketing-footer {
-    grid-template-columns: 1.45fr repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    padding: 32px 14px 20px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 14px;
+    padding: 32px 18px 20px;
   }
   .marketing-footer > div:first-child {
-    grid-column: auto;
-    padding-bottom: 0;
+    grid-column: 1 / -1;
+    padding-bottom: 4px;
   }
   .marketing-footer > div {
     min-width: 0;
     gap: 8px;
   }
   .marketing-footer .logo {
-    gap: 5px;
-    font-size: clamp(0.58rem, 2.2vw, 0.76rem);
+    gap: 7px;
+    font-size: 0.85rem;
   }
   .marketing-footer .logo__mark {
     width: 24px;
     height: 24px;
   }
   .marketing-footer strong {
-    font-size: clamp(0.58rem, 2.2vw, 0.72rem);
+    font-size: 0.72rem;
   }
   .marketing-footer button,
   .marketing-footer p {
-    font-size: clamp(0.52rem, 2vw, 0.68rem);
+    font-size: 0.7rem;
     line-height: 1.45;
   }
   .marketing-footer button {

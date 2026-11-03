@@ -61,29 +61,29 @@ const heroImages: Record<MarketingView, { src: string; alt: string }> = {
 
 const featureMetrics: Record<MarketingView, Array<{ label: string; value: string }>> = {
   platform: [
-    { label: 'Match rate', value: '96%' },
-    { label: 'Stock accuracy', value: '92%' },
-    { label: 'Insights answered', value: '84%' },
+    { label: 'Money and accounting', value: 'Core' },
+    { label: 'Stock and projects', value: 'Locations' },
+    { label: 'Reports and controls', value: 'Reports' },
   ],
   solutions: [
-    { label: 'Hours saved', value: '18h' },
-    { label: 'Team adoption', value: '91%' },
-    { label: 'Branches online', value: '12' },
+    { label: 'Owner tools', value: 'Sales' },
+    { label: 'Team tools', value: 'Shared' },
+    { label: 'Location tools', value: 'Branches' },
   ],
   pricing: [
-    { label: 'Essential value', value: '72%' },
-    { label: 'Most selected', value: '64%' },
-    { label: 'Scale readiness', value: '89%' },
+    { label: 'Starter', value: '2 users' },
+    { label: 'Professional', value: '10 users' },
+    { label: 'Business', value: 'Branches' },
   ],
   security: [
-    { label: 'Access protected', value: '98%' },
-    { label: 'Reviews cleared', value: '94%' },
-    { label: 'Actions logged', value: '100%' },
+    { label: 'Team access', value: 'Roles' },
+    { label: 'Review steps', value: 'Approvals' },
+    { label: 'Action history', value: 'Audit log' },
   ],
   resources: [
-    { label: 'Issues resolved', value: '93%' },
-    { label: 'Guides completed', value: '24' },
-    { label: 'Useful insights', value: '88%' },
+    { label: 'Getting started', value: '5 steps' },
+    { label: 'Business records', value: 'Documents' },
+    { label: 'Make sense of results', value: 'Reports' },
   ],
 };
 
@@ -93,24 +93,24 @@ const pages: Record<MarketingView, PageContent> = {
     title: 'One connected system for',
     accent: 'every financial workflow.',
     description:
-      'Run accounting, banking, inventory, tax, payroll, and reporting from a single source of truth built for growing businesses.',
+      'Handle bank accounts and reconciliation, sales and purchasing, accounting, tax, payroll, stock, online orders, projects, reports, and team access in one workspace.',
     note: 'Everything connects to one reliable ledger.',
     icon: BarChart3,
     features: [
       {
         icon: Landmark,
-        title: 'Connected banking',
-        text: 'Match transactions, reconcile accounts, and understand cash flow in real time.',
+        title: 'Money in, money out, and accounting',
+        text: 'Manage bank accounts and transfers, reconcile transactions, follow invoices and bills, and keep journals, the ledger, trial balance, tax, payroll, fixed assets, and budgets together.',
       },
       {
         icon: Package,
-        title: 'Inventory clarity',
-        text: 'Track products, stock movement, and value across every location.',
+        title: 'Sales, stock, commerce, and projects',
+        text: 'Use point of sale, quotations, invoices, and customer payments; manage products, warehouses, stock movements, channel product matching, online orders, fulfilment, payouts, and project planning and costs.',
       },
       {
         icon: Sparkles,
-        title: 'Practical intelligence',
-        text: 'Turn live business data into clear answers and useful next steps.',
+        title: 'Reports, workflows, and team controls',
+        text: 'Review financial statements, build reports, explore analytics, sync Excel data, ask Cephas AI, route approvals, manage documents and notifications, and control branch, role, currency, and integration settings.',
       },
     ],
   },
@@ -119,24 +119,24 @@ const pages: Record<MarketingView, PageContent> = {
     title: 'Built around how your',
     accent: 'business actually works.',
     description:
-      'From a founder sending a first invoice to a finance team consolidating branches, Cephas Books grows with your operation.',
+      'Use the tools that fit your work, from everyday sales and expenses to stock control, finance reviews, and oversight across branches.',
     note: 'Start focused. Add capability when you need it.',
     icon: Building2,
     features: [
       {
         icon: Zap,
-        title: 'Founders & small teams',
-        text: 'Invoice, track expenses, and see the numbers that matter without the busywork.',
+        title: 'Owners and small teams',
+        text: 'Create quotations and invoices, record payments and expenses, and check cash, income, and bills due.',
       },
       {
         icon: Users,
-        title: 'Growing finance teams',
-        text: 'Add roles, approvals, reporting, and repeatable processes as the team expands.',
+        title: 'Retail and service teams',
+        text: 'Take point-of-sale orders, keep customer and supplier records, track stock, and follow purchases and fulfilment.',
       },
       {
         icon: Building2,
-        title: 'Multi-branch businesses',
-        text: 'Keep each location visible while maintaining central financial control.',
+        title: 'Finance teams across branches',
+        text: 'Review branch activity, manage access by role, track budgets and approvals, and prepare reports from shared records.',
       },
     ],
   },
@@ -152,17 +152,17 @@ const pages: Record<MarketingView, PageContent> = {
       {
         icon: BookOpen,
         title: 'Starter · ₦9,900/mo',
-        text: 'For founders: 2 users, invoicing, expenses, and core financial reports.',
+        text: 'For a small business: 1 business, 2 users, invoicing, expenses, and core financial reports.',
       },
       {
         icon: BarChart3,
         title: 'Professional · ₦29,900/mo',
-        text: 'For growing teams: full accounting, banking, inventory, tax, and reporting.',
+        text: 'For a growing team: 10 users, accounting, banking, inventory, tax, and reports.',
       },
       {
         icon: Building2,
         title: 'Business · ₦69,900/mo',
-        text: 'For complex operations: branches, projects, budgets, approvals, and AI.',
+        text: 'For larger operations: unlimited transactions, branches, projects, budgets, approvals, and AI tools.',
       },
     ],
   },
@@ -177,44 +177,44 @@ const pages: Record<MarketingView, PageContent> = {
     features: [
       {
         icon: LockKeyhole,
-        title: 'Role-based access',
-        text: 'Give every team member only the tools and information their work requires.',
+        title: 'Roles and permissions',
+        text: 'Assign team roles and permissions so people can access the areas needed for their work.',
       },
       {
         icon: ShieldCheck,
-        title: 'Approvals & controls',
-        text: 'Build review steps into sensitive workflows and high-value transactions.',
+        title: 'Approvals and account security',
+        text: 'Review transactions through approval workflows and protect sign-in with verification and session controls.',
       },
       {
         icon: FileText,
-        title: 'Complete audit trail',
-        text: 'Keep a clear record of important actions, changes, and approvals.',
+        title: 'Audit history',
+        text: 'Review recorded actions and changes to support financial oversight and accountability.',
       },
     ],
   },
   resources: {
-    eyebrow: 'Resources & guidance',
-    title: 'Learn faster. Get more',
-    accent: 'from Cephas Books.',
+    eyebrow: 'Explore the product',
+    title: 'Get a clear view of',
+    accent: 'how your business runs.',
     description:
-      'Find practical guides, product documentation, and support designed to help your team work with confidence from day one.',
-    note: 'Clear answers for setup, workflows, and growth.',
+      'See how workspace setup, business records, notifications, financial reports, and Cephas AI fit into everyday work.',
+    note: 'Explore the tools available to your team.',
     icon: BookOpen,
     features: [
       {
         icon: BookOpen,
-        title: 'Help centre',
-        text: 'Step-by-step guidance for everyday tasks, setup, and troubleshooting.',
+        title: 'Set up your workspace',
+        text: 'Enter business details, choose financial defaults, add branches and departments, set tax details, and invite team members.',
       },
       {
         icon: PlayCircle,
-        title: 'Product guides',
-        text: 'Short walkthroughs that help every member of your team get productive.',
+        title: 'Keep records and follow up',
+        text: 'Store business documents, route approvals, and review notifications for invoices, bills, stock, and other activity.',
       },
       {
         icon: FileText,
-        title: 'Business insights',
-        text: 'Useful ideas for stronger financial operations and more informed decisions.',
+        title: 'Review results and ask questions',
+        text: 'Use financial statements, custom reports, analytics, Excel sync, and Cephas AI to explore business performance.',
       },
     ],
   },
@@ -340,7 +340,7 @@ export function MarketingDetailPage({
                   <p>{feature.text}</p>
                   <FeatureChart index={index} metric={featureMetrics[page][index]} />
                   <button onClick={() => onView('register')}>
-                    Learn more <ArrowRight size={15} />
+                    Get started <ArrowRight size={15} />
                   </button>
                 </article>
               );
@@ -402,7 +402,7 @@ function FeatureChart({
         </div>
         <p>
           <strong>{metric.label}</strong>
-          <small>Live operational data</small>
+          <small>Available in Cephas Books</small>
         </p>
       </div>
     );
@@ -437,10 +437,10 @@ function HeroChart({ page }: { page: MarketingView }) {
     return (
       <div className="detail-mini-chart detail-mini-chart--bars">
         <span>
-          <small>Branch performance</small>
-          <strong>+24%</strong>
+          <small>Branch reporting</small>
+          <strong>By location</strong>
         </span>
-        <div className="hero-bars" aria-label="Branch performance increasing across six periods">
+        <div className="hero-bars" aria-label="Illustration of branch performance by period">
           {[38, 52, 44, 68, 61, 86].map((height, index) => (
             <i
               key={height}
@@ -457,17 +457,17 @@ function HeroChart({ page }: { page: MarketingView }) {
     return (
       <div className="detail-mini-chart detail-mini-chart--plans">
         <span>
-          <small>Best value</small>
-          <strong>Professional</strong>
+          <small>Available plans</small>
+          <strong>Three options</strong>
         </span>
         <div
           className="hero-plan-chart"
-          aria-label="Relative value of Starter, Professional and Business plans"
+          aria-label="Starter, Professional and Business plan options"
         >
-          <i style={{ width: '48%' }}>
+          <i style={{ width: '72%' }}>
             <b>S</b>
           </i>
-          <i className="accent" style={{ width: '92%' }}>
+          <i className="accent" style={{ width: '72%' }}>
             <b>P</b>
           </i>
           <i style={{ width: '72%' }}>
@@ -482,13 +482,13 @@ function HeroChart({ page }: { page: MarketingView }) {
     return (
       <div className="detail-mini-chart detail-mini-chart--gauge">
         <span>
-          <small>Protection status</small>
-          <strong>Secure</strong>
+          <small>Account controls</small>
+          <strong>Access</strong>
         </span>
-        <div className="hero-gauge" aria-label="Protection score 98 percent">
+        <div className="hero-gauge" aria-label="Account access and security controls">
           <div>
-            <strong>98%</strong>
-            <small>protected</small>
+            <strong>Roles</strong>
+            <small>and review</small>
           </div>
         </div>
       </div>
@@ -499,10 +499,10 @@ function HeroChart({ page }: { page: MarketingView }) {
     return (
       <div className="detail-mini-chart detail-mini-chart--activity">
         <span>
-          <small>Learning progress</small>
-          <strong>12 guides</strong>
+          <small>Getting started</small>
+          <strong>Five steps</strong>
         </span>
-        <div className="hero-activity" aria-label="Twelve guides completed this month">
+        <div className="hero-activity" aria-label="Five steps to set up a workspace">
           {[35, 62, 48, 78, 56, 88, 72].map((height, index) => (
             <i key={`${height}-${index}`} style={{ height: `${height}%` }} />
           ))}
@@ -514,10 +514,10 @@ function HeroChart({ page }: { page: MarketingView }) {
   return (
     <div className="detail-mini-chart">
       <span>
-        <small>Live cash flow</small>
-        <strong>+18.4%</strong>
+        <small>Financial overview</small>
+        <strong>At a glance</strong>
       </span>
-      <svg viewBox="0 0 180 55" aria-label="Cash flow trending upward">
+      <svg viewBox="0 0 180 55" aria-label="Illustrative financial trend chart">
         <path d="M2 48 C28 44 34 29 58 34 S92 27 108 20 S140 23 178 5" />
       </svg>
     </div>

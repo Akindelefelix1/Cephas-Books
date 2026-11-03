@@ -7,7 +7,15 @@
 .auth-page > aside {
   padding: 42px 55px;
   color: #fff;
-  background: linear-gradient(150deg, #071a42, #1233cc);
+  background:
+    linear-gradient(180deg, rgb(4 17 43 / 48%) 0%, rgb(5 22 57 / 25%) 45%, rgb(7 22 62 / 55%) 100%),
+    linear-gradient(150deg, #071a42, #1233cc);
+  background-image:
+    linear-gradient(180deg, rgb(4 17 43 / 48%) 0%, rgb(5 22 57 / 25%) 45%, rgb(7 22 62 / 55%) 100%),
+    url('../assets/images/login-finance-hero.png'),
+    linear-gradient(150deg, #071a42, #1233cc);
+  background-position: center, 56% center, center;
+  background-size: cover;
   display: flex;
   flex-direction: column;
   justify-content: space-between;

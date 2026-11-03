@@ -1,15 +1,21 @@
 import {
   ArrowRight,
   BarChart3,
+  BookOpen,
+  Boxes,
   Bot,
   Check,
+  ClipboardList,
   ChevronRight,
-  Globe2,
+  FolderKanban,
   Landmark,
   Package,
   Play,
-  ShieldCheck,
+  ReceiptText,
+  ShoppingBag,
+  ShoppingCart,
   Sparkles,
+  Users,
   Zap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -121,7 +127,7 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
                 <div className="preview-main">
                   <div className="preview-heading">
                     <div>
-                      <small>FINANCIAL OVERVIEW</small>
+                      <small>SAMPLE FINANCIAL OVERVIEW</small>
                       <strong>Good morning, Tobi</strong>
                     </div>
                     <button onClick={() => onView('register')}>+ Create</button>
@@ -190,7 +196,7 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
         <section className="visual-story">
           <div className="visual-story__heading">
             <div>
-              <span className="section-kicker">Clarity you can act on</span>
+              <span className="section-kicker">A look inside the dashboard</span>
               <h2>Real people. Real decisions. One live financial picture.</h2>
             </div>
             <p>
@@ -209,7 +215,7 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
             <article className="insight-chart insight-chart--line">
               <header>
                 <div>
-                  <small>REVENUE MOMENTUM</small>
+                  <small>EXAMPLE REVENUE</small>
                   <strong>₦48.2m</strong>
                 </div>
                 <span>+18.4%</span>
@@ -248,7 +254,7 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
                   <small>CASH ALLOCATION</small>
                   <strong>Healthy balance</strong>
                 </div>
-                <span>Live</span>
+                <span>Example</span>
               </header>
               <div className="donut-layout">
                 <div
@@ -325,27 +331,27 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
               </div>
               <h3>Automate the routine</h3>
               <p>
-                Smart matching, recurring invoices, reminders, approvals, and categorisation save
-                hours every week.
+                Match bank transactions, route approvals, send invoice reminders, and keep business
+                records together.
               </p>
               <div className="automation-list">
                 <span>
                   <i>
                     <Check />
                   </i>
-                  Bank feed reconciled <b>124 matched</b>
+                  Bank transactions <b>Reconcile</b>
                 </span>
                 <span>
                   <i>
                     <Check />
                   </i>
-                  Invoices reminded <b>8 sent</b>
+                  Invoice reminders <b>Follow up</b>
                 </span>
                 <span>
                   <i>
                     <Check />
                   </i>
-                  Receipts captured <b>32 scanned</b>
+                  Documents saved <b>Review</b>
                 </span>
               </div>
             </article>
@@ -363,23 +369,62 @@ export function LandingPage({ onView }: { onView: (view: View) => void }) {
                 <span>Marketing spend increased 24%, driven by the Lagos launch campaign.</span>
               </div>
             </article>
+            <article>
+              <div className="feature-icon cyan">
+                <ShoppingCart />
+              </div>
+              <h3>Manage sales from quote to payment</h3>
+              <p>
+                Keep customer records, quotations, invoices, point-of-sale transactions, payments,
+                credit notes, and unpaid balances together.
+              </p>
+            </article>
+            <article>
+              <div className="feature-icon">
+                <ReceiptText />
+              </div>
+              <h3>Keep spending and supplier bills organised</h3>
+              <p>
+                Manage suppliers, purchase requests and orders, bills, expenses, supplier payments,
+                and amounts due.
+              </p>
+            </article>
+            <article>
+              <div className="feature-icon purple">
+                <Boxes />
+              </div>
+              <h3>Follow stock and project costs</h3>
+              <p>
+                Track products, warehouses, stock transfers and adjustments, plus project budgets,
+                costs, and performance.
+              </p>
+            </article>
           </div>
         </section>
         <section className="platform-band" id="solutions">
           <div>
             <span className="section-kicker">Made for modern businesses</span>
             <h2>From first invoice to consolidated accounts.</h2>
-            <p>Start simple and add deeper capabilities as your organisation grows.</p>
-            <button className="button button--light" onClick={() => onView('register')}>
+            <p>
+              Handle day-to-day money, sales, purchasing, stock, online orders, projects, reporting,
+              and team access in one connected workspace.
+            </p>
+            <button className="button button--light" onClick={() => onView('platform')}>
               Explore the platform <ArrowRight size={17} />
             </button>
           </div>
           <div className="capability-grid">
             {[
-              [Landmark, 'Banking', 'Live feeds & reconciliation'],
-              [Package, 'Inventory', 'Stock across every branch'],
-              [Globe2, 'Multi-entity', 'Currencies & consolidation'],
-              [ShieldCheck, 'Controls', 'Roles, approvals & audit'],
+              [Landmark, 'Banking', 'Accounts, transactions & reconciliation'],
+              [ShoppingCart, 'Sales', 'Customers, quotes, invoices & payments'],
+              [ReceiptText, 'Purchasing', 'Suppliers, orders, bills & expenses'],
+              [BookOpen, 'Accounting', 'Ledger, journals, tax, payroll & assets'],
+              [Package, 'Inventory', 'Products, warehouses & stock movements'],
+              [ShoppingBag, 'Commerce', 'Sales channels, orders, fulfilment & payouts'],
+              [FolderKanban, 'Projects', 'Track project budgets, costs & results'],
+              [BarChart3, 'Reports & AI', 'Statements, analytics, Excel sync & answers'],
+              [ClipboardList, 'Workflows', 'Approvals, documents, alerts & audit history'],
+              [Users, 'Team & setup', 'Branches, roles, currencies & connected tools'],
             ].map(([Icon, title, text]) => (
               <article key={String(title)}>
                 <Icon />

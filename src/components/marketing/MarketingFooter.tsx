@@ -27,8 +27,8 @@ export function MarketingFooter({ onView }: { onView: (view: View) => void }) {
       </div>
       <div>
         <strong>Resources</strong>
-        <button onClick={() => onView('resources')}>Help centre</button>
-        <button onClick={() => onView('resources')}>Product guides</button>
+        <button onClick={() => onView('resources')}>Getting started</button>
+        <button onClick={() => onView('resources')}>Explore features</button>
         <button onClick={() => onView('security')}>Security</button>
       </div>
       <small>© 2026 Cephas Technologies. All rights reserved.</small>
