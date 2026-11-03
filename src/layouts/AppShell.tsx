@@ -7,6 +7,8 @@ import {
   Command,
   Menu,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Search,
   Sun,
@@ -35,6 +37,10 @@ interface AppShellProps extends PropsWithChildren {
 
 export function AppShell({ active, onNavigate, onQuickCreate, identity, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('cephas:sidebar-collapsed') === 'true',
+  );
+  const [sidebarPeek, setSidebarPeek] = useState(false);
   const [sidebarTheme, setSidebarTheme] = useState<SidebarTheme>(() => {
     const savedTheme = localStorage.getItem('cephas:sidebar-theme');
     return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'light';
@@ -52,6 +58,12 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
   const updateSidebarTheme = (theme: SidebarTheme) => {
     setSidebarTheme(theme);
     localStorage.setItem('cephas:sidebar-theme', theme);
+  };
+  const toggleSidebar = () => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    localStorage.setItem('cephas:sidebar-collapsed', String(next));
+    setSidebarPeek(next);
   };
   const navigate = (id: string) => {
     const parent = allNavigation.find((item) => item.children?.some((child) => child.id === id));
@@ -99,7 +111,7 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
       );
     });
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <a
         className="skip-link"
         href="#main-content"
@@ -110,9 +122,27 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
       >
         Skip to main content
       </a>
-      <aside className={`sidebar sidebar--${sidebarTheme} ${mobileOpen ? 'is-open' : ''}`}>
+      <aside
+        className={`sidebar sidebar--${sidebarTheme} ${mobileOpen ? 'is-open' : ''} ${sidebarCollapsed ? 'sidebar--collapsed' : ''} ${sidebarPeek ? 'sidebar--peek' : ''}`}
+        onMouseEnter={() => sidebarCollapsed && setSidebarPeek(true)}
+        onMouseLeave={() => setSidebarPeek(false)}
+        onFocusCapture={() => sidebarCollapsed && setSidebarPeek(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setSidebarPeek(false);
+        }}
+      >
         <div className="sidebar__brand">
           <Logo />
+          <button
+            type="button"
+            className="icon-button sidebar-collapse-button"
+            onClick={toggleSidebar}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
           <button className="icon-button mobile-only" onClick={() => setMobileOpen(false)}>
             <X size={19} />
           </button>
@@ -121,7 +151,8 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
           identity.permissions.some((item) => item.endsWith('.manage'))) && (
           <button className="create-button" onClick={onQuickCreate}>
             <Plus size={18} />
-            Quick create<kbd>C</kbd>
+            <span>Quick create</span>
+            <kbd>C</kbd>
           </button>
         )}
         <nav className="app-nav">

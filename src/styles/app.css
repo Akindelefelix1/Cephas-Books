@@ -211,6 +211,84 @@
 .sidebar-theme-toggle button[aria-checked='true'] i {
   transform: translateX(16px);
 }
+.sidebar-collapse-button {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--sidebar-muted);
+}
+.sidebar-collapse-button:hover {
+  color: var(--sidebar-strong);
+  background: var(--sidebar-hover);
+}
+.sidebar--collapsed:not(.sidebar--peek) {
+  width: 72px;
+}
+.sidebar--collapsed.sidebar--peek {
+  width: 248px;
+  box-shadow: 12px 0 32px rgb(15 23 42 / 15%);
+}
+.sidebar,
+.workspace,
+.topbar {
+  transition:
+    width 180ms ease,
+    margin-left 180ms ease,
+    left 180ms ease;
+}
+.app-shell.sidebar-collapsed .workspace {
+  margin-left: 72px;
+}
+.app-shell.sidebar-collapsed .topbar {
+  left: 72px;
+}
+.sidebar--collapsed:not(.sidebar--peek) .sidebar__brand {
+  justify-content: center;
+  gap: 5px;
+  padding-inline: 5px;
+}
+.sidebar--collapsed:not(.sidebar--peek) .sidebar__brand .logo > span,
+.sidebar--collapsed:not(.sidebar--peek) .nav-label,
+.sidebar--collapsed:not(.sidebar--peek) .nav-item > span,
+.sidebar--collapsed:not(.sidebar--peek) .nav-item > svg:last-child,
+.sidebar--collapsed:not(.sidebar--peek) .subnav,
+.sidebar--collapsed:not(.sidebar--peek) .create-button > span,
+.sidebar--collapsed:not(.sidebar--peek) .create-button kbd,
+.sidebar--collapsed:not(.sidebar--peek) .sidebar-theme-toggle > span > span,
+.sidebar--collapsed:not(.sidebar--peek) .sidebar-theme-toggle > button {
+  display: none;
+}
+.sidebar--collapsed:not(.sidebar--peek) .sidebar__brand .logo__mark {
+  width: 31px;
+  height: 31px;
+}
+.sidebar--collapsed:not(.sidebar--peek) .sidebar-collapse-button {
+  width: 25px;
+  height: 28px;
+}
+.sidebar--collapsed:not(.sidebar--peek) .create-button {
+  width: 44px;
+  height: 44px;
+  justify-content: center;
+  margin: 18px auto 10px;
+  padding: 0;
+}
+.sidebar--collapsed:not(.sidebar--peek) .app-nav {
+  padding-inline: 8px;
+}
+.sidebar--collapsed:not(.sidebar--peek) .nav-item {
+  justify-content: center;
+  gap: 0;
+  padding-inline: 0;
+}
+.sidebar--collapsed:not(.sidebar--peek) .sidebar-theme-toggle {
+  justify-content: center;
+  margin-inline: 12px;
+  padding: 11px 0;
+  border-color: transparent;
+  background: transparent;
+}
 .workspace {
   margin-left: 248px;
   min-width: 0;
