@@ -27,6 +27,7 @@ import {
 } from '@/services/operations';
 import {
   posApi,
+  queuePosSale,
   type PosBranch,
   type PosRegister,
   type PosSale,
@@ -365,8 +366,9 @@ export function PosPage({
     );
     setBusy(true);
     try {
-      const completed = await posApi.complete({
+      const salePayload = {
         registerId,
+        branchId: branchId || undefined,
         customerId: customerId || undefined,
         idempotencyKey: crypto.randomUUID(),
         items: cart.map((x) => ({
@@ -375,11 +377,29 @@ export function PosPage({
           discount: x.discount,
         })),
         payments: settledPayments,
-      });
-      const [s, activeShift] = await Promise.all([
-        posApi.receipt(completed.id),
-        shift ? Promise.resolve(shift) : posApi.currentShift(),
-      ]);
+      };
+      let s: PosSale;
+      let activeShift = shift;
+      try {
+        const completed = await posApi.complete(salePayload);
+        [s, activeShift] = await Promise.all([
+          posApi.receipt(completed.id),
+          shift ? Promise.resolve(shift) : posApi.currentShift(),
+        ]);
+      } catch (error) {
+        if (!(error instanceof Error) || !('status' in error) || error.status !== 0) throw error;
+        queuePosSale(salePayload);
+        const stamp = new Date().toISOString();
+        s = {
+          id: String(salePayload.idempotencyKey), receiptNumber: `OFFLINE-${Date.now()}`,
+          status: 'COMPLETED', currency: getDefaultCurrency(),
+          total: String(total), paidAmount: String(paid), changeAmount: String(change), createdAt: stamp,
+          subtotal: String(subtotal), discountTotal: String(discountTotal), taxTotal: String(tax),
+          customer: customers.find((customer) => customer.id === customerId) ?? null,
+          items: cart.map((item) => ({ productId: item.id, description: item.name, quantity: String(item.quantity), unitPrice: String(item.salePrice), discount: String(item.discount * item.quantity), lineTotal: String((Number(item.salePrice) - item.discount) * item.quantity * (1 + Number(item.taxRate) / 100)) })),
+          payments: settledPayments.map((payment) => ({ method: payment.method, amount: String(payment.amount) })),
+        };
+      }
       setShift(activeShift);
       setSale(s);
       setProducts((current) => {

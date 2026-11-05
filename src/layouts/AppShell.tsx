@@ -1,4 +1,4 @@
-import { useState, type PropsWithChildren } from 'react';
+import { useEffect, useState, type PropsWithChildren } from 'react';
 import {
   Bell,
   Building2,
@@ -18,6 +18,7 @@ import { Logo } from '@/components/brand/Logo';
 import { allNavigation, primaryNavigation, secondaryNavigation } from '@/data/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { can, canAccessRoute } from '@/utils/permissions';
+import { getQueuedPosSales, syncQueuedPosSales } from '@/services/pos';
 
 interface AppShellProps extends PropsWithChildren {
   active: string;
@@ -37,6 +38,23 @@ interface AppShellProps extends PropsWithChildren {
 
 export function AppShell({ active, onNavigate, onQuickCreate, identity, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [online, setOnline] = useState(navigator.onLine);
+  const [queuedSales, setQueuedSales] = useState(() => getQueuedPosSales().length);
+  useEffect(() => {
+    const refresh = () => { setOnline(navigator.onLine); setQueuedSales(getQueuedPosSales().length); };
+    const sync = () => { void syncQueuedPosSales().catch(() => undefined); refresh(); };
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', refresh);
+    window.addEventListener('cephas:sync-state', refresh);
+    const retryTimer = window.setInterval(sync, 15000);
+    sync();
+    return () => {
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', refresh);
+      window.removeEventListener('cephas:sync-state', refresh);
+      window.clearInterval(retryTimer);
+    };
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('cephas:sidebar-collapsed') === 'true',
   );
@@ -198,6 +216,9 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
             </kbd>
           </button>
           <div className="topbar__right">
+            <span title={online ? 'Connected to the server' : 'Working offline'} style={{ fontSize: 12, color: online ? '#16804a' : '#a35b00', whiteSpace: 'nowrap' }}>
+              {online ? 'Online' : 'Offline'}{queuedSales ? ` · ${queuedSales} sale${queuedSales === 1 ? '' : 's'} waiting to sync` : ''}
+            </span>
             {can(identity, 'settings.manage') && (
               <button
                 className="icon-button notification-button"

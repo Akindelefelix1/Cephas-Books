@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cephas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+      POSTGRES_DB: cephas_books
+    ports:
+      - "5432:5432"
+    volumes:
+      - cephas_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cephas -d cephas_books"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  api:
+    build:
+      context: ../CephasBooks-BE
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_PREFIX: api
+      DATABASE_URL: postgresql://cephas:${POSTGRES_PASSWORD:-change-me-local}@postgres:5432/cephas_books?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-only-access-secret-change-this-32-chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-only-refresh-secret-change-this-32-chars}
+      JWT_ACCESS_TTL: 30m
+      JWT_REFRESH_TTL: 7d
+      CORS_ORIGINS: http://localhost,http://localhost:5173
+      SWAGGER_ENABLED: "true"
+      LOG_LEVEL: info
+      ZOHO_MAIL_API_TOKEN: ${ZOHO_MAIL_API_TOKEN:-}
+      ZOHO_MAIL_API_URL: ${ZOHO_MAIL_API_URL:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      FRONTEND_URL: http://localhost
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build: .
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  cephas_postgres:

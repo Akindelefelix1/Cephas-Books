@@ -1,4 +1,4 @@
-import { authorizedRequest } from './auth';
+import { authorizedRequest, getAuthCacheIdentity } from './auth';
 export interface PosSale {
   id: string;
   receiptNumber: string;
@@ -54,6 +54,33 @@ export interface PosSale {
     reason: string;
     createdAt: string;
   }>;
+}
+
+const posOutboxKey = () => `cephas:pos-outbox:${getAuthCacheIdentity()}`;
+export type QueuedPosSale = { id: string; queuedAt: string; payload: Record<string, unknown> };
+let posSyncInProgress: Promise<void> | null = null;
+export function getQueuedPosSales(): QueuedPosSale[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(posOutboxKey()) ?? '[]') as QueuedPosSale[];
+    return Array.isArray(value) ? value : [];
+  } catch { return []; }
+}
+export function queuePosSale(payload: Record<string, unknown>): QueuedPosSale {
+  const entry = { id: String(payload.idempotencyKey), queuedAt: new Date().toISOString(), payload };
+  localStorage.setItem(posOutboxKey(), JSON.stringify([...getQueuedPosSales(), entry]));
+  window.dispatchEvent(new Event('cephas:sync-state'));
+  return entry;
+}
+export function syncQueuedPosSales(): Promise<void> {
+  if (posSyncInProgress) return posSyncInProgress;
+  posSyncInProgress = (async () => {
+    for (const entry of getQueuedPosSales()) {
+      await posApi.complete(entry.payload);
+      localStorage.setItem(posOutboxKey(), JSON.stringify(getQueuedPosSales().filter((sale) => sale.id !== entry.id)));
+      window.dispatchEvent(new Event('cephas:sync-state'));
+    }
+  })().finally(() => { posSyncInProgress = null; });
+  return posSyncInProgress;
 }
 export interface PosRegister {
   id: string;

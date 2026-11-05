@@ -244,9 +244,10 @@ async function performAuthorizedRequest<T>(path: string, init: RequestInit = {})
   let requestBody = init.body;
   if (activeBranchId && branchScopedCreate && typeof init.body === 'string') {
     try {
+      const body = JSON.parse(init.body) as Record<string, unknown>;
       requestBody = JSON.stringify({
-        ...(JSON.parse(init.body) as object),
-        branchId: activeBranchId,
+        ...body,
+        branchId: typeof body.branchId === 'string' ? body.branchId : activeBranchId,
       });
     } catch {
       requestBody = init.body;
