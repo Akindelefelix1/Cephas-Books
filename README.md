@@ -2,6 +2,9 @@
 
 Responsive React and TypeScript client for Cephas Books. The sibling `CephasBooks-BE` repository supplies the NestJS API and PostgreSQL database.
 
+C:\Users\akind\Desktop\CephasBooks-BE
+access the BE from here for all end to end wiring
+
 ## Run the complete local stack with Docker Desktop
 
 1. Start Docker Desktop.
@@ -19,11 +22,11 @@ The default database password and JWT secrets are for local development only. Yo
 
 New accounts need email verification. For local registration, add `ZOHO_MAIL_API_URL`, `ZOHO_MAIL_API_TOKEN`, and `EMAIL_FROM` to the root `.env`; otherwise use an account already registered in the local database.
 
-## Offline POS and sync
+## Offline access and sync
 
-Sign in and load the POS catalog while connected so the register, shift, and products are available on the device. If the network drops during checkout, completed POS sales are saved in that browser's local outbox. The app displays the connection and pending sale count, then submits queued sales when connectivity returns. Each queued sale carries an idempotency key so retrying does not create duplicate sales. Pending sales are device and browser specific; keep that browser data until the pending count returns to zero.
+After a successful online sign-in, accept the local-use prompt to save an offline password verifier and your profile in this browser. Your saved sign-in survives closing and reopening the browser. Sign in with the same email and password while disconnected. Pages and records are available offline after they have loaded successfully on this device; open the areas you need while online first. The app is installable, and supported browsers offer an **Add app shortcut** button.
 
-The API and database run locally, so POS, sales, inventory, and the other API backed sections can be used without a connection to the hosted service. Offline checkout queues POS sales; other write actions still need a connection to the local API. External services such as email require internet access and their backend credentials.
+Changes submitted while offline are kept in this browser's pending queue. When connectivity returns, Cephas Books asks before sending queued changes to the cloud; it never syncs them automatically. Review the pending count before clearing browser data or switching devices. Offline-created records may not appear in other cached screens until a successful sync and refresh. Email, SMS, payment providers, and external commerce integrations require connectivity. Local browser storage is specific to the browser profile and is not a substitute for a managed local database or a separate backup.
 
 ## Run the frontend without Docker
 

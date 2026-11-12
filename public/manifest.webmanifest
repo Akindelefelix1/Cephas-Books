@@ -1,0 +1,9 @@
+{
+  "name": "Cephas Books",
+  "short_name": "Cephas Books",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f7f8fc",
+  "theme_color": "#1233cc",
+  "description": "Financial management for modern businesses"
+}

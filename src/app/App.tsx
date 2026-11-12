@@ -53,6 +53,8 @@ import { can, canAccessRoute } from '@/utils/permissions';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { CommercePage } from '@/pages/CommercePage';
 import type { CommerceView } from '@/services/commerce';
+import { getOfflineQueue } from '@/services/offline';
+import { syncOfflineChanges } from '@/services/auth';
 
 const marketingViews = ['platform', 'solutions', 'pricing', 'security', 'resources'] as const;
 const authViews = ['login', 'register', 'forgot', 'mfa'] as const;
@@ -88,6 +90,9 @@ export function App() {
   const [logoutConfirmation, setLogoutConfirmation] = useState<Confirmation | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState('');
+  const [offlineCount, setOfflineCount] = useState(() => getOfflineQueue().length);
+  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+  const [syncMessage, setSyncMessage] = useState('');
   const [identityReady, setIdentityReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(
     () => localStorage.getItem('cephas:onboarding-complete') === 'true',
@@ -117,6 +122,35 @@ export function App() {
     if ((view === 'app' || view === 'onboarding') && !hasAuthTokens())
       routerNavigate('/login', { replace: true });
   }, [routerNavigate, view]);
+  useEffect(() => {
+    const refreshCount = () => setOfflineCount(getOfflineQueue().length);
+    const onOnline = async () => {
+      refreshCount();
+      if (!localStorage.getItem('cephas:offline-enabled')) return;
+      if (window.confirm('Internet is available. Back up your pending offline changes and refresh your cloud workspace now?')) {
+        try {
+          await syncOfflineChanges();
+          setSyncMessage('Your offline changes have been sent to the cloud.');
+        } catch (caught) {
+          setSyncMessage(caught instanceof Error ? `Sync paused: ${caught.message}` : 'Sync paused. Try again when connected.');
+        }
+      }
+      refreshCount();
+    };
+    const onInstall = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    window.addEventListener('cephas:sync-state', refreshCount);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('beforeinstallprompt', onInstall);
+    if (navigator.onLine && localStorage.getItem('cephas:offline-active') === 'true') void onOnline();
+    return () => {
+      window.removeEventListener('cephas:sync-state', refreshCount);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('beforeinstallprompt', onInstall);
+    };
+  }, []);
   useEffect(() => {
     const handleExpiredSession = () => {
       clearAuthTokens();
@@ -432,6 +466,17 @@ export function App() {
       onQuickCreate={() => setQuick(true)}
       identity={identity}
     >
+      {(!navigator.onLine || offlineCount > 0 || installPrompt || syncMessage) && (
+        <aside className="offline-banner" role="status">
+          <span>{!navigator.onLine ? `Offline mode · ${offlineCount} change${offlineCount === 1 ? '' : 's'} waiting to sync` : offlineCount ? `${offlineCount} offline change${offlineCount === 1 ? '' : 's'} waiting to sync` : syncMessage || 'Use Cephas Books as an app on this device.'}</span>
+          {installPrompt && <button className="button button--small" onClick={async () => {
+            const prompt = installPrompt as Event & { prompt?: () => Promise<void> };
+            await prompt.prompt?.();
+            setInstallPrompt(null);
+          }}>Add app shortcut</button>}
+          {syncMessage && <button className="button button--small button--ghost" onClick={() => setSyncMessage('')}>Dismiss</button>}
+        </aside>
+      )}
       {content}
       <QuickCreate
         open={quick}

@@ -1431,3 +1431,16 @@
     grid-template-columns: 1fr;
   }
 }
+.offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .7rem 1rem;
+  margin: 0 0 1rem;
+  border: 1px solid #cbd5ff;
+  border-radius: 12px;
+  background: #f1f4ff;
+  color: #233879;
+  font-size: .875rem;
+}

@@ -16,6 +16,7 @@ import { onboardingApi, onboardingSteps } from '@/services/onboarding';
 import { useEffect } from 'react';
 import { confirmAction } from '@/utils/actions';
 import type { View } from '@/types/app';
+import { createOfflineLogin, getOfflineSnapshot, verifyOfflineLogin } from '@/services/offline';
 
 export function AuthPage({
   mode,
@@ -139,11 +140,42 @@ export function AuthPage({
     if (mode === 'login') {
       setSubmitting(true);
       try {
+        if (!navigator.onLine) {
+          const valid = await verifyOfflineLogin(email, password);
+          const profile = getOfflineSnapshot<Awaited<ReturnType<typeof authApi.me>>>('profile');
+          if (!valid || !profile) throw new Error('Offline sign-in is not set up for this account on this device. Connect to the internet and sign in first.');
+          const tokens = sessionStorage.getItem('cephas:auth') ?? localStorage.getItem('cephas:auth');
+          if (tokens && !localStorage.getItem('cephas:auth')) localStorage.setItem('cephas:auth', tokens);
+          localStorage.setItem('cephas:offline-active', 'true');
+          onView('app');
+          return;
+        }
         const tokens = await authApi.login({ email: email.trim(), password });
         saveAuthTokens(tokens, remember);
         const progress = await onboardingApi.get();
+        try {
+          const profile = await authApi.me();
+          if (window.confirm('Use Cephas Books locally on this device? Your workspace data will be saved in this browser so you can sign in and work when offline. Anyone with access to this browser profile may access the saved data.')) {
+            saveAuthTokens(tokens, true);
+            await createOfflineLogin(email, password, profile);
+            localStorage.setItem('cephas:offline-enabled', 'true');
+          }
+        } catch { /* offline access is optional; keep cloud sign-in available */ }
         onView(progress.onboardingCompletedAt ? 'app' : 'onboarding');
       } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 0) {
+          try {
+            const valid = await verifyOfflineLogin(email, password);
+            const profile = getOfflineSnapshot<Awaited<ReturnType<typeof authApi.me>>>('profile');
+            if (valid && profile) {
+              const tokens = sessionStorage.getItem('cephas:auth') ?? localStorage.getItem('cephas:auth');
+              if (tokens && !localStorage.getItem('cephas:auth')) localStorage.setItem('cephas:auth', tokens);
+              localStorage.setItem('cephas:offline-active', 'true');
+              onView('app');
+              return;
+            }
+          } catch { /* fall through to the connection message */ }
+        }
         if (
           caught instanceof ApiError &&
           caught.status === 403 &&

@@ -1,4 +1,5 @@
 import { notifyError } from '@/utils/actions';
+import { enqueueOfflineWrite, getOfflineQueue, getOfflineSnapshot, removeOfflineWrite, saveOfflineSnapshot } from './offline';
 
 export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ?? 'https://cephasbooks-be.onrender.com/api'
@@ -302,6 +303,10 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
   if (tokens) synchronizeCacheIdentity(tokens.accessToken);
 
   if (method !== 'GET') {
+    if (!navigator.onLine || localStorage.getItem('cephas:offline-active') === 'true') {
+      enqueueOfflineWrite(path, method, typeof init.body === 'string' ? init.body : undefined);
+      return { queuedOffline: true } as T;
+    }
     const payload = await performAuthorizedRequest<T>(path, init);
     if (
       /^\/operations\/(products|movements|transfers|adjustments)(?:\/|\?|$)/.test(path) ||
@@ -314,6 +319,11 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
 
   const branchId = localStorage.getItem('cephas:active-branch') ?? '';
   const key = `${cacheIdentity}:${branchId}:${path}`;
+  if (!navigator.onLine || localStorage.getItem('cephas:offline-active') === 'true') {
+    const saved = getOfflineSnapshot<T>(`api:${key}`);
+    if (saved !== null) return saved;
+    throw new ApiError('This section has not been saved for offline use on this device yet.', 0);
+  }
   if (responseCache.has(key)) return responseCache.get(key) as T;
 
   const pending = pendingRequests.get(key);
@@ -323,6 +333,7 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
   const request = performAuthorizedRequest<T>(path, init)
     .then((payload) => {
       if (generation === cacheGeneration) responseCache.set(key, payload);
+      saveOfflineSnapshot(`api:${key}`, payload);
       return payload;
     })
     .finally(() => {
@@ -330,4 +341,13 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
     });
   pendingRequests.set(key, request);
   return request;
+}
+
+export async function syncOfflineChanges(): Promise<void> {
+  localStorage.removeItem('cephas:offline-active');
+  for (const item of getOfflineQueue()) {
+    await performAuthorizedRequest(item.path, { method: item.method, body: item.body });
+    removeOfflineWrite(item.id);
+  }
+  clearApiCache();
 }
