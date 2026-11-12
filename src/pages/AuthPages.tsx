@@ -11,12 +11,12 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { ApiError, authApi, saveAuthTokens } from '@/services/auth';
+import { ApiError, authApi, authorizedRequest, saveAuthTokens } from '@/services/auth';
 import { onboardingApi, onboardingSteps } from '@/services/onboarding';
 import { useEffect } from 'react';
 import { confirmAction } from '@/utils/actions';
 import type { View } from '@/types/app';
-import { createOfflineLogin, getOfflineSnapshot, verifyOfflineLogin } from '@/services/offline';
+import { cacheBulkWorkspace, createOfflineLogin, getOfflineBulkSnapshot, getOfflineSnapshot, getOfflineSnapshotIdentity, restoreOfflineTokens, type OfflineSnapshot } from '@/services/offline';
 
 export function AuthPage({
   mode,
@@ -141,35 +141,59 @@ export function AuthPage({
       setSubmitting(true);
       try {
         if (!navigator.onLine) {
-          const valid = await verifyOfflineLogin(email, password);
+          const offlineTokens = await restoreOfflineTokens(email, password);
           const profile = getOfflineSnapshot<Awaited<ReturnType<typeof authApi.me>>>('profile');
-          if (!valid || !profile) throw new Error('Offline sign-in is not set up for this account on this device. Connect to the internet and sign in first.');
-          const tokens = sessionStorage.getItem('cephas:auth') ?? localStorage.getItem('cephas:auth');
-          if (tokens && !localStorage.getItem('cephas:auth')) localStorage.setItem('cephas:auth', tokens);
+          if (!offlineTokens || !profile || profile.email.toLowerCase() !== email.trim().toLowerCase()) throw new Error('Offline sign-in is not set up for this account on this device. Connect to the internet and sign in first.');
+          saveAuthTokens(offlineTokens, true);
+          const snapshot = await getOfflineBulkSnapshot();
+          if (!snapshot || `${snapshot.organizationId}:${snapshot.userId}` !== getOfflineSnapshotIdentity()) {
+            localStorage.removeItem('cephas:auth');
+            throw new Error('The saved workspace does not match this account. Connect to the internet and prepare offline access again.');
+          }
           localStorage.setItem('cephas:offline-active', 'true');
           onView('app');
           return;
         }
         const tokens = await authApi.login({ email: email.trim(), password });
         saveAuthTokens(tokens, remember);
+        localStorage.removeItem('cephas:offline-active');
         const progress = await onboardingApi.get();
         try {
           const profile = await authApi.me();
-          if (window.confirm('Use Cephas Books locally on this device? Your workspace data will be saved in this browser so you can sign in and work when offline. Anyone with access to this browser profile may access the saved data.')) {
+          if (window.confirm('Prepare this device for offline use? Cephas Books will save your workspace records and a protected sign-in verifier in this browser profile. Anyone who can use this browser profile may access saved business data. You can still choose whether to sync changes when internet returns.')) {
             saveAuthTokens(tokens, true);
-            await createOfflineLogin(email, password, profile);
+            const snapshot = await authorizedRequest<OfflineSnapshot>('/offline/snapshot');
+            if (
+              snapshot.version !== 1 ||
+              `${snapshot.organizationId}:${snapshot.userId}` !== getOfflineSnapshotIdentity() ||
+              !snapshot.resources ||
+              snapshot.resourceCount !== Object.keys(snapshot.resources).length
+            )
+              throw new Error('The server returned an invalid offline snapshot.');
+            const result = await cacheBulkWorkspace(snapshot);
+            if (result.saved === 0) throw new Error('No workspace data could be saved. Check your connection and try again.');
+            await createOfflineLogin(email, password, profile, tokens);
             localStorage.setItem('cephas:offline-enabled', 'true');
+            localStorage.setItem('cephas:offline-owner', getOfflineSnapshotIdentity());
+            localStorage.setItem('cephas:offline-prepared-at', new Date().toISOString());
+            localStorage.setItem('cephas:offline-prepared-counts', JSON.stringify(result));
           }
-        } catch { /* offline access is optional; keep cloud sign-in available */ }
+        } catch (caught) {
+          if (caught instanceof Error) window.alert(`Offline setup could not be completed: ${caught.message}`);
+        }
         onView(progress.onboardingCompletedAt ? 'app' : 'onboarding');
       } catch (caught) {
         if (caught instanceof ApiError && caught.status === 0) {
           try {
-            const valid = await verifyOfflineLogin(email, password);
+            const offlineTokens = await restoreOfflineTokens(email, password);
             const profile = getOfflineSnapshot<Awaited<ReturnType<typeof authApi.me>>>('profile');
-            if (valid && profile) {
-              const tokens = sessionStorage.getItem('cephas:auth') ?? localStorage.getItem('cephas:auth');
-              if (tokens && !localStorage.getItem('cephas:auth')) localStorage.setItem('cephas:auth', tokens);
+            if (offlineTokens && profile && profile.email.toLowerCase() === email.trim().toLowerCase()) {
+              saveAuthTokens(offlineTokens, true);
+              const snapshot = await getOfflineBulkSnapshot();
+              if (!snapshot || `${snapshot.organizationId}:${snapshot.userId}` !== getOfflineSnapshotIdentity()) {
+                localStorage.removeItem('cephas:auth');
+                throw new Error('The saved workspace does not match this account.');
+              }
               localStorage.setItem('cephas:offline-active', 'true');
               onView('app');
               return;

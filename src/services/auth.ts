@@ -1,5 +1,5 @@
 import { notifyError } from '@/utils/actions';
-import { enqueueOfflineWrite, getOfflineQueue, getOfflineSnapshot, removeOfflineWrite, saveOfflineSnapshot } from './offline';
+import { cacheBulkWorkspace, clearOfflineApiSnapshots, enqueueOfflineWrite, getOfflineBulkSnapshot, getOfflineQueue, getOfflineSnapshot, isOfflineEnabledForCurrentAccount, removeOfflineWrite, saveOfflineSnapshot, type OfflineSnapshot } from './offline';
 
 export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ?? 'https://cephasbooks-be.onrender.com/api'
@@ -177,6 +177,7 @@ export function saveAuthTokens(tokens: AuthTokens, remember: boolean): void {
 export function clearAuthTokens(): void {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem('cephas:offline-active');
   clearStoredPosCatalogs();
   cacheIdentity = '';
   clearApiCache();
@@ -197,6 +198,10 @@ export function getAuthCacheIdentity(): string {
 }
 
 export async function logoutSession(): Promise<void> {
+  if (!navigator.onLine || localStorage.getItem('cephas:offline-active') === 'true') {
+    clearAuthTokens();
+    return;
+  }
   const refreshToken = getAuthTokens()?.refreshToken;
   try {
     if (refreshToken) await authApi.logout(refreshToken);
@@ -320,6 +325,115 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
   const branchId = localStorage.getItem('cephas:active-branch') ?? '';
   const key = `${cacheIdentity}:${branchId}:${path}`;
   if (!navigator.onLine || localStorage.getItem('cephas:offline-active') === 'true') {
+    const bulk = await getOfflineBulkSnapshot();
+    if (
+      bulk?.version === 1 &&
+      bulk.resources &&
+      `${bulk.organizationId}:${bulk.userId}` === cacheIdentity
+    ) {
+      const basePath = path.split('?')[0];
+      const query = new URLSearchParams(path.split('?')[1] ?? '');
+      const page = Math.max(1, Number(query.get('page')) || 1);
+      const limit = Math.min(100, Math.max(1, Number(query.get('limit')) || 100));
+      const pageResponse = (rows: unknown[]) => ({
+        data: rows.slice((page - 1) * limit, page * limit),
+        meta: { page, limit, total: rows.length, totalPages: Math.max(1, Math.ceil(rows.length / limit)) },
+      });
+
+      if (basePath === '/customers') {
+        const source = bulk.resources['/customers?limit=100&search='] as { data?: Array<Record<string, unknown>> } | undefined;
+        const search = query.get('search')?.toLowerCase() ?? '';
+        if (source && Array.isArray(source.data)) {
+          const filtered = source.data.filter((row) => !search || String(row.displayName ?? '').toLowerCase().includes(search));
+          const response = pageResponse(filtered);
+          return { data: response.data, meta: { page, limit, total: filtered.length, pages: response.meta.totalPages } } as T;
+        }
+      }
+
+      if (basePath === '/pos/sales') {
+        const source = bulk.resources['/pos/sales?limit=100&page=1'] as { data?: Array<Record<string, unknown>> } | undefined;
+        if (source && Array.isArray(source.data)) {
+          const from = query.get('from');
+          const to = query.get('to');
+          const customerId = query.get('customerId');
+          const search = query.get('search')?.toLowerCase() ?? '';
+          const filtered = source.data.filter((sale) => {
+            const createdAt = new Date(String(sale.createdAt ?? '')).getTime();
+            const customer = sale.customer as Record<string, unknown> | null;
+            return (!from || createdAt >= new Date(from).getTime()) &&
+              (!to || createdAt < new Date(`${to}T23:59:59.999`).getTime() + 1) &&
+              (!customerId || sale.customerId === customerId) &&
+              (!search || `${sale.receiptNumber ?? ''} ${customer?.displayName ?? ''}`.toLowerCase().includes(search));
+          });
+          return pageResponse(filtered) as T;
+        }
+      }
+
+      if (basePath === '/banking/transactions') {
+        const source = bulk.resources['/banking/transactions?'] as { data?: Array<Record<string, unknown>> } | undefined;
+        if (source && Array.isArray(source.data)) {
+          const filtered = source.data.filter((transaction) => {
+            const account = transaction.bankAccount as Record<string, unknown> | undefined;
+            const search = query.get('search')?.toLowerCase() ?? '';
+            const date = new Date(String(transaction.transactionDate ?? '')).getTime();
+            const to = query.get('to');
+            return (!query.get('accountId') || transaction.bankAccountId === query.get('accountId')) &&
+              (!query.get('type') || transaction.type === query.get('type')) &&
+              (!query.get('status') || transaction.reconciliationStatus === query.get('status')) &&
+              (!query.get('from') || date >= new Date(query.get('from')!).getTime()) &&
+              (!to || date < new Date(`${to}T23:59:59.999`).getTime() + 1) &&
+              (!search || `${transaction.name ?? ''} ${transaction.description ?? ''} ${transaction.reference ?? ''} ${account?.name ?? ''}`.toLowerCase().includes(search));
+          });
+          const response = pageResponse(filtered);
+          return { data: response.data, meta: { page, limit, total: filtered.length, pages: response.meta.totalPages } } as T;
+        }
+      }
+
+      if (basePath === '/operations/products-page') {
+        const source = bulk.resources['/operations/products?'];
+        const rows = Array.isArray(source) ? source as Array<Record<string, unknown>> : [];
+        const search = query.get('search')?.toLowerCase() ?? '';
+        const status = query.get('status') ?? '';
+        const category = query.get('category')?.toLowerCase() ?? '';
+        const filtered = rows.filter((row) => {
+          const matchesSearch = !search || [row.name, row.sku, row.category].some((value) => String(value ?? '').toLowerCase().includes(search));
+          const matchesStatus = status === 'active' ? row.isActive === true : status === 'archived' ? row.isActive === false : status === 'low_stock' ? Number(row.stockQuantity) > 0 && Number(row.stockQuantity) <= Number(row.reorderLevel) : status === 'out_of_stock' ? Number(row.stockQuantity) <= 0 : true;
+          const matchesCategory = !category || String(row.category ?? '').toLowerCase() === category;
+          return matchesSearch && matchesStatus && matchesCategory;
+        });
+        const page = Math.max(1, Number(query.get('page')) || 1);
+        const limit = Math.min(100, Math.max(1, Number(query.get('limit')) || 15));
+        const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
+        return {
+          data: filtered.slice((page - 1) * limit, page * limit),
+          meta: { page, limit, total: filtered.length, totalPages },
+        } as T;
+      }
+      if (Object.prototype.hasOwnProperty.call(bulk.resources, path))
+        return bulk.resources[path] as T;
+      const compatiblePath = Object.keys(bulk.resources).find((resourcePath) =>
+        resourcePath === basePath || resourcePath.startsWith(`${basePath}?`),
+      );
+      if (compatiblePath) {
+        const resource = bulk.resources[compatiblePath];
+        if (Array.isArray(resource)) {
+          const search = query.get('search')?.toLowerCase() ?? '';
+          const status = query.get('status') ?? '';
+          const type = query.get('type') ?? '';
+          const unread = query.get('unread');
+          const archived = query.get('archived');
+          return resource.filter((value) => {
+            const row = value as Record<string, unknown>;
+            return (!search || JSON.stringify(row).toLowerCase().includes(search)) &&
+              (!status || row.status === status || (status === 'active' && row.isActive === true) || (status === 'archived' && row.isActive === false)) &&
+              (!type || row.type === type) &&
+              (!unread || row.isRead === (unread !== 'true')) &&
+              (!archived || row.isArchived === (archived === 'true'));
+          }) as T;
+        }
+        return resource as T;
+      }
+    }
     const saved = getOfflineSnapshot<T>(`api:${key}`);
     if (saved !== null) return saved;
     throw new ApiError('This section has not been saved for offline use on this device yet.', 0);
@@ -333,7 +447,10 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
   const request = performAuthorizedRequest<T>(path, init)
     .then((payload) => {
       if (generation === cacheGeneration) responseCache.set(key, payload);
-      saveOfflineSnapshot(`api:${key}`, payload);
+      if (
+        path !== '/offline/snapshot' &&
+        !isOfflineEnabledForCurrentAccount()
+      ) saveOfflineSnapshot(`api:${key}`, payload);
       return payload;
     })
     .finally(() => {
@@ -344,10 +461,18 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
 }
 
 export async function syncOfflineChanges(): Promise<void> {
-  localStorage.removeItem('cephas:offline-active');
   for (const item of getOfflineQueue()) {
     await performAuthorizedRequest(item.path, { method: item.method, body: item.body });
     removeOfflineWrite(item.id);
   }
+  localStorage.removeItem('cephas:offline-active');
   clearApiCache();
+  clearOfflineApiSnapshots();
+}
+
+export async function refreshOfflineWorkspace(): Promise<void> {
+  clearOfflineApiSnapshots();
+  clearApiCache();
+  const snapshot = await authorizedRequest<OfflineSnapshot>('/offline/snapshot');
+  await cacheBulkWorkspace(snapshot);
 }

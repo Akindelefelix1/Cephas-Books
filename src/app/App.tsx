@@ -53,8 +53,9 @@ import { can, canAccessRoute } from '@/utils/permissions';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { CommercePage } from '@/pages/CommercePage';
 import type { CommerceView } from '@/services/commerce';
-import { getOfflineQueue } from '@/services/offline';
-import { syncOfflineChanges } from '@/services/auth';
+import { getOfflineQueue, isOfflineEnabledForCurrentAccount } from '@/services/offline';
+import { refreshOfflineWorkspace, syncOfflineChanges } from '@/services/auth';
+import { getQueuedPosSales, syncQueuedPosSales } from '@/services/pos';
 
 const marketingViews = ['platform', 'solutions', 'pricing', 'security', 'resources'] as const;
 const authViews = ['login', 'register', 'forgot', 'mfa'] as const;
@@ -90,13 +91,32 @@ export function App() {
   const [logoutConfirmation, setLogoutConfirmation] = useState<Confirmation | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState('');
-  const [offlineCount, setOfflineCount] = useState(() => getOfflineQueue().length);
+  const [offlineCount, setOfflineCount] = useState(() => getOfflineQueue().length + getQueuedPosSales().length);
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
-  const [syncMessage, setSyncMessage] = useState('');
+  const [syncMessage, setSyncMessage] = useState(() => {
+    if (!isOfflineEnabledForCurrentAccount()) return '';
+    try {
+      const counts = JSON.parse(localStorage.getItem('cephas:offline-prepared-counts') ?? '{}') as { saved?: number; failed?: number };
+      return `Offline workspace ready · ${counts.saved ?? 0} sections saved${counts.failed ? ` · ${counts.failed} unavailable` : ''}`;
+    } catch { return 'Offline workspace is enabled on this device.'; }
+  });
   const [identityReady, setIdentityReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(
     () => localStorage.getItem('cephas:onboarding-complete') === 'true',
   );
+  const requestCloudSync = async () => {
+    if (!navigator.onLine) return;
+    if (!window.confirm('Back up your offline changes and refresh your saved workspace from the cloud now? Choose Cancel to keep working locally.')) return;
+    try {
+      await syncOfflineChanges();
+      await syncQueuedPosSales();
+      await refreshOfflineWorkspace();
+      setSyncMessage('Your approved changes are backed up and your workspace is up to date.');
+    } catch (caught) {
+      setSyncMessage(caught instanceof Error ? `Sync paused: ${caught.message}` : 'Sync paused. Try again when connected.');
+    }
+    setOfflineCount(getOfflineQueue().length + getQueuedPosSales().length);
+  };
   const [identity, setIdentity] = useState({
     firstName: '',
     lastName: '',
@@ -123,19 +143,11 @@ export function App() {
       routerNavigate('/login', { replace: true });
   }, [routerNavigate, view]);
   useEffect(() => {
-    const refreshCount = () => setOfflineCount(getOfflineQueue().length);
-    const onOnline = async () => {
+    const refreshCount = () => setOfflineCount(getOfflineQueue().length + getQueuedPosSales().length);
+    const onOnline = () => {
       refreshCount();
-      if (!localStorage.getItem('cephas:offline-enabled')) return;
-      if (window.confirm('Internet is available. Back up your pending offline changes and refresh your cloud workspace now?')) {
-        try {
-          await syncOfflineChanges();
-          setSyncMessage('Your offline changes have been sent to the cloud.');
-        } catch (caught) {
-          setSyncMessage(caught instanceof Error ? `Sync paused: ${caught.message}` : 'Sync paused. Try again when connected.');
-        }
-      }
-      refreshCount();
+      if (isOfflineEnabledForCurrentAccount() || getOfflineQueue().length || getQueuedPosSales().length)
+        void requestCloudSync();
     };
     const onInstall = (event: Event) => {
       event.preventDefault();
@@ -144,7 +156,7 @@ export function App() {
     window.addEventListener('cephas:sync-state', refreshCount);
     window.addEventListener('online', onOnline);
     window.addEventListener('beforeinstallprompt', onInstall);
-    if (navigator.onLine && localStorage.getItem('cephas:offline-active') === 'true') void onOnline();
+    if (navigator.onLine && localStorage.getItem('cephas:offline-active') === 'true') onOnline();
     return () => {
       window.removeEventListener('cephas:sync-state', refreshCount);
       window.removeEventListener('online', onOnline);
@@ -469,10 +481,15 @@ export function App() {
       {(!navigator.onLine || offlineCount > 0 || installPrompt || syncMessage) && (
         <aside className="offline-banner" role="status">
           <span>{!navigator.onLine ? `Offline mode · ${offlineCount} change${offlineCount === 1 ? '' : 's'} waiting to sync` : offlineCount ? `${offlineCount} offline change${offlineCount === 1 ? '' : 's'} waiting to sync` : syncMessage || 'Use Cephas Books as an app on this device.'}</span>
-          {installPrompt && <button className="button button--small" onClick={async () => {
-            const prompt = installPrompt as Event & { prompt?: () => Promise<void> };
-            await prompt.prompt?.();
-            setInstallPrompt(null);
+          {navigator.onLine && (offlineCount > 0 || isOfflineEnabledForCurrentAccount()) && <button className="button button--small button--ghost" onClick={() => void requestCloudSync()}>Back up &amp; sync</button>}
+          {(installPrompt || (isOfflineEnabledForCurrentAccount() && !window.matchMedia('(display-mode: standalone)').matches)) && <button className="button button--small" onClick={async () => {
+            const prompt = installPrompt as (Event & { prompt?: () => Promise<void> }) | null;
+            if (prompt?.prompt) {
+              await prompt.prompt();
+              setInstallPrompt(null);
+            } else {
+              window.alert('To add a Cephas Books shortcut, open your browser menu and choose Install app or Add to Home screen.');
+            }
           }}>Add app shortcut</button>}
           {syncMessage && <button className="button button--small button--ghost" onClick={() => setSyncMessage('')}>Dismiss</button>}
         </aside>

@@ -18,7 +18,7 @@ import { Logo } from '@/components/brand/Logo';
 import { allNavigation, primaryNavigation, secondaryNavigation } from '@/data/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { can, canAccessRoute } from '@/utils/permissions';
-import { getQueuedPosSales, syncQueuedPosSales } from '@/services/pos';
+import { getQueuedPosSales } from '@/services/pos';
 
 interface AppShellProps extends PropsWithChildren {
   active: string;
@@ -42,17 +42,14 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
   const [queuedSales, setQueuedSales] = useState(() => getQueuedPosSales().length);
   useEffect(() => {
     const refresh = () => { setOnline(navigator.onLine); setQueuedSales(getQueuedPosSales().length); };
-    const sync = () => { void syncQueuedPosSales().catch(() => undefined); refresh(); };
-    window.addEventListener('online', sync);
+    window.addEventListener('online', refresh);
     window.addEventListener('offline', refresh);
     window.addEventListener('cephas:sync-state', refresh);
-    const retryTimer = window.setInterval(sync, 15000);
-    sync();
+    refresh();
     return () => {
-      window.removeEventListener('online', sync);
+      window.removeEventListener('online', refresh);
       window.removeEventListener('offline', refresh);
       window.removeEventListener('cephas:sync-state', refresh);
-      window.clearInterval(retryTimer);
     };
   }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
