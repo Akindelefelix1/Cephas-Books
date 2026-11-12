@@ -60,6 +60,10 @@ import { appDialog } from '@/utils/appDialogs';
 
 const marketingViews = ['platform', 'solutions', 'pricing', 'security', 'resources'] as const;
 const authViews = ['login', 'register', 'forgot', 'mfa'] as const;
+interface InstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice?: Promise<{ outcome: 'accepted' | 'dismissed'; platform?: string }>;
+}
 const appPageIds = new Set([
   'profile',
   ...Object.keys(modules),
@@ -93,7 +97,8 @@ export function App() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const [offlineCount, setOfflineCount] = useState(() => getOfflineQueue().length + getQueuedPosSales().length);
-  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState(() => {
     if (!isOfflineEnabledForCurrentAccount()) return '';
     try {
@@ -156,7 +161,8 @@ export function App() {
     };
     const onInstall = (event: Event) => {
       event.preventDefault();
-      setInstallPrompt(event);
+      if ('prompt' in event && typeof event.prompt === 'function')
+        setInstallPrompt(event as InstallPromptEvent);
     };
     window.addEventListener('cephas:sync-state', refreshCount);
     window.addEventListener('online', onOnline);
@@ -487,15 +493,7 @@ export function App() {
         <aside className="offline-banner" role="status">
           <span>{!navigator.onLine ? `Offline mode · ${offlineCount} change${offlineCount === 1 ? '' : 's'} waiting to sync` : offlineCount ? `${offlineCount} offline change${offlineCount === 1 ? '' : 's'} waiting to sync` : syncMessage || 'Use Cephas Books as an app on this device.'}</span>
           {navigator.onLine && (offlineCount > 0 || isOfflineEnabledForCurrentAccount()) && <button className="button button--small button--ghost" onClick={() => void requestCloudSync()}>Back up &amp; sync</button>}
-          {(installPrompt || (isOfflineEnabledForCurrentAccount() && !window.matchMedia('(display-mode: standalone)').matches)) && <button className="button button--small" onClick={async () => {
-            const prompt = installPrompt as (Event & { prompt?: () => Promise<void> }) | null;
-            if (prompt?.prompt) {
-              await prompt.prompt();
-              setInstallPrompt(null);
-            } else {
-              void appDialog('Add an app shortcut', 'Open your browser menu and choose “Install app” or “Add to Home screen” to create a Cephas Books shortcut.');
-            }
-          }}>Add app shortcut</button>}
+          {(installPrompt || (isOfflineEnabledForCurrentAccount() && !window.matchMedia('(display-mode: standalone)').matches)) && <button className="button button--small" onClick={() => setInstallDialogOpen(true)}>Add app shortcut</button>}
           {syncMessage && <button className="button button--small button--ghost" onClick={() => setSyncMessage('')}>Dismiss</button>}
         </aside>
       )}
@@ -515,6 +513,40 @@ export function App() {
         error={logoutError}
         onClose={() => setLogoutConfirmation(null)}
       />
+      <Modal
+        open={installDialogOpen}
+        title="Add Cephas Books to this device?"
+        subtitle="Open Cephas Books in its own app window and launch it again from your device."
+        onClose={() => setInstallDialogOpen(false)}
+        footer={
+          <>
+            <button className="button button--secondary" onClick={() => setInstallDialogOpen(false)}>
+              Cancel
+            </button>
+            <button
+              className="button"
+              onClick={async () => {
+                const prompt = installPrompt;
+                setInstallDialogOpen(false);
+                if (prompt) {
+                  await prompt.prompt();
+                  await prompt.userChoice?.catch(() => undefined);
+                  setInstallPrompt(null);
+                } else {
+                  void appDialog(
+                    'Finish adding the shortcut',
+                    'Open your browser menu and choose “Install app” or “Add to Home screen”.',
+                  );
+                }
+              }}
+            >
+              Continue to install
+            </button>
+          </>
+        }
+      >
+        <p>Your browser will ask you to confirm before it installs the app.</p>
+      </Modal>
     </AppShell>
   );
 }
