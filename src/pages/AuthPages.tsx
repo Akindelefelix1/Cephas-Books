@@ -15,6 +15,7 @@ import { ApiError, authApi, authorizedRequest, saveAuthTokens } from '@/services
 import { onboardingApi, onboardingSteps } from '@/services/onboarding';
 import { useEffect } from 'react';
 import { confirmAction } from '@/utils/actions';
+import { appDialog } from '@/utils/appDialogs';
 import type { View } from '@/types/app';
 import { cacheBulkWorkspace, createOfflineLogin, getOfflineBulkSnapshot, getOfflineSnapshot, getOfflineSnapshotIdentity, restoreOfflineTokens, type OfflineSnapshot } from '@/services/offline';
 
@@ -160,7 +161,11 @@ export function AuthPage({
         const progress = await onboardingApi.get();
         try {
           const profile = await authApi.me();
-          if (window.confirm('Prepare this device for offline use? Cephas Books will save your workspace records and a protected sign-in verifier in this browser profile. Anyone who can use this browser profile may access saved business data. You can still choose whether to sync changes when internet returns.')) {
+          if (await appDialog(
+            'Prepare this device for offline use?',
+            'Cephas Books will save workspace records and a protected sign-in verifier in this browser profile. Anyone who can use this browser profile may access saved business data. You can choose whether to sync changes when internet returns.',
+            { confirmLabel: 'Prepare device', cancelLabel: 'Not now' },
+          )) {
             saveAuthTokens(tokens, true);
             const snapshot = await authorizedRequest<OfflineSnapshot>('/offline/snapshot');
             if (
@@ -179,7 +184,7 @@ export function AuthPage({
             localStorage.setItem('cephas:offline-prepared-counts', JSON.stringify(result));
           }
         } catch (caught) {
-          if (caught instanceof Error) window.alert(`Offline setup could not be completed: ${caught.message}`);
+          if (caught instanceof Error) await appDialog('Offline setup could not be completed', caught.message);
         }
         onView(progress.onboardingCompletedAt ? 'app' : 'onboarding');
       } catch (caught) {

@@ -56,6 +56,7 @@ import type { CommerceView } from '@/services/commerce';
 import { getOfflineQueue, isOfflineEnabledForCurrentAccount } from '@/services/offline';
 import { refreshOfflineWorkspace, syncOfflineChanges } from '@/services/auth';
 import { getQueuedPosSales, syncQueuedPosSales } from '@/services/pos';
+import { appDialog } from '@/utils/appDialogs';
 
 const marketingViews = ['platform', 'solutions', 'pricing', 'security', 'resources'] as const;
 const authViews = ['login', 'register', 'forgot', 'mfa'] as const;
@@ -106,7 +107,11 @@ export function App() {
   );
   const requestCloudSync = async () => {
     if (!navigator.onLine) return;
-    if (!window.confirm('Back up your offline changes and refresh your saved workspace from the cloud now? Choose Cancel to keep working locally.')) return;
+    if (!await appDialog(
+      'Back up and sync',
+      'Send queued changes to your cloud workspace and refresh the saved offline copy? You can keep working locally by cancelling.',
+      { confirmLabel: 'Back up and sync', cancelLabel: 'Keep working locally' },
+    )) return;
     try {
       await syncOfflineChanges();
       await syncQueuedPosSales();
@@ -488,7 +493,7 @@ export function App() {
               await prompt.prompt();
               setInstallPrompt(null);
             } else {
-              window.alert('To add a Cephas Books shortcut, open your browser menu and choose Install app or Add to Home screen.');
+              void appDialog('Add an app shortcut', 'Open your browser menu and choose “Install app” or “Add to Home screen” to create a Cephas Books shortcut.');
             }
           }}>Add app shortcut</button>}
           {syncMessage && <button className="button button--small button--ghost" onClick={() => setSyncMessage('')}>Dismiss</button>}

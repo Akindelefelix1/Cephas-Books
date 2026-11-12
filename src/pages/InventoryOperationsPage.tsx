@@ -18,6 +18,7 @@ import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
+import { appDialog } from '@/utils/appDialogs';
 import {
   INVENTORY_CHANGED_EVENT,
   operationsApi,
@@ -178,10 +179,11 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   };
   const productAction = async (kind: 'status' | 'delete') => {
     if (!detail) return;
-    if (
-      kind === 'delete' &&
-      !window.confirm(`Permanently delete ${detail.name}? This cannot be undone.`)
-    )
+    if (kind === 'delete' && !await appDialog(
+      'Permanently delete product?',
+      `Delete ${detail.name}? This cannot be undone.`,
+      { confirmLabel: 'Delete product', cancelLabel: 'Cancel' },
+    ))
       return;
     setActionBusy(kind);
     setError('');

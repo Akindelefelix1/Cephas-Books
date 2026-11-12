@@ -4,6 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
+import { appDialog } from '@/utils/appDialogs';
 import {
   insightsApi,
   type AiInsight,
@@ -342,10 +343,9 @@ function SavedReportsPage({ canEdit, canDelete }: { canEdit: boolean; canDelete:
                         {canDelete && (
                           <button
                             disabled={busy}
-                            onClick={() =>
-                              window.confirm(`Delete ${x.name}?`) &&
-                              void run(() => insightsApi.deleteReport(x.id), 'Report deleted')
-                            }
+                            onClick={() => void appDialog('Delete saved report?', `Delete ${x.name}?`, { confirmLabel: 'Delete report', cancelLabel: 'Cancel' }).then((confirmed) => {
+                              if (confirmed) void run(() => insightsApi.deleteReport(x.id), 'Report deleted');
+                            })}
                           >
                             <Trash2 size={15} />
                           </button>
@@ -549,16 +549,15 @@ function AiPage({ canManage }: { canManage: boolean }) {
         {canManage && rows.length > 0 && (
           <button
             className="button button--secondary"
-            onClick={() =>
-              window.confirm('Clear all AI history?') &&
-              void insightsApi
+            onClick={() => void appDialog('Clear AI history?', 'This will permanently remove all saved AI conversations.', { confirmLabel: 'Clear history', cancelLabel: 'Cancel' }).then((confirmed) => {
+              if (confirmed) void insightsApi
                 .clearAi()
                 .then(() => {
                   setRows([]);
                   confirmAction('AI history cleared');
                 })
-                .catch((e: Error) => setError(e.message))
-            }
+                .catch((e: Error) => setError(e.message));
+            })}
           >
             Clear history
           </button>
@@ -759,10 +758,9 @@ function SyncPage({ canEdit, canDelete }: { canEdit: boolean; canDelete: boolean
                         {canDelete && (
                           <button
                             disabled={busy}
-                            onClick={() =>
-                              window.confirm(`Delete ${x.name}?`) &&
-                              void run(() => insightsApi.deleteWorkbook(x.id), 'Connection deleted')
-                            }
+                            onClick={() => void appDialog('Delete workbook connection?', `Delete ${x.name}?`, { confirmLabel: 'Delete connection', cancelLabel: 'Cancel' }).then((confirmed) => {
+                              if (confirmed) void run(() => insightsApi.deleteWorkbook(x.id), 'Connection deleted');
+                            })}
                           >
                             <Trash2 size={15} />
                           </button>

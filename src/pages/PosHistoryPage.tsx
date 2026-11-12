@@ -26,6 +26,8 @@ const paymentLabel = (method: string) =>
   ] ?? method;
 const quantityLabel = (value: number) =>
   new Intl.NumberFormat('en-NG', { maximumFractionDigits: 3 }).format(value);
+const localDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 export function PosHistoryPage({
   canReprint = false,
@@ -41,6 +43,10 @@ export function PosHistoryPage({
   const [sales, setSales] = useState<PosSale[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [page, setPage] = useState(1);
+  const [historyMonth, setHistoryMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [filters, setFilters] = useState({ search: '', from: '', to: '', customerId: '' });
   const [selectedSale, setSelectedSale] = useState<PosSale | null>(null);
@@ -67,20 +73,27 @@ export function PosHistoryPage({
       .catch(() => undefined);
   }, []);
   useEffect(() => {
+    const from = localDateKey(new Date(historyMonth.getFullYear(), historyMonth.getMonth(), 1));
+    const to = localDateKey(new Date(historyMonth.getFullYear(), historyMonth.getMonth() + 1, 0));
     const query = Object.fromEntries(
-      Object.entries({ ...filters, page: String(page), limit: '10' }).filter(([, value]) => value),
+      Object.entries({ ...filters, from, to, page: String(page), limit: '10' }).filter(([, value]) => value),
     );
     if (includeVoided) query.includeVoided = 'true';
+    let active = true;
     void posApi
       .sales(query)
       .then((result) => {
-        setSales(result.data);
-        setMeta(result.meta);
+        if (active) {
+          setSales(result.data);
+          setMeta(result.meta);
+          setError('');
+        }
       })
-      .catch((caught) =>
-        setError(caught instanceof Error ? caught.message : 'Unable to load sales history'),
-      );
-  }, [filters, includeVoided, page]);
+      .catch((caught) => {
+        if (active) setError(caught instanceof Error ? caught.message : 'Unable to load sales history');
+      });
+    return () => { active = false; };
+  }, [filters, historyMonth, includeVoided, page]);
   useEffect(() => {
     let active = true;
     const loadAnnualSales = async () => {
@@ -114,6 +127,13 @@ export function PosHistoryPage({
   const updateFilter = (key: keyof typeof filters, value: string) => {
     setPage(1);
     setFilters((current) => ({ ...current, [key]: value }));
+  };
+  const currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const isCurrentMonth = historyMonth.getFullYear() === currentMonth.getFullYear() &&
+    historyMonth.getMonth() === currentMonth.getMonth();
+  const changeHistoryMonth = (offset: number) => {
+    setPage(1);
+    setHistoryMonth((month) => new Date(month.getFullYear(), month.getMonth() + offset, 1));
   };
   const openSale = (sale: PosSale) => {
     setSelectedSale(sale);
@@ -328,28 +348,34 @@ export function PosHistoryPage({
         )}
       </section>
       <section className="panel pos-history-filters">
-        <label>
+        <div className="pos-history-month-nav">
+          <button
+            type="button"
+            className="button button--secondary button--small"
+            aria-label="Show previous month"
+            onClick={() => changeHistoryMonth(-1)}
+          >
+            <ChevronLeft size={16} /> Previous month
+          </button>
+          <h2 aria-live="polite">
+            {historyMonth.toLocaleDateString('en-NG', { month: 'long', year: 'numeric' })}
+          </h2>
+          <button
+            type="button"
+            className="button button--secondary button--small"
+            aria-label="Show next month"
+            disabled={isCurrentMonth}
+            onClick={() => changeHistoryMonth(1)}
+          >
+            Next month <ChevronRight size={16} />
+          </button>
+        </div>
+        <label className="pos-history-search">
           <Search size={16} />{' '}
           <input
             placeholder="Receipt number or customer"
             value={filters.search}
             onChange={(event) => updateFilter('search', event.target.value)}
-          />
-        </label>
-        <label>
-          From{' '}
-          <input
-            type="date"
-            value={filters.from}
-            onChange={(event) => updateFilter('from', event.target.value)}
-          />
-        </label>
-        <label>
-          To{' '}
-          <input
-            type="date"
-            value={filters.to}
-            onChange={(event) => updateFilter('to', event.target.value)}
           />
         </label>
         <label>

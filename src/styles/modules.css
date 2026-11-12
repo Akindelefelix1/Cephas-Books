@@ -1119,11 +1119,25 @@
 }
 .pos-history-filters {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1.4fr;
+  grid-template-columns: 2fr 1.4fr;
   gap: 12px;
   padding: 18px;
   margin-bottom: 16px;
   align-items: end;
+}
+.pos-history-month-nav {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+.pos-history-month-nav h2 {
+  margin: 0;
+  color: #182230;
+  font-size: 1rem;
+  text-align: center;
 }
 .pos-history-filters > label,
 .pos-history-filters input,
@@ -1285,7 +1299,7 @@
   font-size: 0.75rem;
   font-weight: 700;
 }
-.pos-history-filters label:first-child {
+.pos-history-filters .pos-history-search {
   flex-direction: row;
   align-items: center;
   align-self: end;
@@ -1293,7 +1307,7 @@
   border-radius: 8px;
   padding: 0 10px;
 }
-.pos-history-filters label:first-child input {
+.pos-history-filters .pos-history-search input {
   border: 0;
   padding-left: 0;
 }
@@ -1380,7 +1394,7 @@
   .pos-history-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .pos-history-filters > label:first-child {
+  .pos-history-filters .pos-history-search {
     grid-column: 1 / -1;
   }
   .pos-sales-analytics__header {

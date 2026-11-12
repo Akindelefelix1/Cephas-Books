@@ -4,6 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction } from '@/utils/actions';
+import { appDialog } from '@/utils/appDialogs';
 import {
   workflowApi,
   type AppNotification,
@@ -345,10 +346,9 @@ function RecordsTable({
                         <button
                           aria-label="Delete document"
                           disabled={busy}
-                          onClick={() =>
-                            window.confirm('Permanently delete this document?') &&
-                            void onRun(() => workflowApi.deleteDocument(row.id), 'Document deleted')
-                          }
+                          onClick={() => void appDialog('Delete document?', 'Permanently delete this document?', { confirmLabel: 'Delete document', cancelLabel: 'Cancel' }).then((confirmed) => {
+                            if (confirmed) void onRun(() => workflowApi.deleteDocument(row.id), 'Document deleted');
+                          })}
                         >
                           <Trash2 size={15} />
                         </button>
@@ -415,10 +415,9 @@ function RecordsTable({
                         <button
                           aria-label="Delete workflow"
                           disabled={busy}
-                          onClick={() =>
-                            window.confirm('Delete this workflow?') &&
-                            void onRun(() => workflowApi.deleteRule(row.id), 'Workflow deleted')
-                          }
+                          onClick={() => void appDialog('Delete workflow?', 'This workflow will be permanently deleted.', { confirmLabel: 'Delete workflow', cancelLabel: 'Cancel' }).then((confirmed) => {
+                            if (confirmed) void onRun(() => workflowApi.deleteRule(row.id), 'Workflow deleted');
+                          })}
                         >
                           <Trash2 size={15} />
                         </button>
