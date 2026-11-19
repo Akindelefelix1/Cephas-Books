@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
   FileText,
   Landmark,
+  LoaderCircle,
   ReceiptText,
   ShoppingCart,
   WalletCards,
@@ -98,6 +99,8 @@ export function App() {
   const [logoutError, setLogoutError] = useState('');
   const [offlineCount, setOfflineCount] = useState(() => getOfflineQueue().length + getQueuedPosSales().length);
   const [offlineMode, setOfflineMode] = useState(() => isWorkingOffline());
+  const [syncing, setSyncing] = useState(false);
+  const syncInProgress = useRef(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState(() => {
@@ -112,12 +115,14 @@ export function App() {
     () => localStorage.getItem('cephas:onboarding-complete') === 'true',
   );
   const requestCloudSync = async () => {
-    if (!navigator.onLine) return;
+    if (!navigator.onLine || syncInProgress.current) return;
     if (!await appDialog(
       'Back up and sync',
       'Send queued changes to your cloud workspace and refresh the saved offline copy? You can keep working locally by cancelling.',
       { confirmLabel: 'Back up and sync', cancelLabel: 'Keep working locally' },
     )) return;
+    syncInProgress.current = true;
+    setSyncing(true);
     try {
       await syncOfflineChanges();
       await syncQueuedPosSales();
@@ -126,6 +131,9 @@ export function App() {
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 0) activateOfflineMode();
       setSyncMessage(caught instanceof Error ? `Sync paused: ${caught.message}` : 'Sync paused. Try again when connected.');
+    } finally {
+      syncInProgress.current = false;
+      setSyncing(false);
     }
     setOfflineCount(getOfflineQueue().length + getQueuedPosSales().length);
   };
@@ -518,6 +526,17 @@ export function App() {
         error={logoutError}
         onClose={() => setLogoutConfirmation(null)}
       />
+      <Modal
+        open={syncing}
+        title="Backing up and syncing"
+        subtitle="Please keep this window open while we send queued changes and refresh your saved offline workspace."
+        onClose={() => undefined}
+      >
+        <div className="sync-progress" role="status" aria-live="polite">
+          <LoaderCircle className="spin" size={22} aria-hidden="true" />
+          <span>Sync in progress…</span>
+        </div>
+      </Modal>
       <Modal
         open={installDialogOpen}
         title="Add Cephas Books to this device?"

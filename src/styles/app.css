@@ -1444,3 +1444,15 @@
   color: #233879;
   font-size: .875rem;
 }
+.sync-progress {
+  display: flex;
+  min-height: 96px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #344054;
+  font-weight: 650;
+}
+.sync-progress .spin {
+  color: #1838ce;
+}
