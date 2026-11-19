@@ -466,49 +466,6 @@ export function PosHistoryPage({
             )}
           </tbody>
         </table>
-        <div className="pos-history-cards">
-          {sales.map((sale) => (
-            <article className="pos-history-card" key={sale.id}>
-              <header>
-                <div>
-                  <strong>{sale.receiptNumber}</strong>
-                  <time>{new Date(sale.createdAt).toLocaleString()}</time>
-                </div>
-                <span className={`badge ${sale.status === 'VOIDED' ? 'badge--danger' : 'badge--success'}`}>
-                  <i /> {sale.status}
-                </span>
-              </header>
-              <dl>
-                <div>
-                  <dt>Customer</dt>
-                  <dd>{sale.customer?.displayName ?? 'Walk-in customer'}</dd>
-                </div>
-                <div>
-                  <dt>Payment</dt>
-                  <dd>{sale.payments.map((payment) => paymentLabel(payment.method)).join(', ')}</dd>
-                </div>
-                <div>
-                  <dt>Discount</dt>
-                  <dd>{money(Number(sale.discountTotal || 0), sale.currency)}</dd>
-                </div>
-                <div>
-                  <dt>Total</dt>
-                  <dd className="pos-history-card__total">
-                    {money(Number(sale.total), sale.currency)}
-                  </dd>
-                </div>
-              </dl>
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => openSale(sale)}
-              >
-                <ReceiptText size={16} /> View receipt
-              </button>
-            </article>
-          ))}
-          {!sales.length && <p className="pos-history-cards__empty">No sales match these filters.</p>}
-        </div>
         <div className="table-pagination">
           <p>
             Showing{' '}
