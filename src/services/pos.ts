@@ -1,4 +1,5 @@
 import { authorizedRequest, getAuthCacheIdentity } from './auth';
+import { activateOfflineMode } from './offline';
 export interface PosSale {
   id: string;
   receiptNumber: string;
@@ -68,7 +69,7 @@ export function getQueuedPosSales(): QueuedPosSale[] {
 export function queuePosSale(payload: Record<string, unknown>): QueuedPosSale {
   const entry = { id: String(payload.idempotencyKey), queuedAt: new Date().toISOString(), payload };
   localStorage.setItem(posOutboxKey(), JSON.stringify([...getQueuedPosSales(), entry]));
-  window.dispatchEvent(new Event('cephas:sync-state'));
+  activateOfflineMode();
   return entry;
 }
 export function syncQueuedPosSales(): Promise<void> {

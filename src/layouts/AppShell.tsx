@@ -19,6 +19,7 @@ import { allNavigation, primaryNavigation, secondaryNavigation } from '@/data/na
 import { Modal } from '@/components/ui/Modal';
 import { can, canAccessRoute } from '@/utils/permissions';
 import { getQueuedPosSales } from '@/services/pos';
+import { isWorkingOffline } from '@/services/offline';
 
 interface AppShellProps extends PropsWithChildren {
   active: string;
@@ -38,10 +39,10 @@ interface AppShellProps extends PropsWithChildren {
 
 export function AppShell({ active, onNavigate, onQuickCreate, identity, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [online, setOnline] = useState(navigator.onLine);
+  const [online, setOnline] = useState(!isWorkingOffline());
   const [queuedSales, setQueuedSales] = useState(() => getQueuedPosSales().length);
   useEffect(() => {
-    const refresh = () => { setOnline(navigator.onLine); setQueuedSales(getQueuedPosSales().length); };
+    const refresh = () => { setOnline(!isWorkingOffline()); setQueuedSales(getQueuedPosSales().length); };
     window.addEventListener('online', refresh);
     window.addEventListener('offline', refresh);
     window.addEventListener('cephas:sync-state', refresh);

@@ -45,7 +45,7 @@ export const OFFLINE_WORKSPACE_READS = [
   '/insights/analytics?', '/insights/saved-reports?archived=',
   '/insights/saved-reports?archived=true', '/insights/saved-reports?archived=all', '/insights/ai/history',
   '/insights/workbooks', '/pos/registers', '/pos/branches', '/pos/shifts/current',
-  '/pos/sales?limit=100&page=1', '/pos/audit',
+  '/pos/sales?limit=100&page=1', '/pos/sales?includeVoided=true&limit=100&page=1', '/pos/audit',
 ] as const;
 
 const DB_NAME = 'cephas-books-offline';
@@ -64,7 +64,45 @@ function openOfflineDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function cacheBulkWorkspace(snapshot: OfflineSnapshot): Promise<{ saved: number; failed: number }> {
+function expectedOfflineReads(profile?: { role?: string; customRoleId?: string; permissions?: string[] }) {
+  const role = profile?.role ?? 'OWNER';
+  const custom = Boolean(profile?.customRoleId);
+  const permissions = new Set(profile?.permissions ?? []);
+  const can = (permission: string) => !custom || permissions.has(permission);
+  return OFFLINE_WORKSPACE_READS.filter((path) => {
+    if (path === '/organizations/current/onboarding') return true;
+    if (path.startsWith('/organizations/current/admin') || path === '/workflow/rules?') return can('settings.manage');
+    if (['/organizations/current/users', '/organizations/current/roles', '/organizations/current/audit-logs'].includes(path))
+      return custom ? can('users.view') : ['OWNER', 'ADMIN', 'AUDITOR'].includes(role);
+    if (path === '/pos/audit') return !custom && ['OWNER', 'ADMIN'].includes(role);
+    if (path.startsWith('/sales/') || path.startsWith('/customers') || path.startsWith('/invoices') || path.startsWith('/pos/'))
+      return can('sales.view');
+    if (path.startsWith('/purchases/')) return can('purchases.view');
+    if (path.startsWith('/banking/')) return can('banking.view');
+    if (path.startsWith('/accounting/')) return can('accounting.view');
+    if (path.startsWith('/operations/')) {
+      if (['/operations/products?', '/operations/warehouses?'].includes(path))
+        return can('inventory.view') || can('sales.view');
+      return can('inventory.view');
+    }
+    if (path.startsWith('/commerce/')) {
+      if (path === '/commerce/orders') return can('sales.view');
+      return can('inventory.view');
+    }
+    if (path.startsWith('/workflow/')) {
+      if (path === '/workflow/approvals?') return can('approvals.review');
+      if (path === '/workflow/summary' || path === '/workflow/documents?' || path === '/workflow/notifications?')
+        return can('dashboard.view');
+    }
+    if (path.startsWith('/insights/')) return can('reports.view');
+    return true;
+  });
+}
+
+export async function cacheBulkWorkspace(
+  snapshot: OfflineSnapshot,
+  profile?: { role?: string; customRoleId?: string; permissions?: string[] },
+): Promise<{ saved: number; failed: number }> {
   const snapshotKey = `bulk:${snapshot.organizationId}:${snapshot.userId}`;
   const db = await openOfflineDb();
   try {
@@ -78,10 +116,9 @@ export async function cacheBulkWorkspace(snapshot: OfflineSnapshot): Promise<{ s
   } finally {
     db.close();
   }
-  const saved = OFFLINE_WORKSPACE_READS.filter((path) =>
-    Object.prototype.hasOwnProperty.call(snapshot.resources, path),
-  ).length;
-  return { saved, failed: OFFLINE_WORKSPACE_READS.length - saved };
+  const expected = expectedOfflineReads(profile ?? getOfflineSnapshot('profile') ?? undefined);
+  const saved = expected.filter((path) => Object.prototype.hasOwnProperty.call(snapshot.resources, path)).length;
+  return { saved, failed: expected.length - saved };
 }
 
 export async function getOfflineBulkSnapshot(): Promise<OfflineSnapshot | null> {
@@ -126,6 +163,20 @@ export function getOfflineSnapshotIdentity(): string {
 export function isOfflineEnabledForCurrentAccount(): boolean {
   return localStorage.getItem('cephas:offline-enabled') === 'true' &&
     localStorage.getItem('cephas:offline-owner') === getOfflineSnapshotIdentity();
+}
+
+export function isWorkingOffline(): boolean {
+  return !navigator.onLine || localStorage.getItem('cephas:offline-active') === 'true';
+}
+
+export function activateOfflineMode(): void {
+  localStorage.setItem('cephas:offline-active', 'true');
+  window.dispatchEvent(new Event('cephas:sync-state'));
+}
+
+export function deactivateOfflineMode(): void {
+  localStorage.removeItem('cephas:offline-active');
+  window.dispatchEvent(new Event('cephas:sync-state'));
 }
 
 function queueKey(): string {

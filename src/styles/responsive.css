@@ -421,6 +421,27 @@
     max-width: 100%;
     overflow-x: hidden;
   }
+  .app-shell,
+  .workspace,
+  .page-content,
+  .auth-page,
+  .auth-page > main,
+  .auth-card,
+  .marketing,
+  .landing-hero,
+  .landing-hero__copy {
+    min-width: 0;
+  }
+  .auth-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .auth-page > main {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .page-content > * {
+    min-width: 0;
+  }
   button,
   input,
   select,
@@ -431,7 +452,41 @@
     height: 64px;
     padding-inline: 16px;
   }
+  .mobile-menu {
+    display: grid !important;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    place-items: center;
+    border: 1px solid #e3e8f1;
+    border-radius: 10px;
+    background: #fff;
+    color: #25314a;
+  }
+  .hamburger-icon {
+    display: grid;
+    width: 18px;
+    gap: 4px;
+  }
+  .hamburger-icon i {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+  }
+  .mobile-menu.is-open .hamburger-icon i:first-child {
+    transform: translateY(6px) rotate(45deg);
+  }
+  .mobile-menu.is-open .hamburger-icon i:nth-child(2) {
+    opacity: 0;
+  }
+  .mobile-menu.is-open .hamburger-icon i:last-child {
+    transform: translateY(-6px) rotate(-45deg);
+  }
   .marketing-nav nav {
+    position: absolute;
+    display: none;
     top: 66px;
     left: auto;
     right: 12px;
@@ -439,6 +494,17 @@
     max-height: calc(100dvh - 70px);
     overflow-y: auto;
     z-index: 50;
+  }
+  .marketing-nav nav.open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 10px;
+    border: 1px solid #e5eaf2;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 16px 38px rgb(19 34 66 / 16%);
   }
   .marketing-nav nav button {
     width: 100%;
@@ -462,14 +528,30 @@
     min-height: auto;
     padding: 52px 16px 24px;
   }
+  .landing-hero__copy {
+    width: min(100%, calc(100vw - 32px));
+    min-width: 0;
+  }
   .landing-hero h1 {
+    width: 100%;
+    max-width: 100%;
     min-height: 0;
     font-size: clamp(2.45rem, 12vw, 3.1rem);
     line-height: 1.02;
     letter-spacing: -0.055em;
+    overflow-wrap: anywhere;
+  }
+  .landing-hero h1 > span {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .landing-hero__copy > p {
+    width: 100%;
     font-size: 0.98rem;
+    overflow-wrap: anywhere;
   }
   .hero-pill {
     max-width: 100%;
@@ -550,21 +632,18 @@
   .detail-mini-chart--gauge {
     width: 170px;
   }
-  .landing-hero .landing-actions,
-  .landing-hero .hero-trust {
-    flex-direction: row;
-    align-items: center;
-  }
   .landing-hero .landing-actions {
-    gap: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
   }
   .landing-hero .landing-actions .button {
-    width: auto;
+    width: 100%;
     min-width: 0;
-    flex: 1 1 0;
-    padding: 13px 8px;
-    font-size: 0.76rem;
-    white-space: nowrap;
+    min-height: 46px;
+    padding: 12px 14px;
+    font-size: 0.82rem;
+    white-space: normal;
   }
   .landing-hero .landing-actions .button svg {
     width: 16px;
@@ -572,10 +651,11 @@
   }
   .landing-hero .hero-trust {
     width: 100%;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: clamp(7px, 2.5vw, 14px);
-    font-size: clamp(0.57rem, 2.4vw, 0.7rem);
-    white-space: nowrap;
+    gap: 8px 14px;
+    font-size: 0.68rem;
+    white-space: normal;
   }
   .landing-hero .hero-trust span {
     gap: 3px;
@@ -759,10 +839,11 @@
   .page-header__actions,
   .dashboard-heading > div:last-child {
     width: 100%;
+    flex-wrap: wrap;
   }
   .page-header__actions .button,
   .dashboard-heading > div:last-child > * {
-    flex: 1;
+    flex: 1 1 150px;
     min-width: 0;
   }
   .dashboard-heading > div:last-child > * {
@@ -982,6 +1063,7 @@
   }
   .auth-page > main {
     min-height: 100dvh;
+    min-width: 0;
     padding: 24px 16px;
     align-items: flex-start;
   }
@@ -989,7 +1071,8 @@
     margin-bottom: 28px;
   }
   .auth-card {
-    width: 100%;
+    width: min(100%, calc(100vw - 32px));
+    min-width: 0;
     padding-block: 8px 24px;
   }
   .social-buttons,

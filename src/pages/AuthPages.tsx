@@ -17,7 +17,7 @@ import { useEffect } from 'react';
 import { confirmAction } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
 import type { View } from '@/types/app';
-import { cacheBulkWorkspace, createOfflineLogin, getOfflineBulkSnapshot, getOfflineSnapshot, getOfflineSnapshotIdentity, restoreOfflineTokens, type OfflineSnapshot } from '@/services/offline';
+import { activateOfflineMode, cacheBulkWorkspace, createOfflineLogin, deactivateOfflineMode, getOfflineBulkSnapshot, getOfflineSnapshot, getOfflineSnapshotIdentity, restoreOfflineTokens, type OfflineSnapshot } from '@/services/offline';
 
 export function AuthPage({
   mode,
@@ -151,13 +151,13 @@ export function AuthPage({
             localStorage.removeItem('cephas:auth');
             throw new Error('The saved workspace does not match this account. Connect to the internet and prepare offline access again.');
           }
-          localStorage.setItem('cephas:offline-active', 'true');
+          activateOfflineMode();
           onView('app');
           return;
         }
         const tokens = await authApi.login({ email: email.trim(), password });
         saveAuthTokens(tokens, remember);
-        localStorage.removeItem('cephas:offline-active');
+        deactivateOfflineMode();
         const progress = await onboardingApi.get();
         try {
           const profile = await authApi.me();
@@ -175,7 +175,7 @@ export function AuthPage({
               snapshot.resourceCount !== Object.keys(snapshot.resources).length
             )
               throw new Error('The server returned an invalid offline snapshot.');
-            const result = await cacheBulkWorkspace(snapshot);
+            const result = await cacheBulkWorkspace(snapshot, profile);
             if (result.saved === 0) throw new Error('No workspace data could be saved. Check your connection and try again.');
             await createOfflineLogin(email, password, profile, tokens);
             localStorage.setItem('cephas:offline-enabled', 'true');
@@ -197,9 +197,9 @@ export function AuthPage({
               const snapshot = await getOfflineBulkSnapshot();
               if (!snapshot || `${snapshot.organizationId}:${snapshot.userId}` !== getOfflineSnapshotIdentity()) {
                 localStorage.removeItem('cephas:auth');
-                throw new Error('The saved workspace does not match this account.');
+                throw new Error('The saved workspace does not match this account.', { cause: caught });
               }
-              localStorage.setItem('cephas:offline-active', 'true');
+              activateOfflineMode();
               onView('app');
               return;
             }

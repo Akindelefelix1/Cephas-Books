@@ -53,7 +53,7 @@ import { can, canAccessRoute } from '@/utils/permissions';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { CommercePage } from '@/pages/CommercePage';
 import type { CommerceView } from '@/services/commerce';
-import { getOfflineQueue, isOfflineEnabledForCurrentAccount } from '@/services/offline';
+import { activateOfflineMode, getOfflineQueue, isOfflineEnabledForCurrentAccount, isWorkingOffline } from '@/services/offline';
 import { refreshOfflineWorkspace, syncOfflineChanges } from '@/services/auth';
 import { getQueuedPosSales, syncQueuedPosSales } from '@/services/pos';
 import { appDialog } from '@/utils/appDialogs';
@@ -97,6 +97,7 @@ export function App() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const [offlineCount, setOfflineCount] = useState(() => getOfflineQueue().length + getQueuedPosSales().length);
+  const [offlineMode, setOfflineMode] = useState(() => isWorkingOffline());
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState(() => {
@@ -123,6 +124,7 @@ export function App() {
       await refreshOfflineWorkspace();
       setSyncMessage('Your approved changes are backed up and your workspace is up to date.');
     } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 0) activateOfflineMode();
       setSyncMessage(caught instanceof Error ? `Sync paused: ${caught.message}` : 'Sync paused. Try again when connected.');
     }
     setOfflineCount(getOfflineQueue().length + getQueuedPosSales().length);
@@ -153,10 +155,13 @@ export function App() {
       routerNavigate('/login', { replace: true });
   }, [routerNavigate, view]);
   useEffect(() => {
-    const refreshCount = () => setOfflineCount(getOfflineQueue().length + getQueuedPosSales().length);
+    const refreshCount = () => {
+      setOfflineCount(getOfflineQueue().length + getQueuedPosSales().length);
+      setOfflineMode(isWorkingOffline());
+    };
     const onOnline = () => {
       refreshCount();
-      if (isOfflineEnabledForCurrentAccount() || getOfflineQueue().length || getQueuedPosSales().length)
+      if (isOfflineEnabledForCurrentAccount() || localStorage.getItem('cephas:offline-active') === 'true' || getOfflineQueue().length || getQueuedPosSales().length)
         void requestCloudSync();
     };
     const onInstall = (event: Event) => {
@@ -489,10 +494,10 @@ export function App() {
       onQuickCreate={() => setQuick(true)}
       identity={identity}
     >
-      {(!navigator.onLine || offlineCount > 0 || installPrompt || syncMessage) && (
+      {(offlineMode || offlineCount > 0 || installPrompt || syncMessage) && (
         <aside className="offline-banner" role="status">
-          <span>{!navigator.onLine ? `Offline mode · ${offlineCount} change${offlineCount === 1 ? '' : 's'} waiting to sync` : offlineCount ? `${offlineCount} offline change${offlineCount === 1 ? '' : 's'} waiting to sync` : syncMessage || 'Use Cephas Books as an app on this device.'}</span>
-          {navigator.onLine && (offlineCount > 0 || isOfflineEnabledForCurrentAccount()) && <button className="button button--small button--ghost" onClick={() => void requestCloudSync()}>Back up &amp; sync</button>}
+          <span>{offlineMode ? `Offline mode · ${offlineCount} change${offlineCount === 1 ? '' : 's'} waiting to sync` : offlineCount ? `${offlineCount} offline change${offlineCount === 1 ? '' : 's'} waiting to sync` : syncMessage || 'Use Cephas Books as an app on this device.'}</span>
+          {navigator.onLine && (offlineMode || offlineCount > 0 || isOfflineEnabledForCurrentAccount()) && <button className="button button--small button--ghost" onClick={() => void requestCloudSync()}>Back up &amp; sync</button>}
           {(installPrompt || (isOfflineEnabledForCurrentAccount() && !window.matchMedia('(display-mode: standalone)').matches)) && <button className="button button--small" onClick={() => setInstallDialogOpen(true)}>Add app shortcut</button>}
           {syncMessage && <button className="button button--small button--ghost" onClick={() => setSyncMessage('')}>Dismiss</button>}
         </aside>
