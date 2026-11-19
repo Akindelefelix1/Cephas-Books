@@ -1277,6 +1277,17 @@
   color: #344054;
   font-size: 0.7rem;
 }
+.pos-sales-chart__month.is-current > strong {
+  color: #244de5;
+}
+.pos-sales-chart__month.is-current .pos-sales-chart__track {
+  border-bottom-color: #244de5;
+  background: linear-gradient(to top, #edf1ff 1px, #f5f7ff 100%);
+}
+.pos-sales-chart__month.is-current .pos-sales-chart__bar {
+  background: linear-gradient(180deg, #3158e7 0%, #1739bd 100%);
+  box-shadow: 0 0 0 3px #e8edff;
+}
 .pos-sales-chart__month > small {
   color: #667085;
   font-size: 0.59rem;
@@ -1398,11 +1409,19 @@
     grid-column: 1 / -1;
   }
   .pos-sales-analytics__header {
-    align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+  }
+  .pos-sales-analytics__header > div {
+    grid-column: 1 / -1;
+  }
+  .pos-sales-analytics__header .pos-history-void-filter {
+    justify-content: flex-end;
+    white-space: normal;
   }
   .pos-sales-analytics__header label {
-    justify-content: space-between;
+    justify-content: flex-start;
   }
   .pos-sales-analytics__summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1427,9 +1446,14 @@
     min-width: max-content;
     height: 172px;
   }
+  .pos-sales-chart-scroll {
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: calc((100% - 52px) / 2);
+  }
   .pos-sales-chart__month {
     grid-template-rows: 16px 1fr auto auto;
     gap: 3px;
+    scroll-snap-align: center;
   }
   .pos-sales-chart__track {
     min-height: 95px;

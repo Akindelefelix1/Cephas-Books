@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -40,6 +40,8 @@ export function PosHistoryPage({
   canVoid?: boolean;
   canViewAudit?: boolean;
 }) {
+  const currentYear = new Date().getFullYear();
+  const currentMonthIndex = new Date().getMonth();
   const [sales, setSales] = useState<PosSale[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [page, setPage] = useState(1);
@@ -65,6 +67,8 @@ export function PosHistoryPage({
   const [annualSales, setAnnualSales] = useState<PosSale[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState('');
+  const chartScrollRef = useRef<HTMLDivElement>(null);
+  const currentMonthRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     void salesApi
@@ -124,6 +128,17 @@ export function PosHistoryPage({
       active = false;
     };
   }, [analyticsYear]);
+  useEffect(() => {
+    if (analyticsLoading || analyticsYear !== currentYear) return;
+    const viewport = chartScrollRef.current;
+    const month = currentMonthRef.current;
+    if (!viewport || !month) return;
+    const monthLeft =
+      month.getBoundingClientRect().left -
+      viewport.getBoundingClientRect().left +
+      viewport.scrollLeft;
+    viewport.scrollLeft = monthLeft - (viewport.clientWidth - month.clientWidth) / 2;
+  }, [analyticsLoading, analyticsYear, currentYear]);
   const updateFilter = (key: keyof typeof filters, value: string) => {
     setPage(1);
     setFilters((current) => ({ ...current, [key]: value }));
@@ -234,6 +249,7 @@ export function PosHistoryPage({
     return {
       month,
       label: monthFormatter.format(new Date(analyticsYear, month, 1)),
+      isCurrent: analyticsYear === currentYear && month === currentMonthIndex,
       total: monthSales.reduce((sum, sale) => sum + Number(sale.total), 0),
       transactions: monthSales.length,
     };
@@ -317,14 +333,19 @@ export function PosHistoryPage({
         ) : analyticsLoading ? (
           <p className="pos-sales-analytics__empty">Loading annual sales…</p>
         ) : (
-          <div className="pos-sales-chart-scroll">
+          <div className="pos-sales-chart-scroll" ref={chartScrollRef}>
             <div
               className="pos-sales-chart"
               role="img"
               aria-label={`Monthly POS sales chart for ${analyticsYear}`}
             >
               {monthlySales.map((month) => (
-                <div className="pos-sales-chart__month" key={month.month}>
+                <div
+                  className={`pos-sales-chart__month${month.isCurrent ? ' is-current' : ''}`}
+                  key={month.month}
+                  ref={month.isCurrent ? currentMonthRef : undefined}
+                  aria-current={month.isCurrent ? 'date' : undefined}
+                >
                   <div className="pos-sales-chart__value">
                     {month.total > 0 ? money(month.total) : ''}
                   </div>

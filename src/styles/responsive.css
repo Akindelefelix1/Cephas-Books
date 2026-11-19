@@ -1759,12 +1759,15 @@
 }
 
 @media (max-width: 360px) {
-  .topbar-settings-button {
-    display: none;
-  }
   .topbar {
     gap: 6px;
     padding-inline: 8px;
+  }
+  .topbar__right > span:first-child {
+    display: none;
+  }
+  .topbar-settings-button {
+    flex: 0 0 36px;
   }
   .global-search {
     min-width: 0;

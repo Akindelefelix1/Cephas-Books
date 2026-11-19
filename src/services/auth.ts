@@ -60,7 +60,10 @@ export class ApiError extends Error {
   ) {
     super(message);
     this.name = 'ApiError';
-    notifyError(message);
+    // Transport/offline errors are commonly handled by the calling screen
+    // (for example, POS stores a local receipt). Showing a global toast here
+    // reports those handled fallbacks as failures.
+    if (status !== 0) notifyError(message);
   }
 }
 
@@ -309,6 +312,11 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
 
   if (method !== 'GET') {
     if (!navigator.onLine || localStorage.getItem('cephas:offline-active') === 'true') {
+      // POS has an idempotent sale outbox and builds a local receipt. Let its
+      // screen own this fallback instead of placing the sale in the generic
+      // write queue as well.
+      if (path === '/pos/sales')
+        throw new ApiError('Sale saved on this device and will sync when you are online.', 0);
       enqueueOfflineWrite(path, method, typeof init.body === 'string' ? init.body : undefined);
       return { queuedOffline: true } as T;
     }
