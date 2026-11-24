@@ -136,10 +136,13 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
       setSelected(null);
       await load();
       if (result && typeof result === 'object' && 'emailSent' in result && result.emailSent === false) {
-        setError(`Quotation saved as a draft, but it could not be emailed: ${'emailError' in result ? String(result.emailError) : 'Email delivery failed.'}`);
-        confirmAction('Quotation saved as draft');
+        const documentName = view === 'invoices' ? 'Invoice' : 'Quotation';
+        setError(`${documentName} saved as a draft, but it could not be emailed: ${'emailError' in result ? String(result.emailError) : 'Email delivery failed.'}`);
+        confirmAction(`${documentName} saved as draft`);
       } else if (result && typeof result === 'object' && 'queuedOffline' in result) {
-        confirmAction(view === 'quotations' && message.includes('emailed')
+        confirmAction(view === 'invoices' && message.includes('emailed')
+          ? 'Invoice and statement queued offline. They will be emailed when this device syncs.'
+          : view === 'quotations' && message.includes('emailed')
           ? 'Quotation queued offline. It will be emailed when this device syncs.'
           : `${title[view]} queued offline and will sync when online`);
       } else confirmAction(message);
@@ -416,7 +419,9 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
           void run(
             () => create(view, data, selected, intent),
             intent === 'send'
-              ? 'Quotation emailed to customer'
+              ? view === 'invoices'
+                ? 'Invoice and statement emailed to customer'
+                : 'Quotation emailed to customer'
               : view === 'quotations'
                 ? 'Quotation saved as draft'
                 : `${title[view]} saved`,
@@ -453,7 +458,7 @@ function columns(v: View) {
       : v === 'invoices'
         ? ['Number', 'Customer', 'Total', 'Balance', 'Due', 'Status']
         : v === 'payments'
-          ? ['Reference', 'Customer', 'Invoice', 'Amount', 'Date', 'Method']
+          ? ['Reference', 'Customer', 'Invoice Number', 'Amount', 'Date', 'Method']
           : v === 'credit-notes'
             ? ['Number', 'Customer', 'Invoice', 'Amount', 'Date', 'Status']
             : ['Invoice', 'Customer', 'Due date', 'Original', 'Outstanding', 'Age'];
@@ -542,7 +547,7 @@ function actions(
           <Download size={15} /> Download
         </button>
         <button
-          onClick={() => run(() => salesApi.sendInvoice(invoice.id), 'Invoice emailed to customer')}
+          onClick={() => run(() => salesApi.sendInvoice(invoice.id), 'Invoice and statement emailed to customer')}
         >
           <Send size={15} /> Send
         </button>
@@ -630,7 +635,11 @@ async function create(
       status: intent === 'send' ? 'DRAFT' : d.status || 'DRAFT',
       sendEmail: intent === 'send',
     });
-  if (v === 'invoices') return salesApi.createInvoice(d);
+  if (v === 'invoices') return salesApi.createInvoice({
+    ...d,
+    status: intent === 'send' ? 'DRAFT' : d.status || 'DRAFT',
+    sendEmail: intent === 'send',
+  });
   if (v === 'payments' || v === 'receivables') return salesApi.createPayment(d);
   return salesApi.createCredit(d);
 }
@@ -1058,7 +1067,7 @@ function CreateModal({
           <button className="button button--secondary" onClick={close}>
             Cancel
           </button>
-          {view === 'quotations' ? (
+          {view === 'quotations' || view === 'invoices' ? (
             <>
               <button
                 className="button button--secondary"
@@ -1090,7 +1099,7 @@ function CreateModal({
                   if (statusField) statusField.value = 'SENT';
                 }}
               >
-                {busy ? 'Sending…' : 'Save & Send to Customer'}
+                {busy ? 'Sending…' : view === 'invoices' ? 'Save & Send Invoice + Statement' : 'Save & Send to Customer'}
               </button>
             </>
           ) : (
@@ -1128,7 +1137,7 @@ function CreateModal({
                 ? { expiryDate: get('dueDate'), status: get('status') }
                 : {
                     dueDate: get('dueDate'),
-                    status: 'DRAFT',
+                    status: get('status') || 'DRAFT',
                     shippingAddress: get('shippingAddress') || undefined,
                     shippingAmount: Number(get('shippingAmount')),
                   }),
@@ -1196,10 +1205,10 @@ function CreateModal({
         ) : (
           <>
             <label className="full">
-              {view === 'quotations' ? 'Customer Name' : document ? 'Customer' : 'Invoice'}
+              {document ? 'Customer Name' : 'Invoice Number'}
               <select name={document ? 'customerId' : 'invoiceId'} required defaultValue="">
                 <option value="" disabled>
-                  Select
+                  {document ? 'Select a customer name' : 'Select an invoice number'}
                 </option>
                 {(document ? customers : invoices).map((x) => (
                   <option key={x.id} value={x.id}>
@@ -1207,6 +1216,9 @@ function CreateModal({
                   </option>
                 ))}
               </select>
+              {view === 'invoices' && customers.length === 0 && (
+                <small className="field-hint">Add a customer with a name before creating an invoice.</small>
+              )}
             </label>
             {document && (
               <>
@@ -1214,6 +1226,12 @@ function CreateModal({
                   <div className="quotation-section-title full">
                     <h3>Quotation</h3>
                     <p>Set the status and details that will appear on the customer quotation.</p>
+                  </div>
+                )}
+                {view === 'invoices' && (
+                  <div className="quotation-section-title full">
+                    <h3>Invoice</h3>
+                    <p>Choose a customer, invoice status, and billing details.</p>
                   </div>
                 )}
                 <label>
@@ -1225,6 +1243,15 @@ function CreateModal({
                   />
                 </label>
                 {view === 'quotations' && (
+                  <label>
+                    Status
+                    <select name="status" defaultValue="DRAFT">
+                      <option value="DRAFT">Draft</option>
+                      <option value="SENT">Sent</option>
+                    </select>
+                  </label>
+                )}
+                {view === 'invoices' && (
                   <label>
                     Status
                     <select name="status" defaultValue="DRAFT">

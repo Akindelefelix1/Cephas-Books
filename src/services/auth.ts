@@ -1,5 +1,5 @@
 import { notifyError } from '@/utils/actions';
-import { activateOfflineMode, cacheBulkWorkspace, clearOfflineApiSnapshots, deactivateOfflineMode, enqueueOfflineWrite, getOfflineBulkSnapshot, getOfflineQueue, getOfflineSnapshot, isWorkingOffline, removeOfflineWrite, saveOfflineSnapshot, type OfflineSnapshot } from './offline';
+import { activateOfflineMode, cacheBulkWorkspace, clearOfflineApiSnapshots, deactivateOfflineMode, enqueueOfflineWrite, getOfflineBulkSnapshot, getOfflineQueue, getOfflineSnapshot, isWorkingOffline, removeOfflineWrite, replaceOfflineWrite, saveOfflineSnapshot, type OfflineSnapshot } from './offline';
 
 export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ?? 'https://cephasbooks-be.onrender.com/api'
@@ -757,7 +757,17 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
 
 export async function syncOfflineChanges(): Promise<void> {
   for (const item of getOfflineQueue()) {
-    await performAuthorizedRequest(item.path, { method: item.method, body: item.body });
+    const result = await performAuthorizedRequest<Record<string, unknown>>(item.path, { method: item.method, body: item.body });
+    if (item.path === '/invoices' && item.method === 'POST' && item.body) {
+      const queuedBody = JSON.parse(item.body) as Record<string, unknown>;
+      if (queuedBody.sendEmail === true && result.emailSent === false && typeof result.id === 'string') {
+        replaceOfflineWrite(item.id, `/invoices/${result.id}/send`, 'POST');
+        throw new ApiError(
+          `Invoice ${String(result.number ?? '')} was saved, but its invoice and statement email failed. The email is queued for another sync attempt.`,
+          503,
+        );
+      }
+    }
     removeOfflineWrite(item.id);
   }
   deactivateOfflineMode();

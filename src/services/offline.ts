@@ -235,6 +235,14 @@ export function removeOfflineWrite(id: string): void {
   window.dispatchEvent(new Event('cephas:sync-state'));
 }
 
+export function replaceOfflineWrite(id: string, path: string, method: string, body?: string): void {
+  const queue = getOfflineQueue().map((item) =>
+    item.id === id ? { ...item, path, method, body, queuedAt: new Date().toISOString() } : item,
+  );
+  localStorage.setItem(queueKey(), JSON.stringify(queue));
+  window.dispatchEvent(new Event('cephas:sync-state'));
+}
+
 export function clearOfflineQueue(): void {
   localStorage.setItem(queueKey(), '[]');
   window.dispatchEvent(new Event('cephas:sync-state'));
