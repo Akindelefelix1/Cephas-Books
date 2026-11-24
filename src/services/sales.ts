@@ -36,6 +36,8 @@ export interface Invoice {
   shippingAddress?: string;
   customer: Customer;
   customerId: string;
+  projectId?: string | null;
+  project?: { id: string; code: string; name: string } | null;
   items?: Line[];
   payments?: CustomerStatementPayment[];
   creditNotes?: CustomerStatementCredit[];
@@ -97,6 +99,7 @@ export interface SalesSummary {
   openQuotations: number;
   invoiced: string;
   received: string;
+  projectReceived: string;
   credited: string;
   receivable: string;
 }
@@ -122,6 +125,7 @@ export const salesApi = {
   archiveCustomer: (id: string) =>
     authorizedRequest<Customer>(`/customers/${id}`, { method: 'DELETE' }),
   invoices: () => authorizedRequest<Invoice[]>('/invoices'),
+  projects: () => authorizedRequest<Array<{ id: string; code: string; name: string }>>('/invoices/projects'),
   nextInvoiceNumber: () => authorizedRequest<{ number: string }>('/invoices/next-number'),
   createInvoice: (data: object) =>
     authorizedRequest<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) }),

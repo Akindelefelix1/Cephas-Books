@@ -37,11 +37,13 @@ export interface PurchaseRow {
   total?: string;
   paidAmount?: string;
   amount?: string;
+  taxAmount?: string;
   method?: string;
   notes?: string;
   reversedAt?: string;
   isActive?: boolean;
   supplier?: Supplier;
+  project?: { id: string; code: string; name: string } | null;
   bill?: PurchaseRow;
   items?: Array<Line | GoodsReceivedLine>;
   branchId?: string | null;
@@ -102,6 +104,7 @@ export interface PurchaseSummary {
   payable: string;
   expenses: string;
 }
+export interface PurchaseProjectOption { id: string; code: string; name: string }
 const query = (search: string, status = '') => new URLSearchParams({ search, status }).toString();
 const post = (path: string, data: object, method = 'POST') =>
   authorizedRequest<PurchaseRow>(path, { method, body: JSON.stringify(data) });
@@ -135,5 +138,6 @@ export const purchasesApi = {
     authorizedRequest<GoodsReceivedNote[]>(`/purchases/goods-received-notes?${query(s)}`),
   grnOptions: () =>
     authorizedRequest<GoodsReceivedOptions>('/purchases/goods-received-notes/options'),
+  projects: () => authorizedRequest<PurchaseProjectOption[]>('/purchases/projects'),
   createGrn: (d: object) => post('/purchases/goods-received-notes', d),
 };

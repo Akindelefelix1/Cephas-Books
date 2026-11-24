@@ -42,6 +42,7 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
   const canEdit = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role);
   const [summary, setSummary] = useState<SalesSummary | null>(null),
     [customers, setCustomers] = useState<Customer[]>([]),
+    [projects, setProjects] = useState<Array<{ id: string; code: string; name: string }>>([]),
     [invoices, setInvoices] = useState<Invoice[]>([]),
     [rows, setRows] = useState<Row[]>([]),
     [search, setSearch] = useState(''),
@@ -64,14 +65,16 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
     setLoading(true);
     setError('');
     try {
-      const [s, c, i] = await Promise.all([
+      const [s, c, i, projectOptions] = await Promise.all([
         salesApi.summary(),
         salesApi.customers(),
         salesApi.invoices(),
+        view === 'invoices' ? salesApi.projects().catch(() => []) : Promise.resolve([]),
       ]);
       setSummary(s);
       setCustomers(c.data.filter((customer) => customer.isActive));
       setInvoices(i);
+      setProjects(projectOptions);
       if (view === 'customers')
         setRows(
           c.data.filter(
@@ -265,7 +268,8 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
           stats={[
             { label: 'Customers', value: String(summary.customers) },
             { label: 'Open quotations', value: String(summary.openQuotations) },
-            { label: 'Payments received', value: cash(summary.received), tone: 'positive' },
+            { label: summary.projectReceived === undefined ? 'Receipts (cached)' : 'General receipts', value: cash(summary.received), tone: 'positive' },
+            { label: summary.projectReceived === undefined ? 'Project receipts (refresh online)' : 'Project receipts', value: summary.projectReceived === undefined ? '—' : cash(summary.projectReceived), tone: 'positive' },
             { label: 'Outstanding receivables', value: cash(summary.receivable), tone: 'warning' },
           ]}
         />
@@ -441,6 +445,7 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
         selected={selected}
         customerPresetId={customerPresetId}
         customers={customers}
+        projects={projects}
         invoices={invoices.filter(
           (x) => Number(x.total) - Number(x.paidAmount) - Number(x.creditedAmount) > 0,
         )}
@@ -509,9 +514,9 @@ function columns(v: View) {
     : v === 'quotations'
       ? ['Number', 'Customer', 'Total', 'Expiry', 'Status']
       : v === 'invoices'
-        ? ['Number', 'Customer', 'Total', 'Balance', 'Due', 'Status']
+        ? ['Number', 'Customer', 'Project / receipt type', 'Total', 'Balance', 'Due', 'Status']
         : v === 'payments'
-          ? ['Reference', 'Customer', 'Invoice Number', 'Amount', 'Date', 'Method']
+          ? ['Reference', 'Customer', 'Invoice Number', 'Receipt type', 'Amount', 'Date', 'Method']
           : v === 'credit-notes'
             ? ['Number', 'Customer', 'Invoice', 'Amount', 'Date', 'Status']
             : ['Invoice', 'Customer', 'Due date', 'Original', 'Outstanding', 'Age'];
@@ -544,6 +549,7 @@ function values(v: View, r: Row): string[] {
       ? [
           x.number,
           x.customer.displayName,
+          x.project ? `${x.project.code} · ${x.project.name}` : 'General business',
           cash(x.total, x.currency),
           cash(String(out), x.currency),
           day(x.dueDate),
@@ -564,6 +570,7 @@ function values(v: View, r: Row): string[] {
       x.reference,
       x.customer.displayName,
       x.invoice.number,
+      x.invoice.project ? `Project · ${x.invoice.project.code}` : 'General business',
       cash(x.amount, x.currency),
       day(x.paymentDate),
       x.method,
@@ -1139,6 +1146,7 @@ function CreateModal({
   view,
   selected,
   customerPresetId,
+  projects,
   customers,
   invoices,
   busy,
@@ -1150,6 +1158,7 @@ function CreateModal({
   view: View;
   selected: Customer | null;
   customerPresetId: string;
+  projects: Array<{ id: string; code: string; name: string }>;
   customers: Customer[];
   invoices: Invoice[];
   busy: boolean;
@@ -1286,6 +1295,7 @@ function CreateModal({
           else if (document)
             submit({
               customerId: get('customerId'),
+              ...(view === 'invoices' && get('projectId') ? { projectId: get('projectId') } : {}),
               currency: getDefaultCurrency(),
               issueDate: get('issueDate'),
               ...(view === 'quotations'
@@ -1397,6 +1407,16 @@ function CreateModal({
                     <h3>Invoice</h3>
                   <p>Choose a customer and enter the invoice billing details.</p>
                   </div>
+                )}
+                {view === 'invoices' && (
+                  <label className="full">
+                    Project (optional)
+                    <select name="projectId" defaultValue="">
+                      <option value="">General business invoice</option>
+                      {projects.map((project) => <option key={project.id} value={project.id}>{project.code} · {project.name}</option>)}
+                    </select>
+                    <small className="field-hint">Payments against this invoice count as project receipts. Project invoices must use your organization’s base currency.</small>
+                  </label>
                 )}
                 <label>
                   Number

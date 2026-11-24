@@ -13,6 +13,7 @@ import {
   type PurchaseView,
   type Supplier,
   type GoodsReceivedOptions,
+  type PurchaseProjectOption,
 } from '@/services/purchases';
 import { isOfflineEnabledForCurrentAccount, isWorkingOffline } from '@/services/offline';
 import { operationsApi } from '@/services/operations';
@@ -43,6 +44,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     [bills, setBills] = useState<PurchaseRow[]>([]),
     [requests, setRequests] = useState<PurchaseRow[]>([]),
     [accounts, setAccounts] = useState<BankAccount[]>([]),
+    [projects, setProjects] = useState<PurchaseProjectOption[]>([]),
     [summary, setSummary] = useState<PurchaseSummary | null>(null),
     [search, setSearch] = useState(''),
     [status, setStatus] = useState(''),
@@ -89,6 +91,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
       setAccounts(acc);
       setRows(data as (PurchaseRow | Supplier)[]);
       setOrders(orderRows);
+      setProjects(view === 'expenses' ? await purchasesApi.projects().catch(() => []) : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load purchases');
     } finally {
@@ -128,12 +131,15 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     setBusy(true);
     setError('');
     try {
-      await fn();
+      const result = await fn();
       setModal(false);
       setSelected(null);
       setGrnOpen(false);
       setActiveOrder(null);
-      confirmAction(msg);
+      const queuedOffline = Boolean(
+        result && typeof result === 'object' && 'queuedOffline' in result && result.queuedOffline === true,
+      );
+      confirmAction(queuedOffline ? `${msg} and queued for sync` : msg);
       await load();
       return true;
     } catch (e) {
@@ -330,6 +336,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
         view={view}
         selected={selected}
         suppliers={suppliers}
+        projects={projects}
         requests={requests}
         bills={bills}
         accounts={accounts}
@@ -415,7 +422,7 @@ function columns(v: PurchaseView) {
     return ['Bill', 'Supplier', 'Due', 'Total', 'Outstanding', 'Status'];
   if (v === 'supplier-payments')
     return ['Reference', 'Supplier', 'Bill', 'Date', 'Amount', 'Method'];
-  return ['Reference', 'Merchant', 'Category', 'Date', 'Amount', 'Status'];
+  return ['Reference', 'Merchant', 'Category', 'Project / receipt type', 'Date', 'Amount', 'Status'];
 }
 function values(v: PurchaseView, r: PurchaseRow | Supplier) {
   if (v === 'suppliers') {
@@ -487,6 +494,7 @@ function values(v: PurchaseView, r: PurchaseRow | Supplier) {
     x.reference ?? '',
     x.merchant ?? '',
     x.category ?? '',
+    x.project ? `${x.project.code} · ${x.project.name}` : 'General business',
     date(x.expenseDate),
     money(x.amount, x.currency),
     x.status ?? '',
@@ -1170,6 +1178,7 @@ function PurchaseModal({
   view,
   selected,
   suppliers,
+  projects,
   requests,
   bills,
   accounts,
@@ -1182,6 +1191,7 @@ function PurchaseModal({
   view: PurchaseView;
   selected: Supplier | null;
   suppliers: Supplier[];
+  projects: PurchaseProjectOption[];
   requests: PurchaseRow[];
   bills: PurchaseRow[];
   accounts: BankAccount[];
@@ -1276,6 +1286,7 @@ function PurchaseModal({
           else if (view === 'expenses')
             submit({
               supplierId: optional('supplierId'),
+              projectId: optional('projectId'),
               bankAccountId: optional('bankAccountId'),
               reference: g('reference'),
               expenseDate: g('date'),
@@ -1371,6 +1382,11 @@ function PurchaseModal({
               </>
             ) : view === 'expenses' ? (
               <>
+                <label className="full">
+                  Project (optional; project costs are tracked separately)
+                  <select name="projectId" defaultValue=""><option value="">General business expense</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.code} · {project.name}</option>)}</select>
+                  <small className="field-hint">Project expenses use your organization’s base currency. Variance cost excludes recoverable tax.</small>
+                </label>
                 <label>
                   Reference
                   <input name="reference" required />

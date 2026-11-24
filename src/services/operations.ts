@@ -146,9 +146,27 @@ export interface Project {
   budget: string;
   actualCost: string;
   revenue: string;
+  actualRevenue: string;
+  costVariance: string;
+  costVariancePercent: number;
+  costVarianceType: 'FAVORABLE' | 'UNFAVORABLE';
+  revenueVariance: string;
+  revenueVariancePercent: number;
+  revenueVarianceType: 'FAVORABLE' | 'UNFAVORABLE';
   status: string;
   description?: string;
   tasks: Array<{ title?: string; phase?: string; priority?: string }>;
+}
+export interface ProjectVarianceReport {
+  project: Project;
+  summary: {
+    budgetedCost: string; actualCost: string; costVariance: string;
+    costVarianceSigned: string; costVariancePercent: number; costVarianceType: string;
+    expectedRevenue: string; actualRevenue: string; revenueVariance: string;
+    revenueVarianceSigned: string; revenueVariancePercent: number; revenueVarianceType: string;
+  };
+  expenses: Array<{ id: string; reference: string; expenseDate: string; merchant: string; category: string; amount: string; taxAmount: string; status: string }>;
+  payments: Array<{ id: string; reference: string; paymentDate: string; amount: string; invoice: { number: string }; customer: { displayName: string } }>;
 }
 export interface OperationsSummary {
   baseCurrency: string;
@@ -303,6 +321,7 @@ export const operationsApi = {
   adjustmentStatus: (id: string, status: string) =>
     req<StockAdjustment>(`/operations/adjustments/${id}/status`, 'PATCH', { status }),
   projects: (filters = {}) => req<Project[]>(`/operations/projects?${query(filters)}`),
+  projectVariance: (id: string) => req<ProjectVarianceReport>(`/operations/projects/${id}/variance`),
   createProject: (data: object) => req<Project>('/operations/projects', 'POST', data),
   updateProject: (id: string, data: object) =>
     req<Project>(`/operations/projects/${id}`, 'PATCH', data),

@@ -20,6 +20,8 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
 import { isWorkingOffline } from '@/services/offline';
+import { purchasesApi } from '@/services/purchases';
+import { salesApi } from '@/services/sales';
 import {
   INVENTORY_CHANGED_EVENT,
   operationsApi,
@@ -31,6 +33,7 @@ import {
   type ProductCategory,
   type Project,
   type ProjectPlan,
+  type ProjectVarianceReport,
   type StockAdjustment,
   type StockMovement,
   type Warehouse,
@@ -90,6 +93,52 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [inventoryMonths, setInventoryMonths] = useState<InventoryMonth[]>([]);
   const [analyticsError, setAnalyticsError] = useState('');
+  const [varianceReport, setVarianceReport] = useState<ProjectVarianceReport | null>(null);
+  const [varianceLoading, setVarianceLoading] = useState(false);
+  const [varianceOffline, setVarianceOffline] = useState(false);
+  const openVariance = async (project: Project) => {
+    setVarianceLoading(true);
+    setError('');
+    setVarianceReport(null);
+    setVarianceOffline(false);
+    try {
+      setVarianceReport(await operationsApi.projectVariance(project.id));
+    } catch (caught) {
+      if (isWorkingOffline() && project.actualRevenue !== undefined && project.costVariance !== undefined) {
+        const [expenseRows, paymentRows] = await Promise.all([
+          purchasesApi.list('expenses').catch(() => []),
+          salesApi.payments({}).catch(() => []),
+        ]);
+        const expenses = expenseRows.filter((item) => item.project?.id === project.id).map((item) => ({
+          id: item.id, reference: item.reference ?? '', expenseDate: item.expenseDate ?? '',
+          merchant: item.merchant ?? '', category: item.category ?? '',
+          amount: String(Number(item.amount ?? 0) - Number(item.taxAmount ?? 0)), taxAmount: item.taxAmount ?? '0', status: item.status ?? '',
+        }));
+        const payments = paymentRows.filter((item) => item.invoice.project?.id === project.id).map((item) => ({
+          id: item.id, reference: item.reference, paymentDate: item.paymentDate, amount: item.amount,
+          invoice: { number: item.invoice.number }, customer: { displayName: item.customer.displayName },
+        }));
+        const costDelta = Number(project.actualCost) - Number(project.budget);
+        const revenueDelta = Number(project.actualRevenue) - Number(project.revenue);
+        setVarianceOffline(true);
+        setVarianceReport({
+          project,
+          summary: {
+            budgetedCost: project.budget, actualCost: project.actualCost,
+            costVariance: String(Math.abs(costDelta)), costVarianceSigned: String(costDelta),
+            costVariancePercent: project.costVariancePercent, costVarianceType: project.costVarianceType,
+            expectedRevenue: project.revenue, actualRevenue: project.actualRevenue,
+            revenueVariance: String(Math.abs(revenueDelta)), revenueVarianceSigned: String(revenueDelta),
+            revenueVariancePercent: project.revenueVariancePercent, revenueVarianceType: project.revenueVarianceType,
+          },
+          expenses, payments,
+        });
+      } else {
+        setError(caught instanceof Error ? caught.message : 'Unable to load project report');
+      }
+    }
+    finally { setVarianceLoading(false); }
+  };
 
   useEffect(() => {
     if (view !== 'stock-movements' || sessionStorage.getItem('cephas:inventory-open-movement') !== '1')
@@ -491,7 +540,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
                   {columns(view).map((x) => (
                     <th key={x}>{x}</th>
                   ))}
-                  {(canEdit || canApprove) && <th>Actions</th>}
+                  {(canEdit || canApprove || view === 'projects') && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -506,7 +555,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
                     {values(view, row, summary?.baseCurrency).map((x, index) => (
                       <td key={index}>{x}</td>
                     ))}
-                    {(canEdit || canApprove) && (
+                    {(canEdit || canApprove || view === 'projects') && (
                       <td>
                         <div className="inline-actions">
                           {rowActions(
@@ -525,6 +574,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
                             view === 'products'
                               ? () => void openProduct(row as Product)
                               : undefined,
+                            view === 'projects' ? () => void openVariance(row as Project) : undefined,
                           )}
                         </div>
                       </td>
@@ -535,7 +585,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
                   <tr>
                     <td
                       className="table-empty"
-                      colSpan={columns(view).length + (canEdit || canApprove ? 1 : 0)}
+                      colSpan={columns(view).length + (canEdit || canApprove || view === 'projects' ? 1 : 0)}
                     >
                       No records found.
                     </td>
@@ -645,6 +695,28 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
         submit={(data) => void restock(data)}
       />
       <Modal
+        open={Boolean(varianceReport) || varianceLoading}
+        wide
+        title={varianceReport ? `${varianceReport.project.name} · Variance report` : 'Project variance report'}
+        subtitle={varianceOffline ? 'Offline copy from this device. It uses the last cached project totals and transaction details.' : 'Budget compared with approved project costs and recorded project receipts.'}
+        onClose={() => { setVarianceReport(null); setVarianceOffline(false); }}
+        footer={<button className="button button--secondary" onClick={() => { setVarianceReport(null); setVarianceOffline(false); }}>Close</button>}
+      >
+        {varianceLoading ? <LoadingState label="Preparing project report…" /> : varianceReport && <>
+          <div className="project-variance-summary">
+            {[
+          ['Budgeted cost', varianceReport.summary.budgetedCost], ['Actual cost (excl. tax)', varianceReport.summary.actualCost],
+              [`${varianceReport.summary.costVarianceType.toLowerCase()} cost variance · ${Number(varianceReport.summary.costVariancePercent).toFixed(1)}%`, varianceReport.summary.costVariance],
+              ['Expected revenue', varianceReport.summary.expectedRevenue], ['Project receipts', varianceReport.summary.actualRevenue],
+              [`${varianceReport.summary.revenueVarianceType.toLowerCase()} revenue variance · ${Number(varianceReport.summary.revenueVariancePercent).toFixed(1)}%`, varianceReport.summary.revenueVariance],
+            ].map(([label, value]) => <article className="stat-card" key={label}><span>{label}</span><strong>{money(value)}</strong></article>)}
+          </div>
+          <h3>Project expenses</h3><p className="field-hint">Only approved expenses count toward actual cost; recoverable tax is excluded.</p><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Reference</th><th>Date</th><th>Merchant</th><th>Status</th><th>Cost excl. tax</th><th>Tax</th></tr></thead><tbody>{varianceReport.expenses.map(x => <tr key={x.id}><td>{x.reference}</td><td>{date(x.expenseDate)}</td><td>{x.merchant}</td><td>{x.status}</td><td>{money(x.amount)}</td><td>{money(x.taxAmount)}</td></tr>)}{!varianceReport.expenses.length && <tr><td className="table-empty" colSpan={6}>No project expenses recorded.</td></tr>}</tbody></table></div>
+          <h3>Project receipts</h3><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Reference</th><th>Date</th><th>Customer</th><th>Invoice</th><th>Amount</th></tr></thead><tbody>{varianceReport.payments.map(x => <tr key={x.id}><td>{x.reference}</td><td>{date(x.paymentDate)}</td><td>{x.customer.displayName}</td><td>{x.invoice.number}</td><td>{money(x.amount)}</td></tr>)}{!varianceReport.payments.length && <tr><td className="table-empty" colSpan={5}>No project receipts recorded.</td></tr>}</tbody></table></div>
+          <button className="button button--secondary" onClick={() => downloadVarianceCsv(varianceReport)}>Download report CSV</button>
+        </>}
+      </Modal>
+      <Modal
         open={analyticsOpen}
         wide
         title="Monthly stock insights"
@@ -701,6 +773,26 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
       </Modal>
     </>
   );
+}
+function downloadVarianceCsv(report: ProjectVarianceReport) {
+  const s = report.summary;
+  const rows: Array<Array<string | number>> = [
+    ['Section', 'Reference', 'Date', 'Description', 'Status', 'Amount excl. tax', 'Tax', 'Variance %', 'Variance type'],
+    ['Summary', '', '', 'Budgeted cost', '', s.budgetedCost, '', '', ''],
+    ['Summary', '', '', 'Actual cost excl. tax', '', s.actualCost, '', '', ''],
+    ['Summary', '', '', 'Cost variance', '', s.costVariance, '', s.costVariancePercent, s.costVarianceType],
+    ['Summary', '', '', 'Expected revenue', '', s.expectedRevenue, '', '', ''],
+    ['Summary', '', '', 'Actual project receipts', '', s.actualRevenue, '', '', ''],
+    ['Summary', '', '', 'Revenue variance', '', s.revenueVariance, '', s.revenueVariancePercent, s.revenueVarianceType],
+    ...report.expenses.map((x) => ['Expense', x.reference, date(x.expenseDate), `${x.merchant} · ${x.category}`, x.status, x.amount, x.taxAmount, '', ''] as Array<string | number>),
+    ...report.payments.map((x) => ['Project receipt', x.reference, date(x.paymentDate), `${x.customer.displayName} · Invoice ${x.invoice.number}`, 'Recorded', x.amount, '', '', ''] as Array<string | number>),
+  ];
+  const csv = rows.map((row) => row.map((value) => {
+    const text = String(value);
+    const safe = /^[\s]*[=+@-]/.test(text) ? `'${text}` : text;
+    return `"${safe.replaceAll('"', '""')}"`;
+  }).join(',')).join('\n');
+  downloadText(`${report.project.code}-variance.csv`, csv);
 }
 
 function buildInventoryMonths(products: Product[], movements: StockMovement[]): InventoryMonth[] {
@@ -864,6 +956,7 @@ function rowActions(
   run: (op: () => Promise<unknown>, message: string) => void,
   edit: () => void,
   viewProduct?: () => void,
+  viewProject?: () => void,
 ) {
   if (view === 'products' && canEdit) {
     return (
@@ -929,6 +1022,7 @@ function rowActions(
     const x = row as Project;
     return (
       <>
+        <button onClick={viewProject}>Variance report</button>
         {canEdit && <button onClick={edit}>Edit</button>}
         {canApprove && x.status === 'PLANNED' && (
           <button
@@ -1719,7 +1813,6 @@ function OperationsModal({
           startDate: get('startDate'),
           endDate: get('endDate') || undefined,
           budget: num('budget'),
-          actualCost: num('actualCost'),
           revenue: num('revenue'),
           status: get('status'),
           description: get('description') || undefined,
@@ -2128,18 +2221,7 @@ function OperationsModal({
               />
             </label>
             <label>
-              Actual cost
-              <input
-                name="actualCost"
-                type="number"
-                min="0"
-                step=".01"
-                required
-                defaultValue={project?.actualCost || 0}
-              />
-            </label>
-            <label>
-              Revenue
+              Expected revenue
               <input
                 name="revenue"
                 type="number"
@@ -2186,7 +2268,6 @@ function ProjectAiPage({ canEdit }: { canEdit: boolean }) {
         startDate: draft.startDate,
         endDate: draft.targetDate || undefined,
         budget: draft.budget,
-        actualCost: 0,
         revenue: 0,
         status: 'PLANNED',
         description: plan.summary,
