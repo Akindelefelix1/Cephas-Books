@@ -563,7 +563,9 @@ function CustomerHistoryModal({
   onPreview: (invoice: Invoice) => void;
 }) {
   if (!customer) return null;
-  const activity = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const activity = [...entries].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
   const totalSales = activity.reduce(
     (sum, item) =>
       sum + (item.type === 'invoice' || item.type === 'pos-sale' ? Number(item.amount ?? 0) : 0),
@@ -575,11 +577,18 @@ function CustomerHistoryModal({
   );
   const totalCredits = activity.reduce(
     (sum, item) =>
-      sum + (item.type === 'credit-note' || item.type === 'pos-return' ? Number(item.amount ?? 0) : 0),
+      sum +
+      (item.type === 'credit-note' || item.type === 'pos-return' ? Number(item.amount ?? 0) : 0),
     0,
   );
   const invoiceRows = activity.filter(
-    (item) => item.type === 'invoice' || item.type === 'payment' || item.type === 'credit-note' || item.type === 'pos-sale' || item.type === 'pos-return' || item.type === 'quotation',
+    (item) =>
+      item.type === 'invoice' ||
+      item.type === 'payment' ||
+      item.type === 'credit-note' ||
+      item.type === 'pos-sale' ||
+      item.type === 'pos-return' ||
+      item.type === 'quotation',
   );
   return (
     <Modal
@@ -638,11 +647,15 @@ function CustomerHistoryModal({
                         <td>
                           <span className="banking-status">{entry.type.replace('-', ' ')}</span>
                         </td>
-                        <td className="is-primary">{entry.number || entry.reference || entry.title}</td>
+                        <td className="is-primary">
+                          {entry.number || entry.reference || entry.title}
+                        </td>
                         <td>{day(entry.date)}</td>
                         <td>{entry.status || '—'}</td>
                         <td className="is-right">
-                          {entry.amount ? cash(entry.amount, entry.currency || getDefaultCurrency()) : '—'}
+                          {entry.amount
+                            ? cash(entry.amount, entry.currency || getDefaultCurrency())
+                            : '—'}
                         </td>
                         <td>{entry.notes || '—'}</td>
                         <td className="is-right">
@@ -908,6 +921,7 @@ function CreateModal({
             get = (n: string) => String(f.get(n) || '');
           if (view === 'customers')
             submit({
+              name: get('name'),
               displayName: get('displayName'),
               email: get('email') || undefined,
               phone: get('phone') || undefined,
@@ -956,8 +970,12 @@ function CreateModal({
       >
         {view === 'customers' ? (
           <>
+            <label>
+              Name
+              <input name="name" required defaultValue={selected?.name ?? selected?.displayName} />
+            </label>
             <label className="full">
-              Customer name
+              Display name
               <input name="displayName" required defaultValue={selected?.displayName} />
             </label>
             <label>

@@ -39,6 +39,7 @@ export const OFFLINE_WORKSPACE_READS = [
   '/banking/summary', '/banking/accounts?includeArchived=false',
   '/banking/accounts?includeArchived=true',
   '/banking/transactions?', '/banking/transactions/reversals', '/commerce/summary',
+  '/banking/transactions?status=UNRECONCILED',
   '/commerce/channels', '/commerce/orders', '/commerce/catalog',
   '/workflow/summary', '/workflow/documents?', '/workflow/approvals?',
   '/workflow/notifications?', '/workflow/rules?', '/insights/reports?',
@@ -78,7 +79,12 @@ function expectedOfflineReads(profile?: { role?: string; customRoleId?: string; 
     if (path.startsWith('/sales/') || path.startsWith('/customers') || path.startsWith('/invoices') || path.startsWith('/pos/'))
       return can('sales.view');
     if (path.startsWith('/purchases/')) return can('purchases.view');
-    if (path.startsWith('/banking/')) return can('banking.view');
+    if (path === '/banking/summary' || path.startsWith('/banking/accounts'))
+      return can('banking.view') || can('banking.accounts.view') || can('banking.manage');
+    if (path === '/banking/transactions?status=UNRECONCILED')
+      return can('banking.view') || can('banking.reconciliation.view') || can('banking.manage');
+    if (path.startsWith('/banking/transactions'))
+      return can('banking.view') || can('banking.transactions.view') || can('banking.manage');
     if (path.startsWith('/accounting/')) return can('accounting.view');
     if (path.startsWith('/operations/')) {
       if (['/operations/products?', '/operations/warehouses?'].includes(path))

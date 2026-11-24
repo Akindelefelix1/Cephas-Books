@@ -37,6 +37,9 @@ const rolePermissionGroups = [
     module: 'Banking',
     permissions: [
       { key: 'banking.view', label: 'View' },
+      { key: 'banking.accounts.view', label: 'View accounts' },
+      { key: 'banking.transactions.view', label: 'View transactions' },
+      { key: 'banking.reconciliation.view', label: 'View reconciliation' },
       { key: 'banking.manage', label: 'Manage' },
     ],
   },
@@ -99,27 +102,32 @@ export function UsersPage() {
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [roleError, setRoleError] = useState('');
   useEffect(() => {
-    void organizationApi.roles().then((items) => {
-      setRoles(items);
-      if (items[0]) {
-        setSelectedRole(items[0].name);
-        setPermissions(items[0].permissions);
-      }
-    }).catch(() => setRoleError('Unable to load roles'));
+    void organizationApi
+      .roles()
+      .then((items) => {
+        setRoles(items);
+        if (items[0]) {
+          setSelectedRole(items[0].name);
+          setPermissions(items[0].permissions);
+        }
+      })
+      .catch(() => setRoleError('Unable to load roles'));
   }, []);
   const selectedRoleData = roles.find((role) => role.name === selectedRole);
   const openRoleEditor = (editing: boolean) => {
     setEditingRole(editing);
-    setRoleName(editing ? selectedRoleData?.name ?? '' : '');
-    setRoleBase(editing ? selectedRoleData?.baseRole ?? 'MEMBER' : 'MEMBER');
-    setRoleDescription(editing ? selectedRoleData?.description ?? '' : '');
-    setPermissions(editing ? selectedRoleData?.permissions ?? [] : []);
+    setRoleName(editing ? (selectedRoleData?.name ?? '') : '');
+    setRoleBase(editing ? (selectedRoleData?.baseRole ?? 'MEMBER') : 'MEMBER');
+    setRoleDescription(editing ? (selectedRoleData?.description ?? '') : '');
+    setPermissions(editing ? (selectedRoleData?.permissions ?? []) : []);
     setRoleError('');
     setRoleModal(true);
   };
   const togglePermission = (key: string) =>
     setPermissions((current) =>
-      current.includes(key) ? current.filter((permission) => permission !== key) : [...current, key],
+      current.includes(key)
+        ? current.filter((permission) => permission !== key)
+        : [...current, key],
     );
   const rows = [
     ['Tobi Adeyemi', 'tobi@acme.ng', 'Finance Manager', 'Lagos HQ', 'Active'],
@@ -176,7 +184,7 @@ export function UsersPage() {
             </div>
           </header>
           {roleError && <p className="form-error">{roleError}</p>}
-            {roles.map((x) => (
+          {roles.map((x) => (
             <button
               className={selectedRole === x.name ? 'active' : ''}
               key={x.id}
@@ -310,17 +318,27 @@ export function UsersPage() {
               description: roleDescription.trim(),
               permissions,
             };
-            void (editingRole && selectedRoleData
-              ? organizationApi.updateRole(selectedRoleData.id, data)
-              : organizationApi.createRole(data))
+            void (
+              editingRole && selectedRoleData
+                ? organizationApi.updateRole(selectedRoleData.id, data)
+                : organizationApi.createRole(data)
+            )
               .then((role) => {
-                setRoles((items) => editingRole ? items.map((item) => item.id === role.id ? role : item) : [...items, role]);
+                setRoles((items) =>
+                  editingRole
+                    ? items.map((item) => (item.id === role.id ? role : item))
+                    : [...items, role],
+                );
                 setSelectedRole(role.name);
                 setPermissions(role.permissions);
                 setPermissionEditing(false);
                 setRoleModal(false);
               })
-              .catch(() => setRoleError('Unable to save role. Check that the name is unique and permissions are valid.'));
+              .catch(() =>
+                setRoleError(
+                  'Unable to save role. Check that the name is unique and permissions are valid.',
+                ),
+              );
           }}
         >
           <label>
@@ -349,7 +367,9 @@ export function UsersPage() {
               <option value="MANAGER">MANAGER</option>
               <option value="ADMIN">ADMIN</option>
             </select>
-            <small className="form-hint">Sets the highest built-in access this profile can inherit.</small>
+            <small className="form-hint">
+              Sets the highest built-in access this profile can inherit.
+            </small>
           </label>
           <label className="full">
             Description
@@ -1458,7 +1478,12 @@ export function ProfilePage({
             >
               Cancel
             </button>
-            <button className="button" form="change-password-form" disabled={passwordBusy} aria-busy={passwordBusy}>
+            <button
+              className="button"
+              form="change-password-form"
+              disabled={passwordBusy}
+              aria-busy={passwordBusy}
+            >
               {passwordBusy ? 'Changing…' : 'Change password'}
             </button>
           </>
@@ -1488,25 +1513,49 @@ export function ProfilePage({
                 confirmAction('Password changed successfully');
               })
               .catch((caught) =>
-                setPasswordError(caught instanceof Error ? caught.message : 'Unable to change password.'),
+                setPasswordError(
+                  caught instanceof Error ? caught.message : 'Unable to change password.',
+                ),
               )
               .finally(() => setPasswordBusy(false));
           }}
         >
           <label className="full">
             Current password
-            <input name="currentPassword" type="password" autoComplete="current-password" required autoFocus />
+            <input
+              name="currentPassword"
+              type="password"
+              autoComplete="current-password"
+              required
+              autoFocus
+            />
           </label>
           <label className="full">
             New password
-            <input name="newPassword" type="password" autoComplete="new-password" minLength={8} required />
+            <input
+              name="newPassword"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
             <small>Use 8–128 characters with uppercase, lowercase, and a number.</small>
           </label>
           <label className="full">
             Confirm new password
-            <input name="confirmation" type="password" autoComplete="new-password" minLength={8} required />
+            <input
+              name="confirmation"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
           </label>
-          {passwordError && <p className="form-error full" role="alert">{passwordError}</p>}
+          {passwordError && (
+            <p className="form-error full" role="alert">
+              {passwordError}
+            </p>
+          )}
         </form>
       </Modal>
     </>

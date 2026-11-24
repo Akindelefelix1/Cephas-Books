@@ -1,6 +1,7 @@
 import { authorizedRequest } from './auth';
 export interface Customer {
   id: string;
+  name?: string;
   displayName: string;
   companyName?: string;
   email?: string;

@@ -61,9 +61,11 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
     setError('');
     try {
       const [nextAccounts, nextSummary, nextTransactions, nextReversals] = await Promise.all([
-        bankingApi.accounts(true),
-        bankingApi.summary(),
-        bankingApi.transactions(filters),
+        view === 'banking' || canManage ? bankingApi.accounts(true) : Promise.resolve([]),
+        view === 'banking' ? bankingApi.summary() : Promise.resolve(null),
+        view === 'banking'
+          ? Promise.resolve({ data: [], meta: { page: 1, limit: 15, total: 0, pages: 1 } })
+          : bankingApi.transactions(filters),
         view === 'transactions' ? bankingApi.reversalHistory() : Promise.resolve([]),
       ]);
       setAccounts(nextAccounts);
@@ -245,7 +247,9 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
                   <Archive size={16} aria-hidden="true" />
                   <div>
                     <strong>Account visibility</strong>
-                    <span>{showArchived ? 'Active and archived accounts' : 'Active accounts only'}</span>
+                    <span>
+                      {showArchived ? 'Active and archived accounts' : 'Active accounts only'}
+                    </span>
                   </div>
                 </div>
                 <button
@@ -254,7 +258,11 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
                   aria-pressed={showArchived}
                   onClick={() => setShowArchived((current) => !current)}
                 >
-                  {showArchived ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                  {showArchived ? (
+                    <EyeOff size={16} aria-hidden="true" />
+                  ) : (
+                    <Eye size={16} aria-hidden="true" />
+                  )}
                   <span>{showArchived ? 'Hide archived' : 'Show archived'}</span>
                   <b>{visibleAccounts.length}</b>
                 </button>
@@ -271,7 +279,10 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
                       </span>
                       {canManage && (
                         <details className="bank-card__actions">
-                          <summary className="icon-button" aria-label={`Actions for ${account.name}`}>
+                          <summary
+                            className="icon-button"
+                            aria-label={`Actions for ${account.name}`}
+                          >
                             <MoreHorizontal />
                           </summary>
                           <div className="bank-card__menu" role="menu">
@@ -298,7 +309,10 @@ export function BankingPage({ view = 'banking', role }: { view?: View; role: str
                                       confirmLabel: 'Restore account',
                                       onConfirm: () =>
                                         void submit(
-                                          () => bankingApi.updateAccount(account.id, { isActive: true }),
+                                          () =>
+                                            bankingApi.updateAccount(account.id, {
+                                              isActive: true,
+                                            }),
                                           'Bank account restored',
                                         ).then((ok) => ok && setConfirmation(null)),
                                     });
@@ -700,7 +714,19 @@ function TransactionPanel({
                       TRF-{row.transferGroupId.replaceAll('-', '').slice(0, 10).toUpperCase()}
                     </span>
                   )}
-                  {row.reference && <small className="banking-transfer-reference">{row.reference}</small>}
+                  {row.reference && (
+                    <small className="banking-transfer-reference">{row.reference}</small>
+                  )}
+                  {row.receiptUrl && (
+                    <a
+                      className="banking-transfer-reference"
+                      href={row.receiptUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View receipt
+                    </a>
+                  )}
                   {!row.transferGroupId && !row.reference && '—'}
                 </td>
                 <td className="is-right">
@@ -880,9 +906,26 @@ function TransactionModal({
   onClose: () => void;
   onSubmit: (data: TransactionFormData) => void;
 }) {
-  const [rows, setRows] = useState([{ name: '', description: '', reference: '', amount: '' }]);
+  const [rows, setRows] = useState([
+    { name: '', description: '', reference: '', amount: '', receiptMode: 'none', receiptUrl: '' },
+  ]);
+  useEffect(() => {
+    if (open)
+      setRows([
+        {
+          name: '',
+          description: '',
+          reference: '',
+          amount: '',
+          receiptMode: 'none',
+          receiptUrl: '',
+        },
+      ]);
+  }, [open]);
   const updateRow = (index: number, field: keyof (typeof rows)[number], value: string) =>
-    setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
+    setRows((current) =>
+      current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)),
+    );
   return (
     <Modal
       open={open}
@@ -911,7 +954,13 @@ function TransactionModal({
             transactionDate: String(f.get('date')),
             type: String(f.get('type')) as TransactionFormData['type'],
             notes: String(f.get('notes')).trim() || undefined,
-            transactions: rows.map((row) => ({ ...row, reference: row.reference || undefined, amount: Number(row.amount) })),
+            transactions: rows.map((row) => ({
+              name: row.name,
+              description: row.description,
+              reference: row.reference || undefined,
+              receiptUrl: row.receiptMode === 'link' ? row.receiptUrl.trim() : undefined,
+              amount: Number(row.amount),
+            })),
           });
         }}
       >
@@ -945,17 +994,107 @@ function TransactionModal({
           />
         </label>
         <div className="transaction-line-editor full">
-          <div className="invoice-line-editor__heading"><span>Transactions</span><small>Add multiple rows with the same account, type, date, and notes.</small></div>
+          <div className="invoice-line-editor__heading">
+            <span>Transactions</span>
+            <small>Add multiple rows with the same account, type, date, and notes.</small>
+          </div>
           {rows.map((row, index) => (
             <div className="transaction-line-editor__row" key={index}>
               <div className="transaction-line-editor__row-heading">Transaction {index + 1}</div>
-              <label>Name<input required maxLength={160} value={row.name} onChange={(event) => updateRow(index, 'name', event.target.value)} /></label>
-              <label>Description<input required maxLength={240} value={row.description} onChange={(event) => updateRow(index, 'description', event.target.value)} /></label>
-              <label>Reference<input maxLength={100} value={row.reference} onChange={(event) => updateRow(index, 'reference', event.target.value)} /></label>
-              <label>Amount<input type="number" min="0.01" step="0.01" required value={row.amount} onChange={(event) => updateRow(index, 'amount', event.target.value)} /></label>
+              <label>
+                Name
+                <input
+                  required
+                  maxLength={160}
+                  value={row.name}
+                  onChange={(event) => updateRow(index, 'name', event.target.value)}
+                />
+              </label>
+              <label>
+                Description
+                <input
+                  required
+                  maxLength={240}
+                  value={row.description}
+                  onChange={(event) => updateRow(index, 'description', event.target.value)}
+                />
+              </label>
+              <label>
+                Reference
+                <input
+                  maxLength={100}
+                  value={row.reference}
+                  onChange={(event) => updateRow(index, 'reference', event.target.value)}
+                />
+              </label>
+              <label>
+                Amount
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  value={row.amount}
+                  onChange={(event) => updateRow(index, 'amount', event.target.value)}
+                />
+              </label>
+              <label>
+                Attach receipt
+                <select
+                  value={row.receiptMode}
+                  onChange={(event) =>
+                    setRows((current) =>
+                      current.map((item, rowIndex) =>
+                        rowIndex === index ? { ...item, receiptMode: event.target.value } : item,
+                      ),
+                    )
+                  }
+                >
+                  <option value="none">No receipt</option>
+                  <option value="link">Link an existing receipt</option>
+                </select>
+              </label>
+              {row.receiptMode === 'link' && (
+                <label>
+                  Receipt link
+                  <input
+                    type="url"
+                    required
+                    pattern="https://.*"
+                    title="Enter an HTTPS receipt link."
+                    placeholder="https://…"
+                    value={row.receiptUrl}
+                    onChange={(event) =>
+                      setRows((current) =>
+                        current.map((item, rowIndex) =>
+                          rowIndex === index ? { ...item, receiptUrl: event.target.value } : item,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+              )}
             </div>
           ))}
-          <button type="button" className="invoice-line-editor__add" onClick={() => setRows((current) => [...current, { name: '', description: '', reference: '', amount: '' }])}>+ Add another transaction</button>
+          <button
+            type="button"
+            className="invoice-line-editor__add"
+            onClick={() =>
+              setRows((current) => [
+                ...current,
+                {
+                  name: '',
+                  description: '',
+                  reference: '',
+                  amount: '',
+                  receiptMode: 'none',
+                  receiptUrl: '',
+                },
+              ])
+            }
+          >
+            + Add another transaction
+          </button>
         </div>
         <label className="full">
           Notes

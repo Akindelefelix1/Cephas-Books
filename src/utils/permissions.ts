@@ -5,9 +5,9 @@ export interface PermissionIdentity {
 
 const routePermissions: Record<string, string> = {
   dashboard: 'dashboard.view',
-  banking: 'banking.view',
-  transactions: 'banking.view',
-  reconciliation: 'banking.view',
+  banking: 'banking.accounts.view',
+  transactions: 'banking.transactions.view',
+  reconciliation: 'banking.reconciliation.view',
   pos: 'sales.view',
   'pos-history': 'sales.view',
   customers: 'sales.view',
@@ -60,8 +60,25 @@ const routePermissions: Record<string, string> = {
   settings: 'settings.manage',
 };
 
+const legacyPermission: Record<string, string> = {
+  'banking.accounts.view': 'banking.view',
+  'banking.transactions.view': 'banking.view',
+  'banking.reconciliation.view': 'banking.view',
+};
+
+const permissionImplies: Record<string, string[]> = {
+  'banking.accounts.view': ['banking.manage', 'banking.accounts.manage'],
+  'banking.transactions.view': ['banking.manage', 'banking.transactions.manage'],
+  'banking.reconciliation.view': ['banking.manage', 'banking.reconciliation.manage'],
+};
+
 export const can = (identity: PermissionIdentity, permission: string) =>
-  !identity.customRoleId || identity.permissions.includes(permission);
+  !identity.customRoleId ||
+  identity.permissions.includes(permission) ||
+  Boolean(
+    legacyPermission[permission] && identity.permissions.includes(legacyPermission[permission]),
+  ) ||
+  Boolean(permissionImplies[permission]?.some((implied) => identity.permissions.includes(implied)));
 
 export const canAccessRoute = (identity: PermissionIdentity, route: string) =>
   !routePermissions[route] || can(identity, routePermissions[route]);

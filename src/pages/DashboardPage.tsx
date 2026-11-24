@@ -74,9 +74,9 @@ export function DashboardPage({
   useEffect(() => {
     let active = true;
     Promise.allSettled([
-      can(access, 'banking.view') ? bankingApi.summary() : Promise.resolve(undefined),
-      can(access, 'banking.view') ? bankingApi.accounts() : Promise.resolve(undefined),
-      can(access, 'banking.view')
+      can(access, 'banking.accounts.view') ? bankingApi.summary() : Promise.resolve(undefined),
+      can(access, 'banking.accounts.view') ? bankingApi.accounts() : Promise.resolve(undefined),
+      can(access, 'banking.transactions.view')
         ? bankingApi.transactions({ limit: 5 })
         : Promise.resolve(undefined),
       can(access, 'sales.view') ? salesApi.summary() : Promise.resolve(undefined),
@@ -155,9 +155,13 @@ export function DashboardPage({
       ['Bank accounts', 'Balances and account details', 'banking', Landmark],
       ['Transactions', 'Review money in and out', 'transactions', CreditCard],
       ['Reconciliation', 'Match and resolve entries', 'reconciliation', Sparkles],
-      ['Capture receipt', 'Attach proof of payment', 'expenses', FileUp],
+      ['Attach receipt', 'Add proof to a bank transaction', 'transactions', FileUp],
     ] as const
-  ).filter(([, , id]) => canAccessRoute(access, id));
+  ).filter(([title, , id]) =>
+    title === 'Attach receipt'
+      ? canAccessRoute(access, id) && can(access, 'banking.manage')
+      : canAccessRoute(access, id),
+  );
   const today = new Intl.DateTimeFormat('en-NG', { dateStyle: 'full' }).format(new Date());
   const hour = new Date().getHours();
   const dayPeriod = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
@@ -308,7 +312,14 @@ export function DashboardPage({
           </header>
           <div className="dashboard-feature-grid">
             {bankingFeatures.map(([title, description, id, Icon]) => (
-              <button key={title} onClick={() => onNavigate(id)}>
+              <button
+                key={title}
+                onClick={() => {
+                  if (title === 'Attach receipt')
+                    sessionStorage.setItem('cephas:quick-create', 'transactions');
+                  onNavigate(id);
+                }}
+              >
                 <i>
                   <Icon size={19} />
                 </i>

@@ -365,13 +365,32 @@
   font-weight: 500;
 }
 .transaction-line-editor__row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
   margin-top: 12px;
   padding: 12px;
   border: 1px solid #dce2ec;
   border-radius: 8px;
   background: #fff;
 }
+.transaction-line-editor__row > label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  color: #4e586c;
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+.transaction-line-editor__row input,
+.transaction-line-editor__row select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
 .transaction-line-editor__row-heading {
+  grid-column: 1 / -1;
   margin-bottom: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid #e8ebf0;
@@ -2900,6 +2919,11 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+@media (max-width: 820px) {
+  .transaction-line-editor__row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (max-width: 640px) {
   .account-visibility {
     align-items: stretch;
@@ -2911,6 +2935,19 @@
   }
   .banking-filters {
     grid-template-columns: 1fr;
+  }
+  .transaction-line-editor__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+    padding: 10px;
+  }
+  .transaction-line-editor .invoice-line-editor__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .transaction-line-editor__row-heading {
+    grid-column: auto;
   }
   .banking-alert {
     align-items: flex-start;

@@ -247,7 +247,7 @@ async function performAuthorizedRequest<T>(path: string, init: RequestInit = {})
   const activeBranchId = localStorage.getItem('cephas:active-branch');
   const branchScopedCreate =
     init.method === 'POST' &&
-    /^\/(customers|invoices|sales\/(quotations|payments|credit-notes)|pos\/sales|banking\/transactions|purchases\/(suppliers|requests|orders|bills|payments|expenses))$/.test(
+    /^\/(customers|invoices|sales\/(quotations|payments|credit-notes)|pos\/sales|banking\/transactions(?:\/bulk)?|purchases\/(suppliers|requests|orders|bills|payments|expenses))$/.test(
       path,
     );
   let requestBody = init.body;
@@ -559,7 +559,25 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
       // write queue as well.
       if (path === '/pos/sales')
         throw new ApiError('Sale saved on this device and will sync when you are online.', 0);
-      enqueueOfflineWrite(path, method, typeof init.body === 'string' ? init.body : undefined);
+      let queuedBody = typeof init.body === 'string' ? init.body : undefined;
+      if (
+        queuedBody &&
+        method === 'POST' &&
+        /^\/banking\/transactions(?:\/bulk)?$/.test(path)
+      ) {
+        try {
+          const body = JSON.parse(queuedBody) as Record<string, unknown>;
+          const branchId = localStorage.getItem('cephas:active-branch');
+          if (branchId && typeof body.branchId !== 'string') {
+            body.branchId = branchId;
+            queuedBody = JSON.stringify(body);
+          }
+        } catch {
+          // Keep the original request body so the regular sync path can surface
+          // any validation error without losing the queued write.
+        }
+      }
+      enqueueOfflineWrite(path, method, queuedBody);
       return { queuedOffline: true } as T;
     }
     const payload = await performAuthorizedRequest<T>(path, init);
@@ -638,7 +656,11 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
       }
 
       if (basePath === '/banking/transactions') {
-        const source = bulk.resources['/banking/transactions?'] as { data?: Array<Record<string, unknown>> } | undefined;
+        const status = query.get('status');
+        const sourcePath = status === 'UNRECONCILED'
+          ? '/banking/transactions?status=UNRECONCILED'
+          : '/banking/transactions?';
+        const source = (bulk.resources[sourcePath] ?? bulk.resources['/banking/transactions?']) as { data?: Array<Record<string, unknown>> } | undefined;
         if (source && Array.isArray(source.data)) {
           const filtered = source.data.filter((transaction) => {
             const account = transaction.bankAccount as Record<string, unknown> | undefined;

@@ -21,6 +21,7 @@ export interface BankTransaction {
   transactionDate: string;
   description: string;
   reference?: string;
+  receiptUrl?: string;
   transferGroupId?: string | null;
   type: TransactionType;
   amount: string;
@@ -107,10 +108,17 @@ export const bankingApi = {
     }),
   createTransactions: (data: {
     bankAccountId: string;
+    branchId?: string;
     transactionDate: string;
     type: TransactionType;
     notes?: string;
-    transactions: Array<{ name: string; description: string; reference?: string; amount: number }>;
+    transactions: Array<{
+      name: string;
+      description: string;
+      reference?: string;
+      receiptUrl?: string;
+      amount: number;
+    }>;
   }) =>
     authorizedRequest<BankTransaction[]>('/banking/transactions/bulk', {
       method: 'POST',
