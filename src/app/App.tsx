@@ -374,6 +374,7 @@ export function App() {
         'suppliers',
         'purchase-requests',
         'purchase-orders',
+        'goods-received-notes',
         'bills',
         'supplier-payments',
         'payables',

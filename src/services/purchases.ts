@@ -3,6 +3,7 @@ export type PurchaseView =
   | 'suppliers'
   | 'purchase-requests'
   | 'purchase-orders'
+  | 'goods-received-notes'
   | 'bills'
   | 'supplier-payments'
   | 'payables'
@@ -37,11 +38,55 @@ export interface PurchaseRow {
   paidAmount?: string;
   amount?: string;
   method?: string;
+  notes?: string;
   reversedAt?: string;
   isActive?: boolean;
   supplier?: Supplier;
   bill?: PurchaseRow;
-  items?: Line[];
+  items?: Array<Line | GoodsReceivedLine>;
+  branchId?: string | null;
+  goodsReceivedNotes?: Array<{ items: Array<Record<string, unknown>> }>;
+  supplierReference?: string;
+  receivedDate?: string;
+  warehouse?: { id: string; code: string; name: string };
+  purchaseOrder?: { id: string; number: string; currency?: string; items?: Line[] };
+  recordedBy?: { firstName?: string; lastName?: string; email: string } | null;
+}
+export interface GoodsReceivedLine {
+  orderLineIndex: number;
+  productId?: string;
+  receivedQuantity: number;
+  acceptedQuantity: number;
+  damagedQuantity: number;
+  rejectedQuantity: number;
+  notes?: string;
+  itemName?: string;
+  itemDescription?: string;
+  orderedQuantity?: number;
+  outstandingQuantity?: number;
+  unitCost?: number;
+}
+export interface GoodsReceivedNote {
+  id: string;
+  reference: string;
+  supplierReference?: string;
+  receivedDate: string;
+  notes?: string;
+  items: GoodsReceivedLine[];
+  supplier: Supplier;
+  purchaseOrder: { id: string; number: string; currency?: string };
+  warehouse: { id: string; code: string; name: string };
+  recordedBy?: { firstName?: string; lastName?: string; email: string } | null;
+}
+export interface GoodsReceivedOptions {
+  products: Array<{ id: string; sku: string; name: string; unit: string }>;
+  warehouses: Array<{
+    id: string;
+    branchId?: string | null;
+    code: string;
+    name: string;
+    isDefault: boolean;
+  }>;
 }
 export interface Line {
   name: string;
@@ -86,4 +131,9 @@ export const purchasesApi = {
     post(`/purchases/${kind}/${id}/status`, { status }, 'PATCH'),
   reversePayment: (id: string) => post(`/purchases/payments/${id}/reverse`, {}),
   orderToBill: (id: string, d: object) => post(`/purchases/orders/${id}/convert`, d),
+  grns: (s = '') =>
+    authorizedRequest<GoodsReceivedNote[]>(`/purchases/goods-received-notes?${query(s)}`),
+  grnOptions: () =>
+    authorizedRequest<GoodsReceivedOptions>('/purchases/goods-received-notes/options'),
+  createGrn: (d: object) => post('/purchases/goods-received-notes', d),
 };

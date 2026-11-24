@@ -19,6 +19,7 @@ const routePermissions: Record<string, string> = {
   suppliers: 'purchases.view',
   'purchase-requests': 'purchases.view',
   'purchase-orders': 'purchases.view',
+  'goods-received-notes': 'purchases.view',
   bills: 'purchases.view',
   'supplier-payments': 'purchases.view',
   payables: 'purchases.view',

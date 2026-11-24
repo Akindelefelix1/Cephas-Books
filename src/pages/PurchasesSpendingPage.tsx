@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Download, Plus } from 'lucide-react';
+import { Download, Plus, Printer } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
@@ -11,7 +12,10 @@ import {
   type PurchaseSummary,
   type PurchaseView,
   type Supplier,
+  type GoodsReceivedOptions,
 } from '@/services/purchases';
+import { isOfflineEnabledForCurrentAccount, isWorkingOffline } from '@/services/offline';
+import { operationsApi } from '@/services/operations';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
 const money = (v?: string, c = getDefaultCurrency()) =>
@@ -21,6 +25,7 @@ const titles: Record<PurchaseView, string> = {
   suppliers: 'Suppliers',
   'purchase-requests': 'Purchase requests',
   'purchase-orders': 'Purchase orders',
+  'goods-received-notes': 'Goods received notes',
   bills: 'Bills',
   'supplier-payments': 'Supplier payments',
   payables: 'Payables',
@@ -46,12 +51,17 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     [error, setError] = useState(''),
     [modal, setModal] = useState(false),
     [selected, setSelected] = useState<Supplier | null>(null),
-    [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+    [confirmation, setConfirmation] = useState<Confirmation | null>(null),
+    [orders, setOrders] = useState<PurchaseRow[]>([]),
+    [activeOrder, setActiveOrder] = useState<PurchaseRow | null>(null),
+    [grnOptions, setGrnOptions] = useState<GoodsReceivedOptions | null>(null),
+    [grnOpen, setGrnOpen] = useState(false),
+    [offlineMode, setOfflineMode] = useState(isWorkingOffline());
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [sum, sup, bill, req, acc, data] = await Promise.all([
+      const [sum, sup, bill, req, acc, data, orderRows] = await Promise.all([
         purchasesApi.summary(),
         purchasesApi.suppliers(),
         purchasesApi.list('bills'),
@@ -59,7 +69,12 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
         canEdit ? bankingApi.accounts() : Promise.resolve([]),
         view === 'suppliers'
           ? purchasesApi.suppliers(search)
-          : purchasesApi.list(view, search, status),
+          : view === 'goods-received-notes'
+            ? purchasesApi.list(view, search, status)
+            : purchasesApi.list(view, search, status),
+        view === 'goods-received-notes'
+          ? purchasesApi.list('purchase-orders')
+          : Promise.resolve([]),
       ]);
       setSummary(sum);
       setSuppliers(sup.filter((x) => x.isActive));
@@ -72,13 +87,25 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
       );
       setRequests(req);
       setAccounts(acc);
-      setRows(data);
+      setRows(data as (PurchaseRow | Supplier)[]);
+      setOrders(orderRows);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load purchases');
     } finally {
       setLoading(false);
     }
   }, [view, search, status, canEdit]);
+  useEffect(() => {
+    const refresh = () => setOfflineMode(isWorkingOffline());
+    window.addEventListener('online', refresh);
+    window.addEventListener('offline', refresh);
+    window.addEventListener('cephas:sync-state', refresh);
+    return () => {
+      window.removeEventListener('online', refresh);
+      window.removeEventListener('offline', refresh);
+      window.removeEventListener('cephas:sync-state', refresh);
+    };
+  }, []);
   useEffect(() => {
     const t = setTimeout(() => void load(), 250);
     return () => clearTimeout(t);
@@ -104,6 +131,8 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
       await fn();
       setModal(false);
       setSelected(null);
+      setGrnOpen(false);
+      setActiveOrder(null);
       confirmAction(msg);
       await load();
       return true;
@@ -114,7 +143,36 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
       setBusy(false);
     }
   };
+  const openGrn = async (order?: PurchaseRow) => {
+    setError('');
+    try {
+      const [options, orderRows] = await Promise.all([
+        purchasesApi.grnOptions(),
+        order ? Promise.resolve(orders) : purchasesApi.list('purchase-orders'),
+      ]);
+      setGrnOptions(options);
+      setOrders(orderRows);
+      setActiveOrder(order ?? null);
+      setGrnOpen(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to load receipt options');
+    }
+  };
+  const saveGrn = async (payload: Record<string, unknown>) => {
+    const saved = await purchasesApi.createGrn(payload);
+    // Refresh stock reads invalidated by the GRN for opted-in offline users.
+    // This is best-effort and must not delay or undo a committed receipt.
+    if (isOfflineEnabledForCurrentAccount())
+      void Promise.allSettled([
+        operationsApi.summary(),
+        operationsApi.products(),
+        operationsApi.branchInventory(),
+        operationsApi.movements(),
+      ]);
+    return saved;
+  };
   const cols = columns(view);
+  const showActions = canEdit || canApprove || view === 'goods-received-notes';
   const exportCsv = () =>
     downloadText(
       `${view}.csv`,
@@ -139,7 +197,16 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
             <Download size={17} /> Export CSV
           </button>
           {allowedCreate && (
-            <button className="button" onClick={() => setModal(true)}>
+            <button
+              className="button"
+              onClick={() => (view === 'goods-received-notes' ? void openGrn() : setModal(true))}
+              disabled={view === 'goods-received-notes' && offlineMode}
+              title={
+                view === 'goods-received-notes' && offlineMode
+                  ? 'Connect to the internet to validate ordered quantities and update inventory.'
+                  : undefined
+              }
+            >
               <Plus size={17} /> {action(view)}
             </button>
           )}
@@ -156,6 +223,12 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
         />
       )}
       <section className="panel register-panel">
+        {view === 'goods-received-notes' && offlineMode && (
+          <p className="banking-alert" role="status">
+            You can review GRNs saved on this device while offline. Recording a new GRN requires a
+            live connection so outstanding quantities and stock are checked atomically.
+          </p>
+        )}
         <div className="banking-filters">
           <input
             aria-label="Search"
@@ -163,7 +236,9 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {!['suppliers', 'supplier-payments', 'payables'].includes(view) && (
+          {!['suppliers', 'supplier-payments', 'payables', 'goods-received-notes'].includes(
+            view,
+          ) && (
             <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All statuses</option>
               {statuses(view).map((x) => (
@@ -188,7 +263,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
                   {cols.map((x) => (
                     <th key={x}>{x}</th>
                   ))}
-                  {(canEdit || canApprove) && <th>Actions</th>}
+                  {showActions && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -197,7 +272,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
                     {values(view, r).map((x, i) => (
                       <td key={i}>{x}</td>
                     ))}
-                    {(canEdit || canApprove) && (
+                    {showActions && (
                       <td>
                         <div className="inline-actions">
                           {rowActions(
@@ -226,6 +301,11 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
                                 setModal(true);
                               }
                             },
+                            () =>
+                              offlineMode
+                                ? setError('Connect to the internet before recording a receipt.')
+                                : void openGrn(r as PurchaseRow),
+                            offlineMode,
                           )}
                         </div>
                       </td>
@@ -234,10 +314,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
                 ))}
                 {!rows.length && (
                   <tr>
-                    <td
-                      className="table-empty"
-                      colSpan={cols.length + (canEdit || canApprove ? 1 : 0)}
-                    >
+                    <td className="table-empty" colSpan={cols.length + (showActions ? 1 : 0)}>
                       No records found.
                     </td>
                   </tr>
@@ -270,6 +347,22 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
           )
         }
       />
+      <GoodsReceivedModal
+        open={grnOpen}
+        initialOrder={activeOrder}
+        orders={orders}
+        options={grnOptions}
+        busy={busy}
+        error={error}
+        offline={offlineMode}
+        close={() => {
+          setGrnOpen(false);
+          setActiveOrder(null);
+        }}
+        submit={(payload) =>
+          void run(() => saveGrn(payload), 'Goods received note saved and accepted stock posted')
+        }
+      />
       <ConfirmModal
         key={confirmation?.title}
         confirmation={confirmation}
@@ -295,17 +388,29 @@ function action(v: PurchaseView) {
       ? 'New request'
       : v === 'purchase-orders'
         ? 'New purchase order'
-        : v === 'bills'
-          ? 'Create bill'
-          : v === 'expenses'
-            ? 'Record expense'
-            : 'Record payment';
+        : v === 'goods-received-notes'
+          ? 'Record goods received'
+          : v === 'bills'
+            ? 'Create bill'
+            : v === 'expenses'
+              ? 'Record expense'
+              : 'Record payment';
 }
 function columns(v: PurchaseView) {
   if (v === 'suppliers') return ['Supplier', 'Email', 'Phone', 'Terms', 'Status'];
   if (v === 'purchase-requests')
     return ['Request', 'Requested by', 'Required', 'Estimate', 'Status'];
   if (v === 'purchase-orders') return ['Order', 'Supplier', 'Delivery', 'Total', 'Status'];
+  if (v === 'goods-received-notes')
+    return [
+      'GRN',
+      'Purchase order',
+      'Supplier',
+      'Received',
+      'Stock location',
+      'Accepted / Exceptions',
+      'Recorded by',
+    ];
   if (v === 'bills' || v === 'payables')
     return ['Bill', 'Supplier', 'Due', 'Total', 'Outstanding', 'Status'];
   if (v === 'supplier-payments')
@@ -324,6 +429,26 @@ function values(v: PurchaseView, r: PurchaseRow | Supplier) {
     ];
   }
   const x = r as PurchaseRow;
+  if (v === 'goods-received-notes') {
+    const items = (x.items ?? []) as unknown as Array<Record<string, unknown>>;
+    const accepted = items.reduce((sum, line) => sum + Number(line.acceptedQuantity ?? 0), 0);
+    const exceptions = items.reduce(
+      (sum, line) => sum + Number(line.damagedQuantity ?? 0) + Number(line.rejectedQuantity ?? 0),
+      0,
+    );
+    const recorder = x.recordedBy;
+    return [
+      x.reference ?? x.number ?? '',
+      x.purchaseOrder?.number ?? '',
+      x.supplier?.displayName ?? '',
+      date(x.receivedDate),
+      x.warehouse?.name ?? '',
+      `${accepted} accepted / ${exceptions} damaged or rejected`,
+      recorder
+        ? `${recorder.firstName ?? ''} ${recorder.lastName ?? ''}`.trim() || recorder.email
+        : '—',
+    ];
+  }
   if (v === 'purchase-requests')
     return [
       x.number ?? '',
@@ -384,8 +509,21 @@ function rowActions(
   canDelete: boolean,
   run: (f: () => Promise<unknown>, m: string) => void,
   onEdit: () => void,
+  onReceive: () => void,
+  offline: boolean,
 ) {
   const x = r as PurchaseRow;
+  if (v === 'goods-received-notes')
+    return (
+      <>
+        <button onClick={() => exportGrn(x, true)}>
+          <Printer size={15} /> Print
+        </button>
+        <button onClick={() => exportGrn(x)}>
+          <Download size={15} /> Download PDF
+        </button>
+      </>
+    );
   if (v === 'suppliers' && edit)
     return (
       <>
@@ -450,15 +588,16 @@ function rowActions(
             Issue
           </button>
         )}
-        {['ISSUED', 'PARTIALLY_RECEIVED'].includes(x.status ?? '') && (
-          <button
-            onClick={() =>
-              run(() => purchasesApi.status('orders', r.id, 'RECEIVED'), 'Goods received')
-            }
-          >
-            Receive
-          </button>
-        )}
+        {['ISSUED', 'PARTIALLY_RECEIVED', 'BILLED'].includes(x.status ?? '') &&
+          hasOrderOutstanding(x) && (
+            <button
+              onClick={onReceive}
+              disabled={offline}
+              title={offline ? 'Connect to the internet before recording a receipt.' : undefined}
+            >
+              Record GRN
+            </button>
+          )}
         {['ISSUED', 'PARTIALLY_RECEIVED', 'RECEIVED'].includes(x.status ?? '') && (
           <button
             onClick={() => {
@@ -541,6 +680,490 @@ function rowActions(
       </>
     );
   return null;
+}
+
+function hasOrderOutstanding(order: PurchaseRow) {
+  const lines = (order.items ?? []) as unknown as Array<Record<string, unknown>>;
+  return lines.some((line, index) => {
+    const received = (order.goodsReceivedNotes ?? []).reduce(
+      (total, note) =>
+        total +
+        (Array.isArray(note.items) ? note.items : []).reduce((lineTotal, raw) => {
+          const item = raw as Record<string, unknown>;
+          return (
+            lineTotal +
+            (Number(item.orderLineIndex) === index ? Number(item.receivedQuantity ?? 0) : 0)
+          );
+        }, 0),
+      0,
+    );
+    return Number(line.quantity ?? 0) - received > 0.00001;
+  });
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!,
+  );
+}
+function grnHtml(row: PurchaseRow) {
+  const lines = (row.items ?? []) as unknown as Array<Record<string, unknown>>;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(row.reference)}</title><style>body{font:14px Arial,sans-serif;margin:32px;color:#18212f}h1{margin-bottom:4px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:24px 0}table{border-collapse:collapse;width:100%}th,td{padding:9px;border:1px solid #ccd3dc;text-align:left}th{background:#f2f5f8}.notes{margin-top:24px;white-space:pre-wrap}@media print{body{margin:12mm}}</style></head><body><h1>Goods Received Note</h1><p>${escapeHtml(row.reference)}</p><div class="meta"><div><b>Supplier</b><br>${escapeHtml(row.supplier?.displayName)}</div><div><b>Purchase order</b><br>${escapeHtml(row.purchaseOrder?.number)}</div><div><b>Date received</b><br>${escapeHtml(date(row.receivedDate))}</div><div><b>Supplier reference</b><br>${escapeHtml(row.supplierReference || '—')}</div><div><b>Stock location</b><br>${escapeHtml(row.warehouse?.name)}</div><div><b>Recorded by</b><br>${escapeHtml(row.recordedBy?.firstName ? `${row.recordedBy.firstName} ${row.recordedBy.lastName ?? ''}` : row.recordedBy?.email)}</div></div><table><thead><tr><th>Item</th><th>Ordered</th><th>Received</th><th>Accepted</th><th>Damaged</th><th>Rejected</th><th>Outstanding</th><th>Notes</th></tr></thead><tbody>${lines.map((line) => `<tr><td>${escapeHtml(line.itemName)}<br>${escapeHtml(line.itemDescription)}</td><td>${escapeHtml(line.orderedQuantity)}</td><td>${escapeHtml(line.receivedQuantity)}</td><td>${escapeHtml(line.acceptedQuantity)}</td><td>${escapeHtml(line.damagedQuantity)}</td><td>${escapeHtml(line.rejectedQuantity)}</td><td>${escapeHtml(line.outstandingQuantity)}</td><td>${escapeHtml(line.notes)}</td></tr>`).join('')}</tbody></table><div class="notes">${escapeHtml(row.notes)}</div></body></html>`;
+}
+function exportGrn(row: PurchaseRow, print = false) {
+  const html = grnHtml(row);
+  if (print) {
+    const popup = window.open('', '_blank');
+    if (!popup) return;
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  } else {
+    downloadGrnPdf(row);
+  }
+}
+function downloadGrnPdf(row: PurchaseRow) {
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const left = 12;
+  let y = 16;
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(18);
+  pdf.text('Goods Received Note', left, y);
+  pdf.setFontSize(10);
+  pdf.text(String(row.reference ?? row.number ?? ''), pageWidth - left, y, { align: 'right' });
+  y += 9;
+  pdf.setFont('helvetica', 'normal');
+  const recordedBy = row.recordedBy
+    ? `${row.recordedBy.firstName ?? ''} ${row.recordedBy.lastName ?? ''}`.trim() ||
+      row.recordedBy.email
+    : '—';
+  const metadata: string[][] = [
+    [
+      `Supplier: ${row.supplier?.displayName ?? ''}`,
+      `Purchase order: ${row.purchaseOrder?.number ?? ''}`,
+    ],
+    [`Received: ${date(row.receivedDate)}`, `Supplier reference: ${row.supplierReference ?? '—'}`],
+    [`Stock location: ${row.warehouse?.name ?? ''}`, `Recorded by: ${recordedBy}`],
+  ];
+  for (const [first, second] of metadata) {
+    pdf.text(first, left, y);
+    pdf.text(second, pageWidth / 2, y);
+    y += 6;
+  }
+  y += 3;
+  const columns = [
+    { title: 'Item / details', x: left, width: 62 },
+    { title: 'Ordered', x: 76, width: 16 },
+    { title: 'Received', x: 93, width: 17 },
+    { title: 'Accepted', x: 111, width: 17 },
+    { title: 'Damaged', x: 129, width: 17 },
+    { title: 'Rejected', x: 147, width: 17 },
+    { title: 'Outstanding', x: 165, width: 22 },
+    { title: 'Notes', x: 188, width: pageWidth - 200 },
+  ];
+  const drawHeader = () => {
+    pdf.setFillColor(239, 243, 247);
+    pdf.rect(left, y - 4, pageWidth - left * 2, 8, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    for (const column of columns) pdf.text(column.title, column.x, y);
+    y += 7;
+    pdf.setFont('helvetica', 'normal');
+  };
+  drawHeader();
+  pdf.setFontSize(8);
+  const lines = (row.items ?? []) as unknown as Array<Record<string, unknown>>;
+  for (const line of lines) {
+    const itemText = pdf.splitTextToSize(
+      `${String(line.itemName ?? '')}\n${String(line.itemDescription ?? '')}`,
+      60,
+    ) as string[];
+    const notesText = pdf.splitTextToSize(String(line.notes ?? '—'), 20) as string[];
+    const rowHeight = Math.max(itemText.length, notesText.length, 1) * 4 + 3;
+    if (y + rowHeight > pageHeight - 18) {
+      pdf.addPage();
+      y = 16;
+      drawHeader();
+    }
+    pdf.text(itemText, columns[0].x, y);
+    const values = [
+      line.orderedQuantity,
+      line.receivedQuantity,
+      line.acceptedQuantity,
+      line.damagedQuantity,
+      line.rejectedQuantity,
+      line.outstandingQuantity,
+    ];
+    values.forEach((value, index) => pdf.text(String(value ?? 0), columns[index + 1].x, y));
+    pdf.text(notesText, columns[7].x, y);
+    y += rowHeight;
+    pdf.setDrawColor(215, 221, 228);
+    pdf.line(left, y - 1, pageWidth - left, y - 1);
+  }
+  y += 5;
+  if (row.notes && y + 14 > pageHeight - 12) {
+    pdf.addPage();
+    y = 16;
+  }
+  if (row.notes) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Receiving notes', left, y);
+    pdf.setFont('helvetica', 'normal');
+    const noteLines = pdf.splitTextToSize(row.notes, pageWidth - left * 2) as string[];
+    pdf.text(noteLines, left, y + 5);
+  }
+  pdf.save(`${String(row.reference ?? 'goods-received-note').replace(/[^a-z0-9-_]/gi, '_')}.pdf`);
+}
+type ReceiptInputs = {
+  received: string;
+  accepted: string;
+  damaged: string;
+  rejected: string;
+  productId: string;
+  notes: string;
+};
+function GoodsReceivedModal({
+  open,
+  initialOrder,
+  orders,
+  options,
+  busy,
+  error,
+  offline,
+  close,
+  submit,
+}: {
+  open: boolean;
+  initialOrder: PurchaseRow | null;
+  orders: PurchaseRow[];
+  options: GoodsReceivedOptions | null;
+  busy: boolean;
+  error: string;
+  offline: boolean;
+  close: () => void;
+  submit: (data: Record<string, unknown>) => void;
+}) {
+  const availableOrders = (
+    initialOrder
+      ? [initialOrder, ...orders.filter((order) => order.id !== initialOrder.id)]
+      : orders
+  ).filter(
+    (order) =>
+      ['ISSUED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'BILLED'].includes(order.status ?? '') &&
+      (order.id === initialOrder?.id || hasOrderOutstanding(order)),
+  );
+  const [orderId, setOrderId] = useState(initialOrder?.id ?? availableOrders[0]?.id ?? '');
+  const [quantities, setQuantities] = useState<Record<number, ReceiptInputs>>({});
+  const [localError, setLocalError] = useState('');
+  useEffect(() => {
+    setOrderId(initialOrder?.id ?? availableOrders[0]?.id ?? '');
+    setQuantities({});
+    setLocalError('');
+  }, [initialOrder?.id, open]);
+  const order = availableOrders.find((candidate) => candidate.id === orderId);
+  const orderLines = (order?.items ?? []) as unknown as Array<Record<string, unknown>>;
+  const priorReceived = (lineIndex: number) =>
+    (order?.goodsReceivedNotes ?? []).reduce(
+      (sum, grn) =>
+        sum +
+        (Array.isArray(grn.items) ? grn.items : []).reduce((lineSum, raw) => {
+          const line = raw as Record<string, unknown>;
+          return (
+            lineSum +
+            (Number(line.orderLineIndex) === lineIndex ? Number(line.receivedQuantity ?? 0) : 0)
+          );
+        }, 0),
+      0,
+    );
+  const remaining = (lineIndex: number) =>
+    Math.max(0, Number(orderLines[lineIndex]?.quantity ?? 0) - priorReceived(lineIndex));
+  const hasRemaining = orderLines.some((_, index) => remaining(index) > 0.00001);
+  const setLine = (index: number, key: keyof ReceiptInputs, value: string) => {
+    setQuantities((current) => {
+      const previous = current[index] ?? {
+        received: '0',
+        accepted: '0',
+        damaged: '0',
+        rejected: '0',
+        productId: '',
+        notes: '',
+      };
+      const next = { ...previous, [key]: value };
+      if (
+        key === 'received' &&
+        (previous.accepted === previous.received || previous.accepted === '0')
+      )
+        next.accepted = value;
+      return { ...current, [index]: next };
+    });
+  };
+  const warehouseChoices = (options?.warehouses ?? []).filter(
+    (warehouse) => !order?.branchId || warehouse.branchId === order.branchId,
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  return (
+    <Modal
+      open={open}
+      onClose={close}
+      title="Record goods received"
+      footer={
+        <>
+          <button className="button button--secondary" onClick={close}>
+            Cancel
+          </button>
+          <button
+            className="button"
+            form="grn-form"
+            type="submit"
+            disabled={busy || offline || !order || !hasRemaining || !warehouseChoices.length}
+          >
+            {busy ? 'Saving…' : 'Save GRN & update stock'}
+          </button>
+        </>
+      }
+    >
+      <form
+        id="grn-form"
+        className="form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setLocalError('');
+          if (!order) {
+            setLocalError('Select a purchase order.');
+            return;
+          }
+          const form = new FormData(event.currentTarget);
+          const items = orderLines
+            .map((_, orderLineIndex) => {
+              const value = quantities[orderLineIndex] ?? {
+                received: '0',
+                accepted: '0',
+                damaged: '0',
+                rejected: '0',
+                productId: '',
+                notes: '',
+              };
+              return {
+                orderLineIndex,
+                productId:
+                  value.productId ||
+                  (typeof orderLines[orderLineIndex]?.productId === 'string'
+                    ? String(orderLines[orderLineIndex].productId)
+                    : undefined),
+                receivedQuantity: Number(value.received),
+                acceptedQuantity: Number(value.accepted),
+                damagedQuantity: Number(value.damaged),
+                rejectedQuantity: Number(value.rejected),
+                notes: value.notes || undefined,
+              };
+            })
+            .filter((line) => line.receivedQuantity > 0);
+          if (!items.length) {
+            setLocalError('Enter at least one received quantity.');
+            return;
+          }
+          if (items.some((line) => line.acceptedQuantity > 0 && !line.productId)) {
+            setLocalError('Choose an inventory product for each accepted line.');
+            return;
+          }
+          submit({
+            purchaseOrderId: order.id,
+            warehouseId: String(form.get('warehouseId') ?? ''),
+            reference: String(form.get('reference') ?? '').trim(),
+            supplierReference: String(form.get('supplierReference') ?? '').trim() || undefined,
+            receivedDate: String(form.get('receivedDate') ?? ''),
+            items,
+            notes: String(form.get('notes') ?? '').trim() || undefined,
+          });
+        }}
+      >
+        {initialOrder ? (
+          <label>
+            Purchase order
+            <input
+              value={`${initialOrder.number} — ${initialOrder.supplier?.displayName ?? ''}`}
+              readOnly
+            />
+          </label>
+        ) : (
+          <label className="full">
+            Purchase order
+            <select
+              value={orderId}
+              onChange={(event) => {
+                setOrderId(event.target.value);
+                setQuantities({});
+              }}
+              required
+            >
+              <option value="">Select an issued order</option>
+              {availableOrders.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.number} — {candidate.supplier?.displayName ?? 'Supplier'}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label>
+          Supplier
+          <input value={order?.supplier?.displayName ?? ''} readOnly />
+        </label>
+        <label>
+          GRN reference
+          <input name="reference" required maxLength={80} placeholder="GRN-00001" />
+        </label>
+        <label>
+          Supplier delivery reference
+          <input
+            name="supplierReference"
+            maxLength={120}
+            placeholder="Delivery note / docket number"
+          />
+        </label>
+        <label>
+          Delivery date
+          <input name="receivedDate" type="date" defaultValue={today} required />
+        </label>
+        <label>
+          Receiving stock location
+          <select
+            name="warehouseId"
+            required
+            defaultValue={
+              warehouseChoices.find((warehouse) => warehouse.isDefault)?.id ??
+              warehouseChoices[0]?.id ??
+              ''
+            }
+          >
+            <option value="">Select location</option>
+            {warehouseChoices.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.name} ({warehouse.code})
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="grn-lines full">
+          <h3>Delivery items</h3>
+          {!availableOrders.length && !initialOrder && (
+            <p>No issued purchase orders have outstanding quantities to receive.</p>
+          )}
+          {!!order && !hasRemaining && (
+            <p>This purchase order has no outstanding quantities remaining.</p>
+          )}
+          {!orderLines.length && <p>Select a purchase order with item lines.</p>}
+          {orderLines.map((line, index) => {
+            const outstanding = remaining(index);
+            const current = quantities[index] ?? {
+              received: '0',
+              accepted: '0',
+              damaged: '0',
+              rejected: '0',
+              productId: '',
+              notes: '',
+            };
+            const mappedProductId = typeof line.productId === 'string' ? line.productId : '';
+            return (
+              <fieldset className="grn-line" key={index} disabled={outstanding <= 0}>
+                <legend>{String(line.name ?? `Item ${index + 1}`)}</legend>
+                <p>
+                  {String(line.description ?? '')} · Ordered {Number(line.quantity ?? 0)} ·
+                  Previously received {priorReceived(index)} · Outstanding {outstanding}
+                </p>
+                {outstanding > 0 && (
+                  <div className="form-grid form-grid--nested">
+                    <label>
+                      Received
+                      <input
+                        type="number"
+                        min="0"
+                        max={outstanding}
+                        step=".0001"
+                        value={current.received}
+                        onChange={(event) => setLine(index, 'received', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Accepted
+                      <input
+                        type="number"
+                        min="0"
+                        max={current.received}
+                        step=".0001"
+                        value={current.accepted}
+                        onChange={(event) => setLine(index, 'accepted', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Damaged
+                      <input
+                        type="number"
+                        min="0"
+                        max={current.received}
+                        step=".0001"
+                        value={current.damaged}
+                        onChange={(event) => setLine(index, 'damaged', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Rejected
+                      <input
+                        type="number"
+                        min="0"
+                        max={current.received}
+                        step=".0001"
+                        value={current.rejected}
+                        onChange={(event) => setLine(index, 'rejected', event.target.value)}
+                      />
+                    </label>
+                    <label className="full">
+                      Inventory product (required for accepted units)
+                      <select
+                        value={current.productId || mappedProductId}
+                        disabled={Boolean(mappedProductId)}
+                        onChange={(event) => setLine(index, 'productId', event.target.value)}
+                      >
+                        <option value="">Select product</option>
+                        {(options?.products ?? []).map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.sku} — {product.name} ({product.unit})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="full">
+                      Item condition / exception notes
+                      <input
+                        value={current.notes}
+                        onChange={(event) => setLine(index, 'notes', event.target.value)}
+                        placeholder="Damage, defect or rejection details"
+                      />
+                    </label>
+                  </div>
+                )}
+              </fieldset>
+            );
+          })}
+        </div>
+        <label className="full">
+          Receiving notes
+          <textarea name="notes" rows={3} />
+        </label>
+        {(offline || error || localError) && (
+          <p className="form-error full">
+            {offline
+              ? 'Connect to the internet before recording a GRN. Stock is updated only after the server validates current balances.'
+              : localError || error}
+          </p>
+        )}
+      </form>
+    </Modal>
+  );
 }
 function PurchaseModal({
   open,

@@ -27,6 +27,7 @@ export const OFFLINE_WORKSPACE_READS = [
   '/sales/credit-notes?', '/sales/receivables?', '/purchases/summary',
   '/purchases/suppliers?search=&status=', '/purchases/requests?search=&status=',
   '/purchases/orders?search=&status=', '/purchases/bills?search=&status=',
+  '/purchases/goods-received-notes?search=&status=',
   '/purchases/payments?search=&status=', '/purchases/payables?search=&status=',
   '/purchases/expenses?search=&status=', '/operations/summary', '/operations/branch-inventory',
   '/operations/products?', '/operations/products-page?', '/operations/product-categories',

@@ -554,6 +554,8 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
 
   if (method !== 'GET') {
     if (isWorkingOffline()) {
+      if (path === '/purchases/goods-received-notes')
+        throw new ApiError('Connect to the internet before recording a goods receipt so stock and remaining quantities can be verified.', 0);
       // POS has an idempotent sale outbox and builds a local receipt. Let its
       // screen own this fallback instead of placing the sale in the generic
       // write queue as well.

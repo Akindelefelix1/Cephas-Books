@@ -60,6 +60,7 @@ export const primaryNavigation: NavItem[] = [
       { id: 'suppliers', label: 'Suppliers' },
       { id: 'purchase-requests', label: 'Purchase requests' },
       { id: 'purchase-orders', label: 'Purchase orders' },
+      { id: 'goods-received-notes', label: 'Goods received notes' },
       { id: 'bills', label: 'Bills' },
       { id: 'supplier-payments', label: 'Supplier payments' },
       { id: 'payables', label: 'Payables' },

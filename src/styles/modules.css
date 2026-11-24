@@ -4413,3 +4413,14 @@
   .branch-stock-product header { flex-direction: column; }
   .branch-stock-product header strong { text-align: left; white-space: normal; }
 }
+.grn-lines { display: grid; gap: 12px; min-width: 0; }
+.grn-lines h3 { margin: 0; font-size: 1rem; }
+.grn-line { min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--border, #dbe1e8); border-radius: 12px; }
+.grn-line legend { padding: 0 6px; font-weight: 650; }
+.grn-line p { margin: 2px 0 12px; color: var(--text-muted, #687385); font-size: .875rem; overflow-wrap: anywhere; }
+.grn-line .form-grid { gap: 10px; }
+@media (max-width: 640px) {
+  .grn-line { padding: 10px; }
+  .grn-line .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .grn-line .form-grid > * { grid-column: 1 / -1; }
+}
