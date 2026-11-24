@@ -452,8 +452,8 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
           />
         )
       )}
-      <section className="panel register-panel">
-        <div className="banking-filters">
+      <section className={`panel register-panel${view === 'branch-inventory' ? ' register-panel--branch-stock' : ''}`}>
+        <div className={`banking-filters${view === 'branch-inventory' ? ' banking-filters--branch-stock' : ''}`}>
           <input
             aria-label="Search"
             placeholder={`Search ${titles[view].toLowerCase()}`}

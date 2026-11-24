@@ -38,6 +38,45 @@ const queuedQuotationSendIds = () =>
       .map((item) => /^\/sales\/quotations\/([^/]+)\/send$/.exec(item.path)?.[1])
       .filter((id): id is string => Boolean(id)),
   );
+type QueuedCustomerPayment = {
+  id: string;
+  invoiceId: string;
+  paymentDate: string;
+  reference: string;
+  amount: number;
+  method: string;
+};
+const queuedCustomerPayments = (): QueuedCustomerPayment[] =>
+  getOfflineQueue().flatMap((entry) => {
+    if (entry.path !== '/sales/payments' || entry.method !== 'POST' || !entry.body) return [];
+    try {
+      const data = JSON.parse(entry.body) as Record<string, unknown>;
+      if (
+        typeof data.invoiceId !== 'string' ||
+        typeof data.paymentDate !== 'string' ||
+        typeof data.reference !== 'string' ||
+        typeof data.amount !== 'number' ||
+        !Number.isFinite(data.amount) ||
+        data.amount <= 0 ||
+        typeof data.method !== 'string'
+      ) return [];
+      return [{
+        id: `offline:${entry.id}`,
+        invoiceId: data.invoiceId,
+        paymentDate: data.paymentDate,
+        reference: data.reference,
+        amount: data.amount,
+        method: data.method,
+      }];
+    } catch { return []; }
+  });
+const queuedPaymentAmount = (invoiceId: string) =>
+  queuedCustomerPayments()
+    .filter((payment) => payment.invoiceId === invoiceId)
+    .reduce((sum, payment) => sum + payment.amount, 0);
+const invoiceOutstanding = (invoice: Invoice, includeQueued = false) =>
+  Math.max(0, Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount) -
+    (includeQueued ? queuedPaymentAmount(invoice.id) : 0));
 export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: string; onNavigate: (id: string) => void }) {
   const canEdit = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role);
   const [summary, setSummary] = useState<SalesSummary | null>(null),
@@ -92,7 +131,30 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
           ),
         );
       else if (view === 'quotations') setRows(await salesApi.quotations({ search, status }));
-      else if (view === 'payments') setRows(await salesApi.payments({ search }));
+      else if (view === 'payments') {
+        const posted = await salesApi.payments({ search });
+        const term = search.trim().toLowerCase();
+        const pending = queuedCustomerPayments().flatMap((queued) => {
+          const invoice = i.find((item) => item.id === queued.invoiceId);
+          if (!invoice) return [];
+          const payment: Payment = {
+            id: queued.id,
+            reference: queued.reference,
+            amount: String(queued.amount),
+            currency: invoice.currency,
+            paymentDate: queued.paymentDate,
+            method: queued.method,
+            customer: invoice.customer,
+            invoice,
+          };
+          return !term || `${payment.reference} ${payment.customer.displayName} ${payment.invoice.number}`.toLowerCase().includes(term)
+            ? [payment]
+            : [];
+        });
+        setRows([...pending, ...posted].sort((a, b) =>
+          new Date((b as Payment).paymentDate).getTime() - new Date((a as Payment).paymentDate).getTime(),
+        ));
+      }
       else if (view === 'credit-notes') setRows(await salesApi.credits({ search }));
       else setRows(await salesApi.receivables({ search }));
     } catch (e) {
@@ -106,17 +168,25 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
     return () => clearTimeout(t);
   }, [load]);
   useEffect(() => {
+    let refreshTimer: number | undefined;
     const refreshQueuedSends = () => {
       const next = queuedQuotationSendIds();
+      if (['invoices', 'payments', 'receivables'].includes(view)) {
+        window.clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(() => void load(), 250);
+      }
       setQueuedQuotationSends((current) => {
         if (current.size === next.size && [...current].every((id) => next.has(id))) return current;
-        void load();
+        if (!['invoices', 'payments', 'receivables'].includes(view)) void load();
         return next;
       });
     };
     window.addEventListener('cephas:sync-state', refreshQueuedSends);
-    return () => window.removeEventListener('cephas:sync-state', refreshQueuedSends);
-  }, [load]);
+    return () => {
+      window.clearTimeout(refreshTimer);
+      window.removeEventListener('cephas:sync-state', refreshQueuedSends);
+    };
+  }, [load, view]);
   useEffect(() => {
     const openQuickCreate = (event?: Event) => {
       const requested =
@@ -667,12 +737,14 @@ function actions(
       </>
     );
   }
-  if (v === 'payments')
+  if (v === 'payments') {
+    if (r.id.startsWith('offline:')) return <span className="payment-pending-label">Pending sync</span>;
     return (
       <button onClick={() => run(() => salesApi.reversePayment(r.id), 'Payment reversed')}>
         Reverse
       </button>
     );
+  }
   if (v === 'credit-notes' && !(r as CreditNote).isVoid)
     return (
       <button onClick={() => run(() => salesApi.voidCredit(r.id), 'Credit note voided')}>
@@ -822,7 +894,7 @@ function CustomerHistoryModal({
     if (entry.path !== '/sales/payments' || entry.method !== 'POST' || !entry.body) return [];
     try {
       const data = JSON.parse(entry.body) as Record<string, unknown>;
-      if (typeof data.invoiceId !== 'string' || typeof data.paymentDate !== 'string' || typeof data.reference !== 'string' || typeof data.amount !== 'number') return [];
+      if (typeof data.invoiceId !== 'string' || typeof data.paymentDate !== 'string' || typeof data.reference !== 'string' || typeof data.amount !== 'number' || !Number.isFinite(data.amount) || data.amount <= 0) return [];
       return [{ id: entry.id, invoiceId: data.invoiceId, paymentDate: data.paymentDate, reference: data.reference, amount: data.amount }];
     } catch { return []; }
   });
@@ -1102,6 +1174,30 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
             </strong>
           </div>
         </footer>
+        <section className="invoice-payment-history">
+          <h2>Payment history</h2>
+          <div className="data-table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Reference</th><th>Method</th><th>Amount</th></tr></thead>
+              <tbody>
+                {(invoice.payments ?? []).map((payment) => (
+                  <tr key={payment.id}>
+                    <td>{day(payment.paymentDate)}</td><td>{payment.reference}</td><td>{payment.method}</td>
+                    <td>{cash(payment.amount, invoice.currency)}</td>
+                  </tr>
+                ))}
+                {queuedCustomerPayments().filter((payment) => payment.invoiceId === invoice.id).map((payment) => (
+                  <tr key={payment.id}>
+                    <td>{day(payment.paymentDate)}</td><td>{payment.reference} · Pending sync</td><td>{payment.method}</td>
+                    <td>{cash(String(payment.amount), invoice.currency)}</td>
+                  </tr>
+                ))}
+                {!invoice.payments?.length && !queuedCustomerPayments().some((payment) => payment.invoiceId === invoice.id) && <tr><td colSpan={4}>No payments recorded for this invoice.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <p>Outstanding balance <strong>{cash(String(invoiceOutstanding(invoice, true)), invoice.currency)}</strong></p>
+        </section>
         <div className="invoice-paper__bottom-line" />
       </div>
     </article>
@@ -1167,16 +1263,23 @@ function CreateModal({
   submit: (d: Record<string, unknown>, intent?: 'draft' | 'send') => void;
 }) {
   const document = view === 'quotations' || view === 'invoices';
+  const paymentForm = view === 'payments' || view === 'receivables';
   const [lineItems, setLineItems] = useState([
     { name: '', description: '', quantity: '', unitPrice: '' },
   ]);
   const [taxRate, setTaxRate] = useState('0');
   const [customerSelect, setCustomerSelect] = useState(customerPresetId);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState('');
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('Generating…');
   useEffect(() => {
     if (!open) return;
     setLineItems([{ name: '', description: '', quantity: '', unitPrice: '' }]);
     setTaxRate('0');
+    setPaymentInvoiceId('');
+    setInvoiceSearch('');
+    setPaymentAmount('');
   }, [open, view]);
   useEffect(() => setCustomerSelect(customerPresetId), [customerPresetId, open]);
   useEffect(() => {
@@ -1199,6 +1302,23 @@ function CreateModal({
     const amount = Number(item.quantity || 0) * Number(item.unitPrice || 0);
     return sum + amount + amount * (Number(taxRate || 0) / 100);
   }, 0);
+  const pendingPayments = queuedCustomerPayments();
+  const payableInvoices = invoices.filter((invoice) => {
+    const queued = pendingPayments.filter((payment) => payment.invoiceId === invoice.id).reduce((sum, payment) => sum + payment.amount, 0);
+    return !['DRAFT', 'VOID'].includes(invoice.status) &&
+      Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount) - queued > 0;
+  });
+  const visiblePaymentInvoices = payableInvoices.filter((invoice) => {
+    const term = invoiceSearch.trim().toLowerCase();
+    return invoice.id === paymentInvoiceId || !term || `${invoice.number} ${invoice.customer.displayName} ${invoice.customer.companyName ?? ''} ${invoice.customer.email ?? ''}`.toLowerCase().includes(term);
+  });
+  const selectedPaymentInvoice = payableInvoices.find((invoice) => invoice.id === paymentInvoiceId);
+  const queuedForSelectedInvoice = selectedPaymentInvoice
+    ? pendingPayments.filter((payment) => payment.invoiceId === selectedPaymentInvoice.id).reduce((sum, payment) => sum + payment.amount, 0)
+    : 0;
+  const selectedOutstanding = selectedPaymentInvoice
+    ? Math.max(0, Number(selectedPaymentInvoice.total) - Number(selectedPaymentInvoice.paidAmount) - Number(selectedPaymentInvoice.creditedAmount) - queuedForSelectedInvoice)
+    : 0;
   return (
     <Modal
       open={open}
@@ -1370,26 +1490,45 @@ function CreateModal({
           <>
             <label className="full">
               {document ? 'Customer Name' : 'Invoice Number'}
+              {paymentForm && (
+                <input
+                  className="payment-invoice-search"
+                  type="search"
+                  aria-label="Search invoices by number or customer"
+                  placeholder="Search invoice number or customer"
+                  value={invoiceSearch}
+                  onChange={(event) => setInvoiceSearch(event.target.value)}
+                />
+              )}
               <select
                 name={document ? 'customerId' : 'invoiceId'}
                 required
-                value={document ? customerSelect : undefined}
-                defaultValue={document ? undefined : ''}
+                value={document ? customerSelect : paymentForm ? paymentInvoiceId : undefined}
+                defaultValue={document || paymentForm ? undefined : ''}
                 onChange={(event) => {
-                  if (!document) return;
-                  setCustomerSelect(event.target.value);
+                  if (document) setCustomerSelect(event.target.value);
+                  if (paymentForm) {
+                    setPaymentInvoiceId(event.target.value);
+                    setPaymentAmount('');
+                  }
                   event.currentTarget.setCustomValidity('');
                 }}
               >
                 <option value="" disabled>
                   {document ? 'Select a customer name' : 'Select an invoice number'}
                 </option>
-                {(document ? customers : invoices).map((x) => (
+                {(document ? customers : paymentForm ? visiblePaymentInvoices : invoices).map((x) => (
                   <option key={x.id} value={x.id}>
                     {'displayName' in x ? x.displayName : `${x.number} — ${x.customer.displayName}`}
                   </option>
                 ))}
               </select>
+              {paymentForm && (
+                <>
+                  {!payableInvoices.length && <small className="field-hint">There are no outstanding invoices available for payment.</small>}
+                  {!!payableInvoices.length && !visiblePaymentInvoices.length && <small className="field-hint">No outstanding invoices match this search.</small>}
+                </>
+              )}
               {view === 'invoices' && customers.length === 0 && (
                 <small className="field-hint">Add a customer with a name before creating an invoice.</small>
               )}
@@ -1565,13 +1704,50 @@ function CreateModal({
             )}
             {!document && (
               <>
+                {paymentForm && selectedPaymentInvoice && (
+                  <section className="payment-invoice-summary full" aria-live="polite">
+                    <header>
+                      <div><small>Selected invoice</small><strong>{selectedPaymentInvoice.number}</strong></div>
+                      <span>{invoiceStatusLabel(selectedPaymentInvoice).replaceAll('_', ' ')}</span>
+                    </header>
+                    <div className="payment-invoice-summary__customer">
+                      <strong>{selectedPaymentInvoice.customer.displayName}</strong>
+                      {selectedPaymentInvoice.customer.companyName && <span>{selectedPaymentInvoice.customer.companyName}</span>}
+                      {selectedPaymentInvoice.customer.email && <span>{selectedPaymentInvoice.customer.email}</span>}
+                    </div>
+                    <div className="payment-invoice-summary__amounts">
+                      <span>Invoice total <b>{cash(selectedPaymentInvoice.total, selectedPaymentInvoice.currency)}</b></span>
+                      <span>Paid to date <b>{cash(selectedPaymentInvoice.paidAmount, selectedPaymentInvoice.currency)}</b></span>
+                      {Number(selectedPaymentInvoice.creditedAmount) > 0 && <span>Credits applied <b>{cash(selectedPaymentInvoice.creditedAmount, selectedPaymentInvoice.currency)}</b></span>}
+                      <span>Outstanding <b>{cash(String(selectedOutstanding), selectedPaymentInvoice.currency)}</b></span>
+                      {paymentAmount && Number(paymentAmount) > 0 && Number(paymentAmount) <= selectedOutstanding && (
+                        <span>Balance after payment <b>{cash(String(selectedOutstanding - Number(paymentAmount)), selectedPaymentInvoice.currency)}</b></span>
+                      )}
+                    </div>
+                  </section>
+                )}
+                {paymentForm && selectedPaymentInvoice && (
+                  <label key={selectedPaymentInvoice.id} className="payment-invoice-confirmation full">
+                    <input type="checkbox" name="confirmInvoiceAllocation" required />
+                    <span>I confirm this payment belongs to invoice <strong>{selectedPaymentInvoice.number}</strong> for <strong>{selectedPaymentInvoice.customer.displayName}</strong>.</span>
+                  </label>
+                )}
                 <label>
                   {view === 'credit-notes' ? 'Credit note number' : 'Reference'}
                   <input name={view === 'credit-notes' ? 'number' : 'reference'} required />
                 </label>
                 <label>
                   Amount
-                  <input name="amount" type="number" min=".01" step=".01" required />
+                  <input
+                    name="amount"
+                    type="number"
+                    min=".01"
+                    step=".01"
+                    max={paymentForm && selectedPaymentInvoice ? selectedOutstanding : undefined}
+                    required
+                    value={paymentForm ? paymentAmount : undefined}
+                    onChange={paymentForm ? (event) => setPaymentAmount(event.target.value) : undefined}
+                  />
                 </label>
                 <label>
                   Date

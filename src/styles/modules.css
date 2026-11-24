@@ -432,6 +432,111 @@
   font-size: 0.68rem;
   font-weight: 750;
 }
+.payment-invoice-search {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin-top: 8px;
+}
+.payment-invoice-summary {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dce4f2;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8faff, #fff);
+}
+.payment-invoice-summary header,
+.payment-invoice-summary__amounts span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.payment-invoice-summary__amounts span > * { min-width: 0; }
+.payment-invoice-summary header > div,
+.payment-invoice-summary__customer {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.payment-invoice-summary header small,
+.payment-invoice-summary__customer span {
+  color: #667085;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.payment-invoice-summary header > span {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #edf2ff;
+  color: #344db8;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.payment-invoice-summary__amounts {
+  display: grid;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid #e6eaf1;
+  color: #526078;
+  font-size: 0.78rem;
+}
+.payment-invoice-summary__amounts b {
+  color: #172033;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.payment-invoice-confirmation {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 9px !important;
+  padding: 11px 12px;
+  border: 1px solid #e1e6ef;
+  border-radius: 10px;
+  background: #fff;
+  color: #475467;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.payment-invoice-confirmation input {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+}
+.payment-invoice-confirmation span { overflow-wrap: anywhere; }
+.invoice-payment-history {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e5e7eb;
+}
+.invoice-payment-history h2 {
+  margin: 0 0 9px;
+  font-size: 0.85rem;
+}
+.invoice-payment-history p {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+}
+.invoice-payment-history .data-table-wrap { overflow-x: auto; }
+.payment-pending-label {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #fff4d9;
+  color: #8a5700;
+  font-size: 0.65rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .category-picker {
   display: flex;
   align-items: center;
@@ -4320,13 +4425,16 @@
 }
 .branch-stock-overview {
   display: grid;
-  gap: 1rem;
+  gap: 1.125rem;
   min-width: 0;
+  padding: 0 20px 20px;
 }
 .branch-stock-overview__hint {
   margin: 0;
   color: var(--text-muted, #667085);
   line-height: 1.5;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 .branch-stock-overview__locations {
   display: grid;
@@ -4336,7 +4444,7 @@
 .branch-stock-location,
 .branch-stock-product {
   min-width: 0;
-  padding: 1rem;
+  padding: 1.125rem;
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 14px;
   background: var(--surface, #fff);
@@ -4397,6 +4505,13 @@
   padding-top: 0.5rem;
   border-top: 1px solid var(--border, #e5e7eb);
 }
+.register-panel--branch-stock {
+  overflow: hidden;
+}
+.banking-filters--branch-stock {
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 230px);
+  padding: 16px 20px;
+}
 .branch-stock-product__locations span { overflow-wrap: anywhere; }
 .branch-stock-product__locations strong { text-align: right; }
 .branch-stock-status {
@@ -4407,7 +4522,19 @@
 .branch-stock-status--in_stock { color: #067647; }
 .branch-stock-status--low_stock { color: #b54708; }
 .branch-stock-status--out_of_stock { color: #b42318; }
-@media (max-width: 560px) {
+@media (max-width: 640px) {
+  .branch-stock-overview {
+    gap: 0.875rem;
+    padding: 0 12px 12px;
+  }
+  .banking-filters--branch-stock {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+  .branch-stock-location,
+  .branch-stock-product {
+    padding: 14px;
+  }
   .branch-stock-location { flex-direction: column; }
   .branch-stock-location__alerts { display: flex; text-align: left; }
   .branch-stock-product header { flex-direction: column; }
