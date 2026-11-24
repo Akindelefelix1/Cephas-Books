@@ -344,6 +344,7 @@ export function App() {
               'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables'
           }
           role={roleFor('sales.manage')}
+          onNavigate={navigate}
         />
       );
     if (

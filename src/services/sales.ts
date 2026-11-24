@@ -37,6 +37,8 @@ export interface Invoice {
   customer: Customer;
   customerId: string;
   items?: Line[];
+  payments?: CustomerStatementPayment[];
+  creditNotes?: CustomerStatementCredit[];
   organization?: { name: string; countryCode: string };
 }
 export interface Quotation {
@@ -76,20 +78,19 @@ export interface CreditNote {
   customer: Customer;
   invoice: Invoice;
 }
-export interface CustomerHistoryEntry {
+export interface CustomerStatementPayment {
   id: string;
-  type: 'invoice' | 'payment' | 'quotation' | 'credit-note' | 'pos-sale' | 'pos-return';
-  title: string;
-  number?: string;
-  reference?: string;
-  amount?: string;
-  status?: string;
-  currency?: string;
-  date: string;
-  customerId?: string;
-  customer?: Customer;
-  invoice?: Invoice | null;
-  notes?: string;
+  reference: string;
+  amount: string;
+  paymentDate: string;
+  method: string;
+}
+export interface CustomerStatementCredit {
+  id: string;
+  number: string;
+  amount: string;
+  issueDate: string;
+  isVoid: boolean;
 }
 export interface SalesSummary {
   customers: number;
@@ -110,7 +111,7 @@ export const salesApi = {
       `/customers?limit=100&search=${encodeURIComponent(search)}`,
     ),
   customerPurchaseHistory: (id: string) =>
-    authorizedRequest<CustomerHistoryEntry[]>(`/customers/${id}/purchase-history`),
+    authorizedRequest<Invoice[]>(`/customers/${id}/purchase-history`),
   createCustomer: (data: Partial<Customer>) =>
     authorizedRequest<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) }),
   updateCustomer: (id: string, data: Partial<Customer>) =>

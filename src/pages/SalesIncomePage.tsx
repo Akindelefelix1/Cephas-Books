@@ -8,7 +8,6 @@ import {
   salesApi,
   type CreditNote,
   type Customer,
-  type CustomerHistoryEntry,
   type Invoice,
   type Payment,
   type Quotation,
@@ -22,6 +21,16 @@ type Row = Customer | Quotation | Invoice | Payment | CreditNote;
 const cash = (v: string, c = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: c }).format(Number(v));
 const day = (v: string) => new Date(v).toLocaleDateString('en-NG');
+const todayIso = () => {
+  const date = new Date();
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+};
+const invoiceStatusLabel = (invoice: Invoice) => {
+  if (invoice.status === 'VOID' || invoice.status === 'DRAFT') return invoice.status;
+  const balance = Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount);
+  if (balance <= 0) return 'PAID';
+  return invoice.dueDate.slice(0, 10) < todayIso() ? 'OVERDUE' : invoice.status;
+};
 const queuedQuotationSendIds = () =>
   new Set(
     getOfflineQueue()
@@ -29,7 +38,7 @@ const queuedQuotationSendIds = () =>
       .map((item) => /^\/sales\/quotations\/([^/]+)\/send$/.exec(item.path)?.[1])
       .filter((id): id is string => Boolean(id)),
   );
-export function SalesIncomePage({ view, role }: { view: View; role: string }) {
+export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: string; onNavigate: (id: string) => void }) {
   const canEdit = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role);
   const [summary, setSummary] = useState<SalesSummary | null>(null),
     [customers, setCustomers] = useState<Customer[]>([]),
@@ -44,9 +53,11 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     [error, setError] = useState(''),
     [modal, setModal] = useState(false),
     [selected, setSelected] = useState<Customer | null>(null),
+    [customerPresetId, setCustomerPresetId] = useState(''),
     [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null),
-    [historyEntries, setHistoryEntries] = useState<CustomerHistoryEntry[]>([]),
+    [historyEntries, setHistoryEntries] = useState<Invoice[]>([]),
     [historyLoading, setHistoryLoading] = useState(false),
+    [historyError, setHistoryError] = useState(''),
     [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const load = useCallback(async () => {
@@ -74,7 +85,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
               (!search ||
                 x.number.toLowerCase().includes(search.toLowerCase()) ||
                 x.customer.displayName.toLowerCase().includes(search.toLowerCase())) &&
-              (!status || x.status === status),
+              (!status || invoiceStatusLabel(x) === status),
           ),
         );
       else if (view === 'quotations') setRows(await salesApi.quotations({ search, status }));
@@ -118,14 +129,35 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     return () => window.removeEventListener('cephas:quick-create', openQuickCreate);
   }, [canEdit, view]);
   useEffect(() => {
+    const raw = sessionStorage.getItem('cephas:customer-document');
+    if (!raw) return;
+    try {
+      const request = JSON.parse(raw) as { customerId?: string; view?: View };
+      if (request.view === view && request.customerId && ['quotations', 'invoices'].includes(view)) {
+        setCustomerPresetId(request.customerId);
+        setModal(true);
+        sessionStorage.removeItem('cephas:customer-document');
+      }
+    } catch {
+      sessionStorage.removeItem('cephas:customer-document');
+    }
+  }, [view]);
+  useEffect(() => {
     if (!historyCustomer) return;
-    void salesApi
-      .customerPurchaseHistory(historyCustomer.id)
-      .then((entries) => setHistoryEntries(entries))
-      .catch((caught) =>
-        setError(caught instanceof Error ? caught.message : 'Unable to load customer history'),
-      )
-      .finally(() => setHistoryLoading(false));
+    const refresh = () => {
+      setHistoryError('');
+      void salesApi
+        .customerPurchaseHistory(historyCustomer.id)
+        .then((entries) => setHistoryEntries(entries))
+        .catch((caught) => {
+          const message = caught instanceof Error ? caught.message : 'Unable to load customer dashboard';
+          setHistoryError(message);
+        })
+        .finally(() => setHistoryLoading(false));
+    };
+    refresh();
+    window.addEventListener('cephas:sync-state', refresh);
+    return () => window.removeEventListener('cephas:sync-state', refresh);
   }, [historyCustomer]);
   const run = async (fn: () => Promise<unknown>, message: string) => {
     setBusy(true);
@@ -134,6 +166,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
       const result = await fn();
       setModal(false);
       setSelected(null);
+      setCustomerPresetId('');
       await load();
       if (result && typeof result === 'object' && 'emailSent' in result && result.emailSent === false) {
         const documentName = view === 'invoices' ? 'Invoice' : 'Quotation';
@@ -375,6 +408,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
                             (invoice) => setPreviewInvoice(invoice),
                             (customer) => {
                               setHistoryEntries([]);
+                              setHistoryError('');
                               setHistoryLoading(true);
                               setHistoryCustomer(customer);
                             },
@@ -405,6 +439,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         open={modal}
         view={view}
         selected={selected}
+        customerPresetId={customerPresetId}
         customers={customers}
         invoices={invoices.filter(
           (x) => Number(x.total) - Number(x.paidAmount) - Number(x.creditedAmount) > 0,
@@ -414,6 +449,7 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         close={() => {
           setModal(false);
           setSelected(null);
+          setCustomerPresetId('');
         }}
         submit={(data, intent = 'draft') =>
           void run(
@@ -441,11 +477,28 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         onClose={() => setPreviewInvoice(null)}
       />
       <CustomerHistoryModal
+        key={historyCustomer?.id || 'closed'}
         customer={historyCustomer}
-        entries={historyEntries}
+        invoices={historyEntries}
         loading={historyLoading}
+        error={historyError}
+        onRetry={() => {
+          if (!historyCustomer) return;
+          setHistoryLoading(true);
+          setHistoryError('');
+          void salesApi.customerPurchaseHistory(historyCustomer.id)
+            .then(setHistoryEntries)
+            .catch((caught) => setHistoryError(caught instanceof Error ? caught.message : 'Unable to load customer dashboard'))
+            .finally(() => setHistoryLoading(false));
+        }}
         onClose={() => setHistoryCustomer(null)}
         onPreview={setPreviewInvoice}
+        canEdit={canEdit}
+        onCreateDocument={(target, customer) => {
+          sessionStorage.setItem('cephas:customer-document', JSON.stringify({ customerId: customer.id, view: target }));
+          setHistoryCustomer(null);
+          onNavigate(target);
+        }}
       />
     </>
   );
@@ -494,7 +547,7 @@ function values(v: View, r: Row): string[] {
           cash(x.total, x.currency),
           cash(String(out), x.currency),
           day(x.dueDate),
-          x.status,
+          invoiceStatusLabel(x),
         ]
       : [
           x.number,
@@ -558,7 +611,7 @@ function actions(
     return (
       <>
         <button onClick={() => history(r as Customer)}>
-          <History size={15} /> History
+          <History size={15} /> Dashboard
         </button>
         {canEdit && <button onClick={edit}>Edit</button>}
         {canEdit && (r as Customer).isActive && (
@@ -635,11 +688,7 @@ async function create(
       status: intent === 'send' ? 'DRAFT' : d.status || 'DRAFT',
       sendEmail: intent === 'send',
     });
-  if (v === 'invoices') return salesApi.createInvoice({
-    ...d,
-    status: intent === 'send' ? 'DRAFT' : d.status || 'DRAFT',
-    sendEmail: intent === 'send',
-  });
+  if (v === 'invoices') return salesApi.createInvoice({ ...d, sendEmail: intent === 'send' });
   if (v === 'payments' || v === 'receivables') return salesApi.createPayment(d);
   return salesApi.createCredit(d);
 }
@@ -701,129 +750,222 @@ function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose
 }
 function CustomerHistoryModal({
   customer,
-  entries,
+  invoices,
   loading,
+  error,
+  onRetry,
   onClose,
   onPreview,
+  onCreateDocument,
+  canEdit,
 }: {
   customer: Customer | null;
-  entries: CustomerHistoryEntry[];
+  invoices: Invoice[];
   loading: boolean;
+  error: string;
+  onRetry: () => void;
   onClose: () => void;
   onPreview: (invoice: Invoice) => void;
+  onCreateDocument: (target: 'quotations' | 'invoices', customer: Customer) => void;
+  canEdit: boolean;
 }) {
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [cardViews, setCardViews] = useState(['outstanding', 'invoiced', 'payments', 'credits', 'overdue']);
+  const [openCard, setOpenCard] = useState<string | null>(null);
   if (!customer) return null;
-  const activity = [...entries].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  const offlineWrites = getOfflineQueue();
+  const labels: Record<string, string> = { outstanding: 'Outstanding balance', invoiced: 'Invoiced', payments: 'Payments received', credits: 'Credits applied', overdue: 'Overdue balance' };
+  const dateInRange = (value: string) => {
+    const date = value.slice(0, 10);
+    return (!fromDate || date >= fromDate) && (!toDate || date <= toDate);
+  };
+  const pendingInvoices = offlineWrites.flatMap((entry) => {
+    if (entry.path !== '/invoices' || entry.method !== 'POST' || !entry.body) return [];
+    try {
+      const data = JSON.parse(entry.body) as Record<string, unknown>;
+      if (data.sendEmail !== true || data.customerId !== customer.id || typeof data.issueDate !== 'string' || typeof data.dueDate !== 'string' || !Array.isArray(data.items)) return [];
+      const total = data.items.reduce((sum: number, rawItem: unknown) => {
+        const item = rawItem as Record<string, unknown>;
+        const base = Number(item.quantity) * Number(item.unitPrice);
+        return sum + base + base * Number(item.taxRate ?? 0) / 100;
+      }, 0) + Number(data.shippingAmount ?? 0);
+      if (!Number.isFinite(total)) return [];
+      return [{
+        id: 'offline:' + entry.id,
+        number: 'Pending sync ' + entry.id.slice(0, 8),
+        status: 'PENDING_SEND',
+        currency: typeof data.currency === 'string' ? data.currency : getDefaultCurrency(),
+        issueDate: data.issueDate,
+        dueDate: data.dueDate,
+        subtotal: String(total),
+        taxTotal: '0',
+        shippingAmount: String(data.shippingAmount ?? 0),
+        total: String(total),
+        paidAmount: '0',
+        creditedAmount: '0',
+        customer,
+        customerId: customer.id,
+        items: [],
+      } as Invoice];
+    } catch { return []; }
+  });
+  const pendingPayments = offlineWrites.flatMap((entry) => {
+    if (entry.path !== '/sales/payments' || entry.method !== 'POST' || !entry.body) return [];
+    try {
+      const data = JSON.parse(entry.body) as Record<string, unknown>;
+      if (typeof data.invoiceId !== 'string' || typeof data.paymentDate !== 'string' || typeof data.reference !== 'string' || typeof data.amount !== 'number') return [];
+      return [{ id: entry.id, invoiceId: data.invoiceId, paymentDate: data.paymentDate, reference: data.reference, amount: data.amount }];
+    } catch { return []; }
+  });
+  const liveInvoices = [...invoices, ...pendingInvoices].filter((invoice) =>
+    invoice.status !== 'VOID' &&
+    (invoice.status !== 'DRAFT' || pendingPayments.some((payment) => payment.invoiceId === invoice.id)),
   );
-  const totalSales = activity.reduce(
-    (sum, item) =>
-      sum + (item.type === 'invoice' || item.type === 'pos-sale' ? Number(item.amount ?? 0) : 0),
-    0,
+  const currencies = [...new Set(liveInvoices.map((invoice) => invoice.currency))];
+  if (!currencies.length) currencies.push(getDefaultCurrency());
+  const pendingAmount = (invoice: Invoice) => Math.min(
+    pendingPayments.filter((payment) => payment.invoiceId === invoice.id).reduce((sum, payment) => sum + payment.amount, 0),
+    Math.max(0, Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount)),
   );
-  const totalPayments = activity.reduce(
-    (sum, item) => sum + (item.type === 'payment' ? Number(item.amount ?? 0) : 0),
-    0,
-  );
-  const totalCredits = activity.reduce(
-    (sum, item) =>
-      sum +
-      (item.type === 'credit-note' || item.type === 'pos-return' ? Number(item.amount ?? 0) : 0),
-    0,
-  );
-  const invoiceRows = activity.filter(
-    (item) =>
-      item.type === 'invoice' ||
-      item.type === 'payment' ||
-      item.type === 'credit-note' ||
-      item.type === 'pos-sale' ||
-      item.type === 'pos-return' ||
-      item.type === 'quotation',
-  );
+  const balance = (invoice: Invoice) => Math.max(0, Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount) - pendingAmount(invoice));
+  const dashboardStatus = (invoice: Invoice) =>
+    invoice.id.startsWith('offline:')
+      ? 'INVOICE PENDING SYNC'
+      : pendingAmount(invoice) > 0
+      ? balance(invoice) === 0 ? 'PAYMENT PENDING SYNC' : 'PARTIAL PAYMENT PENDING SYNC'
+      : invoiceStatusLabel(invoice);
+  const metricValue = (metric: string, currency: string) => {
+    const records = liveInvoices.filter((invoice) => invoice.currency === currency);
+    if (metric === 'outstanding') return records.reduce((sum, invoice) => sum + (dateInRange(invoice.issueDate) ? balance(invoice) : 0), 0);
+    if (metric === 'invoiced') return records.reduce((sum, invoice) => sum + (dateInRange(invoice.issueDate) ? Number(invoice.total) : 0), 0);
+    if (metric === 'payments') return records.flatMap((invoice) => invoice.payments ?? []).reduce((sum, payment) => sum + (dateInRange(payment.paymentDate) ? Number(payment.amount) : 0), 0) + pendingPayments.filter((payment) => records.some((invoice) => invoice.id === payment.invoiceId) && dateInRange(payment.paymentDate)).reduce((sum, payment) => sum + payment.amount, 0);
+    if (metric === 'credits') return records.flatMap((invoice) => invoice.creditNotes ?? []).reduce((sum, credit) => sum + (!credit.isVoid && dateInRange(credit.issueDate) ? Number(credit.amount) : 0), 0);
+    const today = todayIso();
+    return records.reduce((sum, invoice) => sum + (dateInRange(invoice.issueDate) && invoice.dueDate.slice(0, 10) < today ? balance(invoice) : 0), 0);
+  };
+  const cardDetails = (metric: string, currency: string) => {
+    const records = liveInvoices.filter((invoice) => invoice.currency === currency);
+    const today = todayIso();
+    if (metric === 'payments') {
+      const posted = records.flatMap((invoice) => (invoice.payments ?? []).filter((payment) => dateInRange(payment.paymentDate)).map((payment) => ({ id: payment.id, reference: payment.reference, date: payment.paymentDate, amount: '-' + cash(payment.amount, invoice.currency), detail: 'Payment for ' + invoice.number })));
+      const queued = pendingPayments.filter((payment) => records.some((invoice) => invoice.id === payment.invoiceId) && dateInRange(payment.paymentDate)).map((payment) => ({ id: payment.id, reference: payment.reference, date: payment.paymentDate, amount: '-' + cash(String(payment.amount), currency), detail: 'Payment pending sync' }));
+      return [...posted, ...queued];
+    }
+    if (metric === 'credits') return records.flatMap((invoice) => (invoice.creditNotes ?? []).filter((credit) => !credit.isVoid && dateInRange(credit.issueDate)).map((credit) => ({ id: credit.id, reference: credit.number, date: credit.issueDate, amount: '−' + cash(credit.amount, invoice.currency), detail: 'Credit for ' + invoice.number })));
+    return records.filter((invoice) => dateInRange(invoice.issueDate) && (metric === 'invoiced' || balance(invoice) > 0) && (metric !== 'overdue' || invoice.dueDate.slice(0, 10) < today)).map((invoice) => ({ id: invoice.id, reference: invoice.number, date: invoice.issueDate, amount: cash(String(metric === 'invoiced' ? invoice.total : balance(invoice)), invoice.currency), detail: dashboardStatus(invoice) + ' · due ' + day(invoice.dueDate), invoice }));
+  };
+  const downloadStatement = () => {
+    const entries: { date: string; row: string[] }[] = [];
+    for (const invoice of liveInvoices) {
+      if (dateInRange(invoice.issueDate)) entries.push({ date: invoice.issueDate.slice(0, 10), row: [invoice.issueDate.slice(0, 10), invoice.id.startsWith('offline:') ? 'Invoice pending sync' : 'Invoice', invoice.number, invoice.number, invoice.currency, String(invoice.total), String(balance(invoice))] });
+      for (const payment of invoice.payments ?? []) if (dateInRange(payment.paymentDate)) entries.push({ date: payment.paymentDate.slice(0, 10), row: [payment.paymentDate.slice(0, 10), 'Payment', payment.reference, invoice.number, invoice.currency, '-' + payment.amount, ''] });
+      for (const payment of pendingPayments.filter((item) => item.invoiceId === invoice.id && dateInRange(item.paymentDate))) entries.push({ date: payment.paymentDate.slice(0, 10), row: [payment.paymentDate.slice(0, 10), 'Payment pending sync', payment.reference, invoice.number, invoice.currency, '-' + payment.amount, ''] });
+      for (const credit of invoice.creditNotes ?? []) if (!credit.isVoid && dateInRange(credit.issueDate)) entries.push({ date: credit.issueDate.slice(0, 10), row: [credit.issueDate.slice(0, 10), 'Credit', credit.number, invoice.number, invoice.currency, '-' + credit.amount, ''] });
+    }
+    const currentBalances = currencies.map((currency) => [
+      '',
+      'Current total outstanding',
+      '',
+      '',
+      currency,
+      '',
+      String(liveInvoices.filter((invoice) => invoice.currency === currency).reduce((sum, invoice) => sum + balance(invoice), 0)),
+    ]);
+    const lines = [
+      ['Date', 'Type', 'Reference', 'Invoice', 'Currency', 'Amount', 'Current balance'],
+      ...entries.sort((a, b) => a.date.localeCompare(b.date)).map((entry) => entry.row),
+      ...currentBalances,
+    ];
+    const csv = lines.map((line) => line.map((value, index) => {
+      const safeValue = index === 2 && /^[\s]*[=+@-]/.test(value) ? "'" + value : value;
+      return '"' + safeValue.replaceAll('"', '""') + '"';
+    }).join(',')).join('\n');
+    downloadText(customer.displayName.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-statement.csv', csv);
+  };
   return (
     <Modal
       open
       wide
-      title={`${customer.displayName} customer history`}
+      title={customer.displayName + ' customer dashboard'}
       subtitle={customer.billingAddress || customer.email || 'Everything tied to this customer'}
       onClose={onClose}
       footer={
-        <button className="button button--secondary" onClick={onClose}>
-          Close
-        </button>
+        <>
+          {canEdit && <button className="button button--secondary" onClick={() => onCreateDocument('quotations', customer)}>Create quotation</button>}
+          {canEdit && <button className="button" onClick={() => onCreateDocument('invoices', customer)}>Create invoice</button>}
+          <button className="button button--secondary" onClick={downloadStatement} disabled={loading || Boolean(error)}>Download statement</button>
+          <button className="button button--secondary" onClick={onClose}>Close</button>
+        </>
       }
     >
       <div className="customer-history">
         {loading ? (
           <LoadingState label="Loading customer history…" />
+        ) : error ? (
+          <div className="banking-alert" role="alert">
+            {error}
+            <button type="button" onClick={onRetry}>Try again</button>
+          </div>
         ) : (
           <>
-            <div className="customer-history__summary">
-              <div>
-                <span>Activities</span>
-                <strong>{invoiceRows.length}</strong>
-              </div>
-              <div>
-                <span>Sales</span>
-                <strong>{cash(String(totalSales))}</strong>
-              </div>
-              <div>
-                <span>Payments</span>
-                <strong>{cash(String(totalPayments))}</strong>
-              </div>
-              <div>
-                <span>Credits / returns</span>
-                <strong>{cash(String(totalCredits))}</strong>
-              </div>
+            <div className="customer-dashboard-toolbar">
+              <strong>Account activity · balances update as payments are recorded</strong>
+              <button type="button" className="button button--secondary button--small" aria-label="Filter customer dashboard by date" aria-expanded={filterOpen} onClick={() => setFilterOpen((value) => !value)}><Filter size={15} /> Filter</button>
             </div>
+            {filterOpen && <div className="customer-dashboard-date-filter"><label>From<input type="date" max={toDate || undefined} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label><label>To<input type="date" min={fromDate || undefined} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label><button type="button" className="button button--ghost button--small" onClick={() => { setFromDate(''); setToDate(''); }}>Clear dates</button></div>}
+            {currencies.map((currency) => (
+              <section className="customer-dashboard-currency" key={currency}>
+                <h3>{currency}</h3>
+                <div className="customer-dashboard-cards">
+                  {cardViews.map((metric, index) => {
+                    const cardId = currency + '-' + index;
+                    const details = cardDetails(metric, currency);
+                    return <article className={'customer-dashboard-card' + (openCard === cardId ? ' is-open' : '')} key={cardId}>
+                      <button type="button" className="customer-dashboard-card__toggle" aria-expanded={openCard === cardId} onClick={() => setOpenCard((current) => current === cardId ? null : cardId)}><span>{labels[metric]}</span><strong>{cash(String(metricValue(metric, currency)), currency)}</strong><small>{details.length} records</small></button>
+                      <label className="customer-dashboard-card__view">Calculation view<select aria-label={'Calculation view for card ' + (index + 1) + ' in ' + currency} value={metric} onChange={(event) => setCardViews((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))}>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                      {openCard === cardId && <div className="customer-dashboard-card__details">{details.length ? details.map((item) => <div key={item.id}><span><strong>{item.reference}</strong><small>{item.detail} · {day(item.date)}</small></span><b>{item.amount}{'invoice' in item && ((item.invoice as Invoice).id.startsWith('offline:') ? <small>Pending sync</small> : <button type="button" onClick={() => onPreview(item.invoice as Invoice)}><Eye size={14} /> View</button>)}</b></div>) : <p>No activity in this date range.</p>}</div>}
+                    </article>;
+                  })}
+                </div>
+              </section>
+            ))}
             <div className="data-table-wrap">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Type</th>
-                    <th>Reference</th>
-                    <th>Date</th>
+                    <th>Invoice</th>
+                    <th>Issue date</th>
+                    <th>Due date</th>
                     <th>Status</th>
-                    <th className="is-right">Amount</th>
-                    <th>Notes</th>
+                    <th className="is-right">Total</th>
+                    <th className="is-right">Paid</th>
+                    <th className="is-right">Balance</th>
                     <th aria-label="Actions" />
                   </tr>
                 </thead>
                 <tbody>
-                  {activity.map((entry) => {
-                    const invoice = entry.invoice ?? null;
+                  {liveInvoices.filter((invoice) => dateInRange(invoice.issueDate)).map((invoice) => {
                     return (
-                      <tr key={entry.id}>
-                        <td>
-                          <span className="banking-status">{entry.type.replace('-', ' ')}</span>
-                        </td>
-                        <td className="is-primary">
-                          {entry.number || entry.reference || entry.title}
-                        </td>
-                        <td>{day(entry.date)}</td>
-                        <td>{entry.status || '—'}</td>
+                      <tr key={invoice.id}>
+                        <td className="is-primary">{invoice.number}</td>
+                        <td>{day(invoice.issueDate)}</td>
+                        <td>{day(invoice.dueDate)}</td>
+                        <td>{dashboardStatus(invoice)}</td>
+                        <td className="is-right">{cash(invoice.total, invoice.currency)}</td>
+                        <td className="is-right">{cash(String(Number(invoice.paidAmount) + pendingAmount(invoice)), invoice.currency)}</td>
+                        <td className="is-right">{cash(String(balance(invoice)), invoice.currency)}</td>
                         <td className="is-right">
-                          {entry.amount
-                            ? cash(entry.amount, entry.currency || getDefaultCurrency())
-                            : '—'}
-                        </td>
-                        <td>{entry.notes || '—'}</td>
-                        <td className="is-right">
-                          {invoice ? (
-                            <button onClick={() => onPreview(invoice)}>
-                              <Eye size={15} /> View
-                            </button>
-                          ) : (
-                            '—'
-                          )}
+                          {invoice.id.startsWith('offline:') ? <span>Pending sync</span> : <button onClick={() => onPreview(invoice)}><Eye size={15} /> View</button>}
                         </td>
                       </tr>
                     );
                   })}
-                  {!activity.length && (
+                  {!liveInvoices.filter((invoice) => dateInRange(invoice.issueDate)).length && (
                     <tr>
-                      <td className="table-empty" colSpan={7}>
-                        No activity recorded for this customer.
+                      <td className="table-empty" colSpan={8}>
+                        No invoices recorded for this customer in the selected date range.
                       </td>
                     </tr>
                   )}
@@ -996,6 +1138,7 @@ function CreateModal({
   open,
   view,
   selected,
+  customerPresetId,
   customers,
   invoices,
   busy,
@@ -1006,6 +1149,7 @@ function CreateModal({
   open: boolean;
   view: View;
   selected: Customer | null;
+  customerPresetId: string;
   customers: Customer[];
   invoices: Invoice[];
   busy: boolean;
@@ -1018,12 +1162,14 @@ function CreateModal({
     { name: '', description: '', quantity: '', unitPrice: '' },
   ]);
   const [taxRate, setTaxRate] = useState('0');
+  const [customerSelect, setCustomerSelect] = useState(customerPresetId);
   const [invoiceNumber, setInvoiceNumber] = useState('Generating…');
   useEffect(() => {
     if (!open) return;
     setLineItems([{ name: '', description: '', quantity: '', unitPrice: '' }]);
     setTaxRate('0');
   }, [open, view]);
+  useEffect(() => setCustomerSelect(customerPresetId), [customerPresetId, open]);
   useEffect(() => {
     if (!open || !document) return;
     const request =
@@ -1119,6 +1265,15 @@ function CreateModal({
             get = (n: string) => String(f.get(n) || '');
           const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
           const intent = submitter?.value === 'send' ? 'send' : 'draft';
+          if (document && intent === 'send') {
+            const customerField = e.currentTarget.querySelector<HTMLSelectElement>('select[name="customerId"]');
+            const selectedCustomer = customers.find((customer) => customer.id === get('customerId'));
+            if (!selectedCustomer?.email) {
+              customerField?.setCustomValidity('Add an email address to this customer before sending.');
+              customerField?.reportValidity();
+              return;
+            }
+          }
           if (view === 'customers')
             submit({
               name: get('name'),
@@ -1137,7 +1292,6 @@ function CreateModal({
                 ? { expiryDate: get('dueDate'), status: get('status') }
                 : {
                     dueDate: get('dueDate'),
-                    status: get('status') || 'DRAFT',
                     shippingAddress: get('shippingAddress') || undefined,
                     shippingAmount: Number(get('shippingAmount')),
                   }),
@@ -1206,7 +1360,17 @@ function CreateModal({
           <>
             <label className="full">
               {document ? 'Customer Name' : 'Invoice Number'}
-              <select name={document ? 'customerId' : 'invoiceId'} required defaultValue="">
+              <select
+                name={document ? 'customerId' : 'invoiceId'}
+                required
+                value={document ? customerSelect : undefined}
+                defaultValue={document ? undefined : ''}
+                onChange={(event) => {
+                  if (!document) return;
+                  setCustomerSelect(event.target.value);
+                  event.currentTarget.setCustomValidity('');
+                }}
+              >
                 <option value="" disabled>
                   {document ? 'Select a customer name' : 'Select an invoice number'}
                 </option>
@@ -1231,7 +1395,7 @@ function CreateModal({
                 {view === 'invoices' && (
                   <div className="quotation-section-title full">
                     <h3>Invoice</h3>
-                    <p>Choose a customer, invoice status, and billing details.</p>
+                  <p>Choose a customer and enter the invoice billing details.</p>
                   </div>
                 )}
                 <label>
@@ -1243,15 +1407,6 @@ function CreateModal({
                   />
                 </label>
                 {view === 'quotations' && (
-                  <label>
-                    Status
-                    <select name="status" defaultValue="DRAFT">
-                      <option value="DRAFT">Draft</option>
-                      <option value="SENT">Sent</option>
-                    </select>
-                  </label>
-                )}
-                {view === 'invoices' && (
                   <label>
                     Status
                     <select name="status" defaultValue="DRAFT">
