@@ -2,8 +2,13 @@
 
 Responsive React and TypeScript client for Cephas Books. The sibling `CephasBooks-BE` repository supplies the NestJS API and PostgreSQL database.
 
-C:\Users\akind\Desktop\CephasBooks-BE
-access the BE from here for all end to end wiring
+PS C:\Users\akind\Desktop\CephasBOOKS-Project\CephasBooks-BE> 
+access the BE from here  for all end to  end wiring.
+
+make sure  that all fixes and implementation are all mobile and tablet and all screen responsive..also be sure that offine compactibility are well check
+
+Audit the last implementationand check for any gap, error or inconsistency and fix them neatly
+
 
 ## Run the complete local stack with Docker Desktop
 

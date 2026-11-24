@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Download, Eye, History, LoaderCircle, MapPin, Plus, Send, Trash2 } from 'lucide-react';
+import { Download, Eye, Filter, History, LoaderCircle, MapPin, Plus, Send, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal, type Confirmation } from '@/components/ui/ConfirmModal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
@@ -16,11 +16,19 @@ import {
 } from '@/services/sales';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
+import { getOfflineQueue, isWorkingOffline } from '@/services/offline';
 type View = 'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables';
 type Row = Customer | Quotation | Invoice | Payment | CreditNote;
 const cash = (v: string, c = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: c }).format(Number(v));
 const day = (v: string) => new Date(v).toLocaleDateString('en-NG');
+const queuedQuotationSendIds = () =>
+  new Set(
+    getOfflineQueue()
+      .filter((item) => item.method === 'POST')
+      .map((item) => /^\/sales\/quotations\/([^/]+)\/send$/.exec(item.path)?.[1])
+      .filter((id): id is string => Boolean(id)),
+  );
 export function SalesIncomePage({ view, role }: { view: View; role: string }) {
   const canEdit = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role);
   const [summary, setSummary] = useState<SalesSummary | null>(null),
@@ -29,6 +37,8 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     [rows, setRows] = useState<Row[]>([]),
     [search, setSearch] = useState(''),
     [status, setStatus] = useState(''),
+    [filterOpen, setFilterOpen] = useState(false),
+    [queuedQuotationSends, setQueuedQuotationSends] = useState<Set<string>>(() => queuedQuotationSendIds()),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -82,6 +92,18 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     return () => clearTimeout(t);
   }, [load]);
   useEffect(() => {
+    const refreshQueuedSends = () => {
+      const next = queuedQuotationSendIds();
+      setQueuedQuotationSends((current) => {
+        if (current.size === next.size && [...current].every((id) => next.has(id))) return current;
+        void load();
+        return next;
+      });
+    };
+    window.addEventListener('cephas:sync-state', refreshQueuedSends);
+    return () => window.removeEventListener('cephas:sync-state', refreshQueuedSends);
+  }, [load]);
+  useEffect(() => {
     const openQuickCreate = (event?: Event) => {
       const requested =
         event instanceof CustomEvent
@@ -109,11 +131,18 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
     setBusy(true);
     setError('');
     try {
-      await fn();
+      const result = await fn();
       setModal(false);
       setSelected(null);
-      confirmAction(message);
       await load();
+      if (result && typeof result === 'object' && 'emailSent' in result && result.emailSent === false) {
+        setError(`Quotation saved as a draft, but it could not be emailed: ${'emailError' in result ? String(result.emailError) : 'Email delivery failed.'}`);
+        confirmAction('Quotation saved as draft');
+      } else if (result && typeof result === 'object' && 'queuedOffline' in result) {
+        confirmAction(view === 'quotations' && message.includes('emailed')
+          ? 'Quotation queued offline. It will be emailed when this device syncs.'
+          : `${title[view]} queued offline and will sync when online`);
+      } else confirmAction(message);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to save record');
@@ -161,6 +190,16 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
           <p>Manage {title[view].toLowerCase()} across your organisation.</p>
         </div>
         <div className="page-header__actions">
+          {view === 'quotations' && (
+            <button
+              className="button button--secondary button--small"
+              type="button"
+              aria-expanded={filterOpen}
+              onClick={() => setFilterOpen((open) => !open)}
+            >
+              <Filter size={15} /> Filter
+            </button>
+          )}
           <button className="button button--secondary" onClick={exportCsv}>
             <Download size={17} /> Export CSV
           </button>
@@ -172,6 +211,19 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
           )}
         </div>
       </div>
+      {view === 'quotations' && filterOpen && (
+        <div className="quotation-filter-panel">
+          <label>
+            Status
+            <select aria-label="Filter quotations by status" value={status} onChange={(event) => setStatus(event.target.value)}>
+              <option value="">All statuses</option>
+              {['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED', 'CONVERTED', 'VOID'].map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       {summary && (
         <StatsGrid
           stats={[
@@ -190,13 +242,10 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {(view === 'invoices' || view === 'quotations') && (
+          {view === 'invoices' && (
             <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All statuses</option>
-              {(view === 'quotations'
-                ? ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED', 'CONVERTED', 'VOID']
-                : ['DRAFT', 'SENT', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID']
-              ).map((x) => (
+              {['DRAFT', 'SENT', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID'].map((x) => (
                 <option key={x}>{x}</option>
               ))}
             </select>
@@ -210,6 +259,76 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
         )}
         {loading ? (
           <LoadingState label="Loading sales and income…" />
+        ) : view === 'quotations' ? (
+          <div className="quotation-card-grid">
+            {(rows as Quotation[]).map((quotation) => (
+              <article className="quotation-card" key={quotation.id}>
+                <header className="quotation-card__header">
+                  <div>
+                    <span className={`quotation-status quotation-status--${quotation.status.toLowerCase()}`}>
+                      {quotation.status}
+                    </span>
+                    <h2>{quotation.number}</h2>
+                  </div>
+                  <strong>{cash(quotation.total, quotation.currency)}</strong>
+                </header>
+                <div className="quotation-card__details">
+                  <span><small>Customer</small>{quotation.customer.displayName}</span>
+                  <span><small>Date</small>{day(quotation.issueDate)}</span>
+                  <span><small>Valid until</small>{day(quotation.expiryDate)}</span>
+                </div>
+                <div className="quotation-card__items">
+                  <strong>Items</strong>
+                  {(quotation.items ?? []).map((item, index) => (
+                    <div className="quotation-card__item" key={`${item.name}-${index}`}>
+                      <span><b>{item.name}</b><small>{item.description}</small></span>
+                      <span>
+                        {item.quantity} × {cash(String(item.unitPrice), quotation.currency)} ={' '}
+                        {cash(String(Number(item.quantity) * Number(item.unitPrice)), quotation.currency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {quotation.notes && (
+                  <p className="quotation-card__terms"><strong>Terms &amp; Conditions</strong>{quotation.notes}</p>
+                )}
+                {canEdit && (
+                  <footer className="quotation-card__actions">
+                    {actions(
+                      'quotations', quotation,
+                      (operation, message) => {
+                        const queueEmail = message === 'Quotation emailed to customer' && isWorkingOffline();
+                        if (queueEmail)
+                          setQueuedQuotationSends((current) => new Set(current).add(quotation.id));
+                        if (message === 'Quotation voided') {
+                          setConfirmation({
+                            title: 'Void quotation',
+                            message: `Void ${quotation.number}? This status can’t be undone.`,
+                            confirmLabel: 'Void quotation',
+                            onConfirm: () => void run(operation, message).then((ok) => ok && setConfirmation(null)),
+                          });
+                        } else
+                          void run(operation, message).then((ok) => {
+                            if (queueEmail && !ok && !getOfflineQueue().some((item) => item.path === `/sales/quotations/${quotation.id}/send`))
+                              setQueuedQuotationSends((current) => {
+                                const next = new Set(current);
+                                next.delete(quotation.id);
+                                return next;
+                              });
+                          });
+                      },
+                      () => {},
+                      () => {},
+                      () => {},
+                      canEdit,
+                      queuedQuotationSends.has(quotation.id),
+                    )}
+                  </footer>
+                )}
+              </article>
+            ))}
+            {!rows.length && <p className="quotation-card-grid__empty">No quotations match these filters.</p>}
+          </div>
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">
@@ -293,7 +412,16 @@ export function SalesIncomePage({ view, role }: { view: View; role: string }) {
           setModal(false);
           setSelected(null);
         }}
-        submit={(data) => void run(() => create(view, data, selected), `${title[view]} saved`)}
+        submit={(data, intent = 'draft') =>
+          void run(
+            () => create(view, data, selected, intent),
+            intent === 'send'
+              ? 'Quotation emailed to customer'
+              : view === 'quotations'
+                ? 'Quotation saved as draft'
+                : `${title[view]} saved`,
+          )
+        }
       />
       <ConfirmModal
         key={confirmation?.title}
@@ -401,6 +529,7 @@ function actions(
   preview: (invoice: Invoice) => void,
   history: (customer: Customer) => void,
   canEdit: boolean,
+  sendQueued = false,
 ) {
   if (v === 'invoices') {
     const invoice = r as Invoice;
@@ -447,14 +576,16 @@ function actions(
     const x = r as Quotation;
     return (
       <>
-        {x.status === 'DRAFT' && (
+        {x.status === 'DRAFT' && x.customer.email && (
           <button
-            onClick={() =>
-              run(() => salesApi.quotationStatus(x.id, 'SENT'), 'Quotation marked sent')
-            }
+            disabled={sendQueued}
+            onClick={() => run(() => salesApi.sendQuotation(x.id), 'Quotation emailed to customer')}
           >
-            Send
+            {sendQueued ? 'Email queued' : 'Send'}
           </button>
+        )}
+        {x.status === 'DRAFT' && !x.customer.email && (
+          <span className="quotation-card__send-hint">Add a customer email to send</span>
         )}
         {!['CONVERTED', 'VOID', 'DECLINED', 'EXPIRED'].includes(x.status) && (
           <button onClick={() => run(() => salesApi.convertQuotation(x.id), 'Invoice created')}>
@@ -485,10 +616,20 @@ function actions(
     );
   return null;
 }
-async function create(v: View, d: Record<string, unknown>, selected: Customer | null) {
+async function create(
+  v: View,
+  d: Record<string, unknown>,
+  selected: Customer | null,
+  intent: 'draft' | 'send' = 'draft',
+) {
   if (v === 'customers')
     return selected ? salesApi.updateCustomer(selected.id, d) : salesApi.createCustomer(d);
-  if (v === 'quotations') return salesApi.createQuotation(d);
+  if (v === 'quotations')
+    return salesApi.createQuotation({
+      ...d,
+      status: intent === 'send' ? 'DRAFT' : d.status || 'DRAFT',
+      sendEmail: intent === 'send',
+    });
   if (v === 'invoices') return salesApi.createInvoice(d);
   if (v === 'payments' || v === 'receivables') return salesApi.createPayment(d);
   return salesApi.createCredit(d);
@@ -861,13 +1002,19 @@ function CreateModal({
   busy: boolean;
   error: string;
   close: () => void;
-  submit: (d: Record<string, unknown>) => void;
+  submit: (d: Record<string, unknown>, intent?: 'draft' | 'send') => void;
 }) {
   const document = view === 'quotations' || view === 'invoices';
   const [lineItems, setLineItems] = useState([
     { name: '', description: '', quantity: '', unitPrice: '' },
   ]);
+  const [taxRate, setTaxRate] = useState('0');
   const [invoiceNumber, setInvoiceNumber] = useState('Generating…');
+  useEffect(() => {
+    if (!open) return;
+    setLineItems([{ name: '', description: '', quantity: '', unitPrice: '' }]);
+    setTaxRate('0');
+  }, [open, view]);
   useEffect(() => {
     if (!open || !document) return;
     const request =
@@ -884,10 +1031,15 @@ function CreateModal({
     setLineItems((items) =>
       items.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)),
     );
+  const quotationTotal = lineItems.reduce((sum, item) => {
+    const amount = Number(item.quantity || 0) * Number(item.unitPrice || 0);
+    return sum + amount + amount * (Number(taxRate || 0) / 100);
+  }, 0);
   return (
     <Modal
       open={open}
       onClose={close}
+      wide={document}
       title={
         selected
           ? `Edit ${selected.displayName}`
@@ -906,9 +1058,46 @@ function CreateModal({
           <button className="button button--secondary" onClick={close}>
             Cancel
           </button>
-          <button className="button" disabled={busy} form="sales-form" type="submit">
-            {busy ? 'Saving…' : 'Save'}
-          </button>
+          {view === 'quotations' ? (
+            <>
+              <button
+                className="button button--secondary"
+                disabled={busy}
+                form="sales-form"
+                type="submit"
+                name="intent"
+                value="draft"
+                onClick={() => {
+                  const statusField = window.document
+                    .getElementById('sales-form')
+                    ?.querySelector<HTMLSelectElement>('select[name="status"]');
+                  if (statusField) statusField.value = 'DRAFT';
+                }}
+              >
+                {busy ? 'Saving…' : 'Save as Draft'}
+              </button>
+              <button
+                className="button"
+                disabled={busy}
+                form="sales-form"
+                type="submit"
+                name="intent"
+                value="send"
+                onClick={() => {
+                  const statusField = window.document
+                    .getElementById('sales-form')
+                    ?.querySelector<HTMLSelectElement>('select[name="status"]');
+                  if (statusField) statusField.value = 'SENT';
+                }}
+              >
+                {busy ? 'Sending…' : 'Save & Send to Customer'}
+              </button>
+            </>
+          ) : (
+            <button className="button" disabled={busy} form="sales-form" type="submit">
+              {busy ? 'Saving…' : 'Save'}
+            </button>
+          )}
         </>
       }
     >
@@ -919,6 +1108,8 @@ function CreateModal({
           e.preventDefault();
           const f = new FormData(e.currentTarget),
             get = (n: string) => String(f.get(n) || '');
+          const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+          const intent = submitter?.value === 'send' ? 'send' : 'draft';
           if (view === 'customers')
             submit({
               name: get('name'),
@@ -934,7 +1125,7 @@ function CreateModal({
               currency: getDefaultCurrency(),
               issueDate: get('issueDate'),
               ...(view === 'quotations'
-                ? { expiryDate: get('dueDate') }
+                ? { expiryDate: get('dueDate'), status: get('status') }
                 : {
                     dueDate: get('dueDate'),
                     status: 'DRAFT',
@@ -948,7 +1139,7 @@ function CreateModal({
                 taxRate: Number(get('taxRate')),
               })),
               notes: get('notes') || undefined,
-            });
+            }, intent);
           else if (view === 'credit-notes')
             submit({
               invoiceId: get('invoiceId'),
@@ -1005,7 +1196,7 @@ function CreateModal({
         ) : (
           <>
             <label className="full">
-              {document ? 'Customer' : 'Invoice'}
+              {view === 'quotations' ? 'Customer Name' : document ? 'Customer' : 'Invoice'}
               <select name={document ? 'customerId' : 'invoiceId'} required defaultValue="">
                 <option value="" disabled>
                   Select
@@ -1019,6 +1210,12 @@ function CreateModal({
             </label>
             {document && (
               <>
+                {view === 'quotations' && (
+                  <div className="quotation-section-title full">
+                    <h3>Quotation</h3>
+                    <p>Set the status and details that will appear on the customer quotation.</p>
+                  </div>
+                )}
                 <label>
                   Number
                   <input
@@ -1027,8 +1224,17 @@ function CreateModal({
                     aria-label={`Automatically generated ${view === 'invoices' ? 'invoice' : 'quotation'} number`}
                   />
                 </label>
+                {view === 'quotations' && (
+                  <label>
+                    Status
+                    <select name="status" defaultValue="DRAFT">
+                      <option value="DRAFT">Draft</option>
+                      <option value="SENT">Sent</option>
+                    </select>
+                  </label>
+                )}
                 <label>
-                  Issue date
+                  {view === 'quotations' ? 'Date' : 'Issue date'}
                   <input name="issueDate" type="date" required />
                 </label>
                 <label>
@@ -1041,9 +1247,9 @@ function CreateModal({
                     <small>Add as many line items as needed.</small>
                   </div>
                   {lineItems.map((item, index) => (
-                    <div className="invoice-line-editor__row" key={index}>
+                    <div className={`invoice-line-editor__row ${view === 'quotations' ? 'quotation-item-row' : ''}`} key={index}>
                       <label>
-                        Name
+                        {view === 'quotations' ? 'Item Name' : 'Name'}
                         <input
                           required
                           value={item.name}
@@ -1051,7 +1257,7 @@ function CreateModal({
                         />
                       </label>
                       <label>
-                        Line description
+                        {view === 'quotations' ? 'Item Details' : 'Line description'}
                         <input
                           required
                           value={item.description}
@@ -1059,7 +1265,7 @@ function CreateModal({
                         />
                       </label>
                       <label>
-                        Quantity
+                        {view === 'quotations' ? 'Qty' : 'Quantity'}
                         <input
                           required
                           type="number"
@@ -1070,7 +1276,7 @@ function CreateModal({
                         />
                       </label>
                       <label>
-                        Unit price
+                        {view === 'quotations' ? 'Rate' : 'Unit price'}
                         <input
                           required
                           type="number"
@@ -1080,6 +1286,16 @@ function CreateModal({
                           onChange={(event) => updateLine(index, 'unitPrice', event.target.value)}
                         />
                       </label>
+                      {view === 'quotations' && (
+                        <label>
+                          Amount
+                          <input
+                            readOnly
+                            value={cash(String(Number(item.quantity || 0) * Number(item.unitPrice || 0)), getDefaultCurrency())}
+                            aria-label={`Amount for item ${index + 1}`}
+                          />
+                        </label>
+                      )}
                       <button
                         type="button"
                         className="icon-button"
@@ -1109,8 +1325,14 @@ function CreateModal({
                   </button>
                 </div>
                 <label>
-                  Tax %<input name="taxRate" type="number" min="0" step=".01" defaultValue="0" />
+                  Tax %<input name="taxRate" type="number" min="0" step=".01" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} />
                 </label>
+                {view === 'quotations' && (
+                  <div className="quotation-total-card">
+                    <small>Quotation total</small>
+                    <strong>{cash(String(quotationTotal))}</strong>
+                  </div>
+                )}
                 {view === 'invoices' && (
                   <>
                     <label>
@@ -1130,11 +1352,11 @@ function CreateModal({
                   </>
                 )}
                 <label className="full">
-                  Customer message <small>Optional</small>
+                  {view === 'quotations' ? 'Terms & Conditions' : 'Customer message'} <small>Optional</small>
                   <textarea
                     name="notes"
                     rows={3}
-                    placeholder="Thank you for your business. Please remit this invoice by the due date."
+                    placeholder={view === 'quotations' ? 'Enter the terms and conditions for this quotation.' : 'Thank you for your business. Please remit this invoice by the due date.'}
                   />
                 </label>
               </>

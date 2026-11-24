@@ -563,7 +563,7 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
       if (
         queuedBody &&
         method === 'POST' &&
-        /^\/banking\/transactions(?:\/bulk)?$/.test(path)
+        /^\/(customers|invoices|sales\/(quotations|payments|credit-notes)|pos\/sales|banking\/transactions(?:\/bulk)?|purchases\/(suppliers|requests|orders|bills|payments|expenses))$/.test(path)
       ) {
         try {
           const body = JSON.parse(queuedBody) as Record<string, unknown>;

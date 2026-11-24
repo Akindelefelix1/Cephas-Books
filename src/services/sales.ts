@@ -134,6 +134,8 @@ export const salesApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  sendQuotation: (id: string) =>
+    authorizedRequest<{ sent: true }>(`/sales/quotations/${id}/send`, { method: 'POST' }),
   quotationStatus: (id: string, status: string) =>
     authorizedRequest<Quotation>(`/sales/quotations/${id}/status`, {
       method: 'PATCH',
