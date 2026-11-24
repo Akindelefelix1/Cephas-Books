@@ -44,7 +44,8 @@ export const primaryNavigation: NavItem[] = [
     icon: FolderKanban,
     children: [
       { id: 'products', label: 'Products & services' },
-      { id: 'warehouses', label: 'Warehouses' },
+      { id: 'warehouses', label: 'Branches & stock locations' },
+      { id: 'branch-inventory', label: 'Branch stock overview' },
       { id: 'stock-movements', label: 'Stock movements' },
       { id: 'stock-adjustments', label: 'Adjustments' },
       { id: 'projects', label: 'Projects' },

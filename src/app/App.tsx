@@ -410,6 +410,7 @@ export function App() {
       [
         'products',
         'warehouses',
+        'branch-inventory',
         'stock-movements',
         'stock-adjustments',
         'projects',
@@ -421,6 +422,7 @@ export function App() {
           key={active}
           view={active as OperationsView}
           role={roleFor('inventory.manage')}
+          onNavigate={navigate}
         />
       );
     if (modules[active]) return <ModulePage key={active} definition={modules[active]} />;

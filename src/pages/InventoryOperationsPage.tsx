@@ -19,10 +19,12 @@ import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
+import { isWorkingOffline } from '@/services/offline';
 import {
   INVENTORY_CHANGED_EVENT,
   operationsApi,
   type OperationsSummary,
+  type BranchInventory,
   type OperationsView,
   type Product,
   type ProductDetails,
@@ -50,20 +52,23 @@ const quantity = (value: string | number) =>
 const date = (value?: string) => (value ? new Date(value).toLocaleDateString('en-NG') : '—');
 const titles: Record<OperationsView, string> = {
   products: 'Products & services',
-  warehouses: 'Warehouses',
+  warehouses: 'Branches & stock locations',
+  'branch-inventory': 'Branches & stock locations',
   'stock-movements': 'Stock movements',
   'stock-adjustments': 'Stock adjustments',
   projects: 'Projects',
   'project-ai': 'Project management AI',
 };
 
-export function InventoryOperationsPage({ view, role }: { view: OperationsView; role: string }) {
+export function InventoryOperationsPage({ view, role, onNavigate }: { view: OperationsView; role: string; onNavigate: (id: string) => void }) {
   const canEdit = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role);
+  const offlineMode = isWorkingOffline();
   const canApprove = canEdit || role === 'APPROVER';
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [branchInventory, setBranchInventory] = useState<BranchInventory | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -86,6 +91,13 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   const [inventoryMonths, setInventoryMonths] = useState<InventoryMonth[]>([]);
   const [analyticsError, setAnalyticsError] = useState('');
 
+  useEffect(() => {
+    if (view !== 'stock-movements' || sessionStorage.getItem('cephas:inventory-open-movement') !== '1')
+      return;
+    sessionStorage.removeItem('cephas:inventory-open-movement');
+    setModal(true);
+  }, [view]);
+
   const load = useCallback(async () => {
     if (view === 'project-ai') {
       setLoading(false);
@@ -104,6 +116,7 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       setProducts(p.filter((x) => x.isActive && x.type === 'PRODUCT'));
       setWarehouses(w.filter((x) => x.isActive));
       setCategories(c);
+      if (view === 'branch-inventory') setBranchInventory(await operationsApi.branchInventory());
       if (view === 'products') {
         const result = await operationsApi.productsPage({
           search,
@@ -141,10 +154,12 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       if (document.visibilityState === 'visible') refresh();
     };
     window.addEventListener(INVENTORY_CHANGED_EVENT, refresh);
+    window.addEventListener('cephas:sync-state', refresh);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {
       window.removeEventListener(INVENTORY_CHANGED_EVENT, refresh);
+      window.removeEventListener('cephas:sync-state', refresh);
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
@@ -153,10 +168,13 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
     setBusy(true);
     setError('');
     try {
-      await operation();
+      const result = await operation();
       setModal(false);
       setSelected(null);
-      confirmAction(message);
+      const queuedOffline = Boolean(
+        result && typeof result === 'object' && 'queuedOffline' in result && result.queuedOffline === true,
+      );
+      confirmAction(queuedOffline ? `${message} and queued for sync` : message);
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save record');
@@ -241,7 +259,8 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
   if (view === 'project-ai') return <ProjectAiPage canEdit={canEdit} />;
   const action = {
     products: 'New item',
-    warehouses: 'Add warehouse',
+    warehouses: 'Add branch/location',
+    'branch-inventory': '',
     'stock-movements': 'Record movement',
     'stock-adjustments': 'New adjustment',
     projects: 'New project',
@@ -260,6 +279,27 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
       ].join('\n'),
     );
   const exportCsv = async () => {
+    if (view === 'branch-inventory' && branchInventory) {
+      const branchNames = branchInventory.branches.map((branch) => branch.name);
+      const lines = [
+        ['SKU', 'Product', 'Unit', ...branchNames, 'Total across branches'],
+        ...branchInventory.products.map((product) => [
+          product.sku,
+          product.productName,
+          product.unit,
+          ...branchInventory.branches.map((branch) =>
+            product.locations.find((location) => location.branchId === branch.id)?.quantity ?? '0',
+          ),
+          product.totalQuantity,
+        ]),
+      ];
+      const csv = lines.map((line) => line.map((value) => {
+        const safe = /^[\s]*[=+@-]/.test(String(value)) ? `'${value}` : String(value);
+        return `"${safe.replaceAll('"', '""')}"`;
+      }).join(',')).join('\n');
+      downloadText('branch-inventory.csv', csv);
+      return;
+    }
     if (view !== 'products') return exportRows(rows);
     try {
       setBusy(true);
@@ -283,6 +323,24 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
           <p>Manage {titles[view].toLowerCase()} with controlled, traceable operational records.</p>
         </div>
         <div className="page-header__actions">
+          {view === 'branch-inventory' && (
+            <>
+              <button className="button button--secondary" onClick={() => onNavigate('warehouses')}>
+                Manage branches
+              </button>
+              {canEdit && (
+                <button className="button" onClick={() => setModal(true)} disabled={offlineMode} title={offlineMode ? 'Connect to the internet to register a branch.' : undefined}>
+                  <Plus size={17} /> Add branch
+                </button>
+              )}
+              <button className="button" onClick={() => {
+                sessionStorage.setItem('cephas:inventory-open-movement', '1');
+                onNavigate('stock-movements');
+              }} disabled={!canEdit}>
+                New receipt / transfer
+              </button>
+            </>
+          )}
           {view === 'products' && (
             <button
               className="button button--secondary"
@@ -298,8 +356,8 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
           >
             <Download size={17} /> Export CSV
           </button>
-          {canEdit && (
-            <button className="button" onClick={() => setModal(true)}>
+          {canEdit && action && view !== 'branch-inventory' && (
+            <button className="button" onClick={() => setModal(true)} disabled={offlineMode && view === 'warehouses'} title={offlineMode && view === 'warehouses' ? 'Connect to the internet to register a branch.' : undefined}>
               <Plus size={17} /> {action}
             </button>
           )}
@@ -320,17 +378,26 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
             stats={[
               {
                 label: 'Inventory value',
-                value: money(summary.inventoryValue, summary.baseCurrency),
+                value: money(
+                  view === 'branch-inventory' && branchInventory
+                    ? branchInventory.branches.reduce((value, branch) => value + Number(branch.inventoryValue), 0)
+                    : summary.inventoryValue,
+                  summary.baseCurrency,
+                ),
               },
-              { label: 'Active items', value: String(summary.products) },
+              { label: 'Active items', value: String(view === 'branch-inventory' ? branchInventory?.products.length ?? 0 : summary.products) },
               {
                 label: 'Stock alerts',
-                value: `${summary.lowStock} low · ${summary.outOfStock} out`,
-                tone: summary.outOfStock ? 'danger' : 'warning',
+                value: view === 'branch-inventory'
+                  ? `${branchInventory?.branches.reduce((count, branch) => count + branch.lowStock, 0) ?? 0} low · ${branchInventory?.branches.reduce((count, branch) => count + branch.outOfStock, 0) ?? 0} out`
+                  : `${summary.lowStock} low · ${summary.outOfStock} out`,
+                tone: (view === 'branch-inventory'
+                  ? branchInventory?.branches.some((branch) => branch.outOfStock)
+                  : summary.outOfStock) ? 'danger' : 'warning',
               },
               {
-                label: view === 'projects' ? 'Active projects' : 'Warehouses',
-                value: String(view === 'projects' ? summary.activeProjects : summary.warehouses),
+                label: view === 'projects' ? 'Active projects' : view === 'branch-inventory' ? 'Active branches' : 'Warehouses',
+                value: String(view === 'projects' ? summary.activeProjects : view === 'branch-inventory' ? branchInventory?.branches.length ?? 0 : summary.warehouses),
               },
             ]}
           />
@@ -408,6 +475,8 @@ export function InventoryOperationsPage({ view, role }: { view: OperationsView; 
         )}
         {loading ? (
           <LoadingState label="Loading inventory and operations…" />
+        ) : view === 'branch-inventory' ? (
+          <BranchStockView data={branchInventory} search={search} status={status} />
         ) : view === 'products' && display === 'cards' ? (
           <ProductCards
             products={rows as Product[]}
@@ -714,9 +783,9 @@ function columns(view: OperationsView) {
       'Total stock value',
       'Status',
     ];
-  if (view === 'warehouses') return ['Code', 'Warehouse', 'Manager', 'Address', 'Status'];
+  if (view === 'warehouses') return ['Code', 'Branch / stock location', 'Manager', 'Address', 'Status'];
   if (view === 'stock-movements')
-    return ['Reference', 'Item', 'Warehouse', 'Date', 'Type / quantity'];
+    return ['Reference', 'Transfer ID', 'Item', 'Branch', 'Date', 'Type / quantity', 'Recorded by'];
   if (view === 'stock-adjustments')
     return ['Reference', 'Item', 'Warehouse', 'Date / quantity', 'Status'];
   return ['Code', 'Project / client', 'Owner', 'Timeline', 'Budget / actual', 'Status'];
@@ -748,10 +817,14 @@ function values(view: OperationsView, row: Row, currency = 'NGN') {
     const x = row as StockMovement;
     return [
       x.reference,
+      x.transferGroupId ? `TRF-${x.transferGroupId.replaceAll('-', '').slice(0, 10).toUpperCase()}` : '—',
       x.product.name,
       x.warehouse.name,
       date(x.movementDate),
       `${x.type.replaceAll('_', ' ')} · ${x.quantity}`,
+      x.performedBy
+        ? `${[x.performedBy.firstName, x.performedBy.lastName].filter(Boolean).join(' ') || x.performedBy.email}`
+        : 'Legacy record',
     ];
   }
   if (view === 'stock-adjustments') {
@@ -777,6 +850,7 @@ function values(view: OperationsView, row: Row, currency = 'NGN') {
 function statusOptions(view: OperationsView) {
   if (view === 'products') return ['active', 'archived', 'low_stock', 'out_of_stock'];
   if (view === 'warehouses') return ['active', 'archived'];
+  if (view === 'branch-inventory') return ['LOW_STOCK', 'OUT_OF_STOCK', 'IN_STOCK'];
   if (view === 'stock-movements')
     return ['RECEIPT', 'ISSUE', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'];
   if (view === 'stock-adjustments') return ['DRAFT', 'APPROVED', 'VOID'];
@@ -893,12 +967,95 @@ async function save(
     return selected
       ? operationsApi.updateWarehouse(selected.id, data)
       : operationsApi.createWarehouse(data);
+  if (view === 'branch-inventory') return operationsApi.createBranch(data);
   if (view === 'stock-movements')
     return transfer ? operationsApi.transfer(data) : operationsApi.createMovement(data);
   if (view === 'stock-adjustments') return operationsApi.createAdjustment(data);
   return selected
     ? operationsApi.updateProject(selected.id, data)
     : operationsApi.createProject(data);
+}
+
+function BranchStockView({
+  data,
+  search,
+  status,
+}: {
+  data: BranchInventory | null;
+  search: string;
+  status: string;
+}) {
+  if (!data) return <LoadingState label="Loading branch stock…" />;
+  const query = search.trim().toLowerCase();
+  const matchingBranches = data.branches.filter(
+    (branch) => !query || `${branch.code} ${branch.name} ${branch.address ?? ''} ${branch.manager ?? ''}`.toLowerCase().includes(query),
+  );
+  const matchesProduct = data.products.some(
+    (product) => `${product.sku} ${product.productName}`.toLowerCase().includes(query),
+  );
+  const branchSearchMatches = Boolean(query && matchingBranches.length && !matchesProduct);
+  const visibleBranches = branchSearchMatches ? matchingBranches : data.branches;
+  const products = data.products.filter((product) => {
+    const relevantLocations = product.locations.filter(
+      (location) => !branchSearchMatches || visibleBranches.some((branch) => branch.id === location.branchId),
+    );
+    const matchesSearch = !query ||
+      `${product.sku} ${product.productName}`.toLowerCase().includes(query) ||
+      product.locations.some((location) => `${location.branchName} ${location.code}`.toLowerCase().includes(query));
+    const matchesStatus = !status || relevantLocations.some((location) => location.status === status);
+    return matchesSearch && matchesStatus;
+  });
+  return (
+    <div className="branch-stock-overview">
+      <p className="branch-stock-overview__hint">
+        Each active warehouse is an independently stocked branch location. Receipts and transfers update the same stock ledger used by sales and POS.
+      </p>
+      {!!data.pendingOfflineChanges && (
+        <div className="banking-alert" role="status">
+          {data.pendingOfflineChanges} offline stock change{data.pendingOfflineChanges === 1 ? '' : 's'} shown provisionally. Balances will be confirmed when sync completes.
+        </div>
+      )}
+      <div className="branch-stock-overview__locations">
+        {visibleBranches.map((branch) => (
+          <article className="branch-stock-location" key={branch.id}>
+            <div>
+              <span className="branch-stock-location__code">{branch.code}</span>
+              <h2>{branch.name}</h2>
+              <p>{branch.address || 'No address recorded'}{branch.manager ? ` · ${branch.manager}` : ''}</p>
+            </div>
+            <div className="branch-stock-location__alerts">
+              <span>{branch.lowStock} low</span>
+              <span className={branch.outOfStock ? 'is-danger' : ''}>{branch.outOfStock} out</span>
+            </div>
+          </article>
+        ))}
+        {!data.branches.length && <p className="table-empty">Create a warehouse to register the first branch stock location.</p>}
+      </div>
+      <div className="branch-stock-overview__products">
+        {products.map((product) => (
+          <article className="branch-stock-product" key={product.productId}>
+            <header>
+              <div><small>{product.sku}</small><h3>{product.productName}</h3></div>
+              <strong>Total: {quantity(product.totalQuantity)} {product.unit}</strong>
+            </header>
+            <div className="branch-stock-product__locations">
+              {product.locations.filter((location) => !branchSearchMatches || visibleBranches.some((branch) => branch.id === location.branchId)).map((location) => (
+                <div key={location.branchId}>
+                  <span>{location.branchName}</span>
+                  <strong>{quantity(location.quantity)} {product.unit}</strong>
+                  <small className={`branch-stock-status branch-stock-status--${location.status.toLowerCase()}`}>
+                    {location.status.replaceAll('_', ' ')}
+                  </small>
+                </div>
+              ))}
+              {!product.locations.length && <p>No active branches yet.</p>}
+            </div>
+          </article>
+        ))}
+        {!products.length && <p className="table-empty">No products match these branch stock filters.</p>}
+      </div>
+    </div>
+  );
 }
 
 function ProductCards({
@@ -1451,6 +1608,13 @@ function OperationsModal({
   submit: (data: Record<string, unknown>, transfer: boolean) => void;
 }) {
   const [transfer, setTransfer] = useState(false);
+  const [sourceWarehouseId, setSourceWarehouseId] = useState(
+    warehouses.find((warehouse) => warehouse.isDefault)?.id || '',
+  );
+  useEffect(() => {
+    if (!sourceWarehouseId && warehouses.length)
+      setSourceWarehouseId(warehouses.find((warehouse) => warehouse.isDefault)?.id || warehouses[0].id);
+  }, [sourceWarehouseId, warehouses]);
   const [selectedCategory, setSelectedCategory] = useState(
     view === 'products' ? ((selected as Product | null)?.category ?? '') : '',
   );
@@ -1496,7 +1660,7 @@ function OperationsModal({
         },
         false,
       );
-    else if (view === 'warehouses')
+    else if (view === 'warehouses' || view === 'branch-inventory')
       submit(
         {
           code: get('code'),
@@ -1728,7 +1892,7 @@ function OperationsModal({
             </label>
             {itemType === 'PRODUCT' && (
               <label>
-                Default stock warehouse
+                Default branch stock location
                 <select
                   name="defaultWarehouseId"
                   defaultValue={
@@ -1798,7 +1962,7 @@ function OperationsModal({
             </label>
           </>
         )}
-        {view === 'warehouses' && (
+        {(view === 'warehouses' || view === 'branch-inventory') && (
           <>
             <label>
               Code
@@ -1834,14 +1998,15 @@ function OperationsModal({
               </select>
             </label>
             <label>
-              Warehouse
+              Branch
               <select
                 name="warehouseId"
                 required
                 defaultValue={warehouses.find((warehouse) => warehouse.isDefault)?.id || ''}
+                onChange={(event) => setSourceWarehouseId(event.target.value)}
               >
                 <option value="" disabled>
-                  Select warehouse
+                  Select branch location
                 </option>
                 {warehouses.map((x) => (
                   <option value={x.id} key={x.id}>
@@ -1858,7 +2023,7 @@ function OperationsModal({
                   onChange={(e) => setTransfer(e.target.value === 'TRANSFER')}
                 >
                   <option value="SINGLE">Receipt / issue</option>
-                  <option value="TRANSFER">Warehouse transfer</option>
+                  <option value="TRANSFER">Branch transfer</option>
                 </select>
               </label>
             )}
@@ -1867,9 +2032,9 @@ function OperationsModal({
                 Destination
                 <select name="toWarehouseId" required defaultValue="">
                   <option value="" disabled>
-                    Select destination
+                    Select destination branch
                   </option>
-                  {warehouses.map((x) => (
+                  {warehouses.filter((x) => x.id !== sourceWarehouseId).map((x) => (
                     <option value={x.id} key={x.id}>
                       {x.code} — {x.name}
                     </option>

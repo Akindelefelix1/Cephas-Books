@@ -28,7 +28,7 @@ export const OFFLINE_WORKSPACE_READS = [
   '/purchases/suppliers?search=&status=', '/purchases/requests?search=&status=',
   '/purchases/orders?search=&status=', '/purchases/bills?search=&status=',
   '/purchases/payments?search=&status=', '/purchases/payables?search=&status=',
-  '/purchases/expenses?search=&status=', '/operations/summary',
+  '/purchases/expenses?search=&status=', '/operations/summary', '/operations/branch-inventory',
   '/operations/products?', '/operations/products-page?', '/operations/product-categories',
   '/operations/warehouses?', '/operations/movements?', '/operations/adjustments?',
   '/operations/projects?', '/accounting/accounts?includeArchived=false',

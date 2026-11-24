@@ -4318,3 +4318,98 @@
     gap: 7px;
   }
 }
+.branch-stock-overview {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.branch-stock-overview__hint {
+  margin: 0;
+  color: var(--text-muted, #667085);
+  line-height: 1.5;
+}
+.branch-stock-overview__locations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 0.75rem;
+}
+.branch-stock-location,
+.branch-stock-product {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+}
+.branch-stock-location {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.branch-stock-location h2,
+.branch-stock-product h3 {
+  margin: 0.2rem 0;
+  overflow-wrap: anywhere;
+}
+.branch-stock-location p,
+.branch-stock-product small {
+  color: var(--text-muted, #667085);
+}
+.branch-stock-location__code {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.branch-stock-location__alerts {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+  text-align: right;
+  font-size: 0.8rem;
+}
+.branch-stock-location__alerts .is-danger { color: #b42318; }
+.branch-stock-overview__products {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 0.75rem;
+}
+.branch-stock-product header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.branch-stock-product header strong {
+  text-align: right;
+  white-space: nowrap;
+}
+.branch-stock-product__locations {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.branch-stock-product__locations > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.branch-stock-product__locations span { overflow-wrap: anywhere; }
+.branch-stock-product__locations strong { text-align: right; }
+.branch-stock-status {
+  grid-column: 1 / -1;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.branch-stock-status--in_stock { color: #067647; }
+.branch-stock-status--low_stock { color: #b54708; }
+.branch-stock-status--out_of_stock { color: #b42318; }
+@media (max-width: 560px) {
+  .branch-stock-location { flex-direction: column; }
+  .branch-stock-location__alerts { display: flex; text-align: left; }
+  .branch-stock-product header { flex-direction: column; }
+  .branch-stock-product header strong { text-align: left; white-space: normal; }
+}

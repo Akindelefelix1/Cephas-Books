@@ -33,6 +33,7 @@ const routePermissions: Record<string, string> = {
   payroll: 'accounting.view',
   products: 'inventory.view',
   warehouses: 'inventory.view',
+  'branch-inventory': 'inventory.view',
   'stock-movements': 'inventory.view',
   'stock-adjustments': 'inventory.view',
   projects: 'inventory.view',
