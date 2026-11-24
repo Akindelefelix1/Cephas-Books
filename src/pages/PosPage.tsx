@@ -34,11 +34,12 @@ import {
   type PosShiftCloseResult,
   type PosShift,
 } from '@/services/pos';
-import { salesApi, type Customer } from '@/services/sales';
+import { salesApi, type Customer, type CustomerCreditStatus } from '@/services/sales';
 import { organizationApi, type OrganizationMember } from '@/services/organization';
 import { bankingApi, type BankAccount } from '@/services/banking';
 import { getDefaultCurrency } from '@/utils/currency';
 import { confirmAction } from '@/utils/actions';
+import { isWorkingOffline } from '@/services/offline';
 const money = (v: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(v);
 const quantity = (value: string | number) =>
@@ -55,10 +56,12 @@ type Line = Product & { quantity: number; discount: number };
 const CATALOG_PAGE_SIZE = 15;
 export function PosPage({
   canConfigurePos,
+  canApproveCredit,
   onNavigate,
   salesperson,
 }: {
   canConfigurePos: boolean;
+  canApproveCredit: boolean;
   onNavigate: (id: string) => void;
   salesperson: string;
 }) {
@@ -74,6 +77,10 @@ export function PosPage({
     [branchId, setBranchId] = useState(''),
     [registerId, setRegisterId] = useState(''),
     [customerId, setCustomerId] = useState(''),
+    [creditStatus, setCreditStatus] = useState<CustomerCreditStatus | null>(null),
+    [creditStatusError, setCreditStatusError] = useState(''),
+    [approveCredit, setApproveCredit] = useState(false),
+    [approvalReason, setApprovalReason] = useState(''),
     [search, setSearch] = useState(''),
     [category, setCategory] = useState(''),
     [catalogPage, setCatalogPage] = useState(1),
@@ -135,6 +142,14 @@ export function PosPage({
         setProductsLoading(false);
       });
   }, [canConfigurePos]);
+  useEffect(() => {
+    setCreditStatus(null); setCreditStatusError(''); setApproveCredit(false); setApprovalReason('');
+    if (!customerId) return;
+    let active = true;
+    void salesApi.customerCreditStatus(customerId).then((status) => { if (active) setCreditStatus(status); })
+      .catch((caught) => { if (active) setCreditStatusError(caught instanceof Error ? caught.message : 'Unable to check credit balance'); });
+    return () => { active = false; };
+  }, [customerId]);
   useEffect(() => {
     const register = registers.find((item) => item.id === registerId);
     if (!register) return;
@@ -200,7 +215,9 @@ export function PosPage({
         : payments,
     paid = paymentRows.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
     change = Math.max(0, paid - total),
-    remaining = Math.max(0, total - paid);
+    remaining = Math.max(0, total - paid),
+    creditAmount = paymentRows.filter((payment) => payment.method === 'CREDIT').reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    creditWouldExceed = Boolean(creditStatus && Number(creditStatus.outstandingBalance) + creditAmount > Number(creditStatus.creditLimit));
   const available = (product: Product) =>
     product.type === 'SERVICE' ? Infinity : Number(product.stockQuantity);
   const cartQuantity = (productId: string) =>
@@ -361,6 +378,12 @@ export function PosPage({
       return setError('Only cash payments can exceed the amount due.');
     if (settledPayments.some((payment) => payment.method === 'CREDIT') && !customerId)
       return setError('Select a customer before using customer credit.');
+    if (settledPayments.some((payment) => payment.method === 'CREDIT') && isWorkingOffline())
+      return setError('Customer credit sales require an online balance check. Reconnect before completing this sale.');
+    if (creditAmount > 0 && creditWouldExceed && (!canApproveCredit || !approveCredit || !approvalReason.trim()))
+      return setError(canApproveCredit
+        ? 'This sale exceeds the credit limit. Approve the exception and enter a reason to continue.'
+        : 'This sale exceeds the customer credit limit and requires an authorized approver.');
     const soldQuantities = new Map(
       cart.filter((item) => item.type === 'PRODUCT').map((item) => [item.id, item.quantity]),
     );
@@ -377,6 +400,8 @@ export function PosPage({
           discount: x.discount,
         })),
         payments: settledPayments,
+        creditLimitOverride: approveCredit,
+        creditLimitOverrideReason: approvalReason.trim() || undefined,
       };
       let s: PosSale;
       let activeShift = shift;
@@ -388,6 +413,8 @@ export function PosPage({
         ]);
       } catch (error) {
         if (!(error instanceof Error) || !('status' in error) || error.status !== 0) throw error;
+        if (settledPayments.some((payment) => payment.method === 'CREDIT'))
+          throw new Error('The credit sale could not be confirmed online. Check recent sales before retrying; credit sales are not queued offline.');
         queuePosSale(salePayload);
         const stamp = new Date().toISOString();
         s = {
@@ -947,6 +974,8 @@ export function PosPage({
                 <UserPlus size={15} /> New
               </button>
             </div>
+            {creditStatus && <p className={creditStatus.nearLimit ? 'banking-alert' : 'field-hint'}>Credit limit {money(Number(creditStatus.creditLimit), creditStatus.currency)} · outstanding {money(Number(creditStatus.outstandingBalance), creditStatus.currency)} · available {money(Number(creditStatus.availableCredit), creditStatus.currency)}{creditStatus.nearLimit ? ` · ${creditStatus.usagePercent}% used` : ''}</p>}
+            {creditStatusError && <p className="banking-alert" role="alert">Credit balance unavailable: {creditStatusError}. Credit sales need a verified balance and cannot be queued offline.</p>}
           </div>
           {cart.map((x) => (
             <div className="pos-cart-lines" key={x.id}>
@@ -1110,6 +1139,10 @@ export function PosPage({
                 )}
               </div>
             ))}
+            {creditAmount > 0 && creditStatus && <div className={creditWouldExceed ? 'banking-alert' : 'field-hint'} role={creditWouldExceed ? 'alert' : 'status'}>
+              {creditWouldExceed ? 'This credit sale exceeds the customer’s approved limit.' : `After this sale, estimated available credit is ${money(Math.max(0, Number(creditStatus.creditLimit) - Number(creditStatus.outstandingBalance) - creditAmount), creditStatus.currency)}.`}
+              {creditWouldExceed && canApproveCredit && <div><label><input type="checkbox" checked={approveCredit} onChange={(event) => setApproveCredit(event.target.checked)} /> Approve credit exception</label>{approveCredit && <input aria-label="Credit exception approval reason" required maxLength={1000} value={approvalReason} onChange={(event) => setApprovalReason(event.target.value)} placeholder="Approval reason" />}</div>}
+            </div>}
             <div className="pos-payment__totals">
               <span>
                 Paid <b>{money(paid)}</b>

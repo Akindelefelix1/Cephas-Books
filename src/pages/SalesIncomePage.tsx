@@ -77,7 +77,7 @@ const queuedPaymentAmount = (invoiceId: string) =>
 const invoiceOutstanding = (invoice: Invoice, includeQueued = false) =>
   Math.max(0, Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount) -
     (includeQueued ? queuedPaymentAmount(invoice.id) : 0));
-export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: string; onNavigate: (id: string) => void }) {
+export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = false }: { view: View; role: string; onNavigate: (id: string) => void; canApproveCredit?: boolean }) {
   const canEdit = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role);
   const [summary, setSummary] = useState<SalesSummary | null>(null),
     [customers, setCustomers] = useState<Customer[]>([]),
@@ -99,7 +99,10 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
     [historyLoading, setHistoryLoading] = useState(false),
     [historyError, setHistoryError] = useState(''),
     [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null),
+    [creditApprovalInvoice, setCreditApprovalInvoice] = useState<Invoice | null>(null),
+    [creditApprovalReason, setCreditApprovalReason] = useState(''),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const adjustCustomerCredit = (customer: Customer) => { setHistoryCustomer(null); setSelected(customer); setModal(true); };
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -243,8 +246,11 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
       await load();
       if (result && typeof result === 'object' && 'emailSent' in result && result.emailSent === false) {
         const documentName = view === 'invoices' ? 'Invoice' : 'Quotation';
-        setError(`${documentName} saved as a draft, but it could not be emailed: ${'emailError' in result ? String(result.emailError) : 'Email delivery failed.'}`);
-        confirmAction(`${documentName} saved as draft`);
+        const failure = 'emailError' in result ? String(result.emailError) : 'Email delivery failed.';
+        setError(view === 'invoices'
+          ? `Invoice recorded as sent, but the email could not be delivered: ${failure}`
+          : `Quotation saved as a draft, but it could not be emailed: ${failure}`);
+        confirmAction(view === 'invoices' ? 'Invoice recorded as sent' : 'Quotation saved as draft');
       } else if (result && typeof result === 'object' && 'queuedOffline' in result) {
         confirmAction(view === 'invoices' && message.includes('emailed')
           ? 'Invoice and statement queued offline. They will be emailed when this device syncs.'
@@ -259,6 +265,21 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
     } finally {
       setBusy(false);
     }
+  };
+  const requestInvoiceSend = async (invoice: Invoice) => {
+    if (invoice.status !== 'DRAFT') {
+      void run(() => salesApi.sendInvoice(invoice.id), 'Invoice and statement emailed to customer');
+      return;
+    }
+    try {
+      const status = await salesApi.customerCreditStatus(invoice.customerId);
+      const balance = Math.max(0, Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount));
+      if (Number(status.outstandingBalance) + balance > Number(status.creditLimit)) {
+        if (!canApproveCredit) { setError('This invoice exceeds the customer credit limit and requires an authorized approver.'); return; }
+        setCreditApprovalReason(''); setCreditApprovalInvoice(invoice); return;
+      }
+      void run(() => salesApi.sendInvoice(invoice.id), 'Invoice and statement emailed to customer');
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to verify customer credit'); }
   };
   const title: Record<View, string> = {
     customers: 'Customers',
@@ -447,7 +468,7 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
                   {columns(view).map((x) => (
                     <th key={x}>{x}</th>
                   ))}
-                  {(canEdit || view === 'customers') && <th>Actions</th>}
+                  {(canEdit || view === 'customers' || (view === 'invoices' && canApproveCredit)) && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -456,7 +477,7 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
                     {values(view, r).map((x, j) => (
                       <td key={j}>{x}</td>
                     ))}
-                    {(canEdit || view === 'customers') && (
+                    {(canEdit || view === 'customers' || (view === 'invoices' && canApproveCredit)) && (
                       <td>
                         <div className="inline-actions">
                           {actions(
@@ -487,6 +508,8 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
                               setHistoryCustomer(customer);
                             },
                             canEdit,
+                            false,
+                            requestInvoiceSend,
                           )}
                         </div>
                       </td>
@@ -497,7 +520,7 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
                   <tr>
                     <td
                       className="table-empty"
-                      colSpan={columns(view).length + (canEdit || view === 'customers' ? 1 : 0)}
+                      colSpan={columns(view).length + (canEdit || view === 'customers' || (view === 'invoices' && canApproveCredit) ? 1 : 0)}
                     >
                       No records found.
                     </td>
@@ -515,6 +538,7 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
         selected={selected}
         customerPresetId={customerPresetId}
         customers={customers}
+        canApproveCredit={canApproveCredit}
         projects={projects}
         invoices={invoices.filter(
           (x) => Number(x.total) - Number(x.paidAmount) - Number(x.creditedAmount) > 0,
@@ -550,7 +574,12 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
         key={previewInvoice?.id || 'closed'}
         invoice={previewInvoice}
         onClose={() => setPreviewInvoice(null)}
+        onSend={requestInvoiceSend}
       />
+      <Modal open={Boolean(creditApprovalInvoice)} title="Approve credit limit exception" onClose={() => { if (!busy) setCreditApprovalInvoice(null); }} footer={<><button className="button button--secondary" onClick={() => setCreditApprovalInvoice(null)}>Cancel</button><button className="button" disabled={busy || !creditApprovalReason.trim()} onClick={() => { const invoice = creditApprovalInvoice; if (!invoice) return; setCreditApprovalInvoice(null); void run(() => salesApi.sendInvoice(invoice.id, { creditLimitOverride: true, creditLimitOverrideReason: creditApprovalReason.trim() }), 'Invoice and statement emailed to customer'); }}>Approve and send</button></>}>
+        <p>{creditApprovalInvoice ? `${creditApprovalInvoice.number} will exceed ${creditApprovalInvoice.customer.displayName}’s approved credit limit. Record a reason for this exception.` : ''}</p>
+        <label>Approval reason<textarea maxLength={1000} rows={3} value={creditApprovalReason} onChange={(event) => setCreditApprovalReason(event.target.value)} /></label>
+      </Modal>
       <CustomerHistoryModal
         key={historyCustomer?.id || 'closed'}
         customer={historyCustomer}
@@ -574,13 +603,14 @@ export function SalesIncomePage({ view, role, onNavigate }: { view: View; role: 
           setHistoryCustomer(null);
           onNavigate(target);
         }}
+        onAdjustCredit={adjustCustomerCredit}
       />
     </>
   );
 }
 function columns(v: View) {
   return v === 'customers'
-    ? ['Name', 'Email', 'Phone', 'Address', 'Status']
+    ? ['Name', 'Email', 'Phone', 'Credit limit', 'Address', 'Status']
     : v === 'quotations'
       ? ['Number', 'Customer', 'Total', 'Expiry', 'Status']
       : v === 'invoices'
@@ -598,6 +628,7 @@ function values(v: View, r: Row): string[] {
       x.displayName,
       x.email || '—',
       x.phone || '—',
+      cash(String(x.creditLimit ?? '0')),
       x.billingAddress || '—',
       x.isActive ? 'Active' : 'Archived',
     ];
@@ -665,6 +696,7 @@ function actions(
   history: (customer: Customer) => void,
   canEdit: boolean,
   sendQueued = false,
+  sendInvoice?: (invoice: Invoice) => void,
 ) {
   if (v === 'invoices') {
     const invoice = r as Invoice;
@@ -677,7 +709,7 @@ function actions(
           <Download size={15} /> Download
         </button>
         <button
-          onClick={() => run(() => salesApi.sendInvoice(invoice.id), 'Invoice and statement emailed to customer')}
+          onClick={() => sendInvoice ? sendInvoice(invoice) : run(() => salesApi.sendInvoice(invoice.id), 'Invoice and statement emailed to customer')}
         >
           <Send size={15} /> Send
         </button>
@@ -771,7 +803,7 @@ async function create(
   if (v === 'payments' || v === 'receivables') return salesApi.createPayment(d);
   return salesApi.createCredit(d);
 }
-function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose: () => void }) {
+function InvoicePreview({ invoice, onClose, onSend }: { invoice: Invoice | null; onClose: () => void; onSend: (invoice: Invoice) => void | Promise<void> }) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   if (!invoice) return null;
@@ -780,8 +812,7 @@ function InvoicePreview({ invoice, onClose }: { invoice: Invoice | null; onClose
     setSending(true);
     setSendError('');
     try {
-      await salesApi.sendInvoice(invoice.id);
-      confirmAction('Invoice emailed to customer');
+      await onSend(invoice);
     } catch (caught) {
       setSendError(caught instanceof Error ? caught.message : 'Unable to send invoice email');
     } finally {
@@ -836,6 +867,7 @@ function CustomerHistoryModal({
   onClose,
   onPreview,
   onCreateDocument,
+  onAdjustCredit,
   canEdit,
 }: {
   customer: Customer | null;
@@ -847,7 +879,28 @@ function CustomerHistoryModal({
   onPreview: (invoice: Invoice) => void;
   onCreateDocument: (target: 'quotations' | 'invoices', customer: Customer) => void;
   canEdit: boolean;
+  onAdjustCredit: (customer: Customer) => void;
 }) {
+  const [creditStatus, setCreditStatus] = useState<Awaited<ReturnType<typeof salesApi.customerCreditStatus>> | null>(null);
+  const [creditHistory, setCreditHistory] = useState<Awaited<ReturnType<typeof salesApi.customerCreditLimitHistory>>>([]);
+  const [creditOverrides, setCreditOverrides] = useState<Awaited<ReturnType<typeof salesApi.customerCreditOverrideHistory>>>([]);
+  const [creditHistoryError, setCreditHistoryError] = useState('');
+  useEffect(() => {
+    if (!customer) { setCreditStatus(null); setCreditHistory([]); setCreditOverrides([]); return; }
+    let active = true;
+    Promise.allSettled([salesApi.customerCreditStatus(customer.id), salesApi.customerCreditLimitHistory(customer.id), salesApi.customerCreditOverrideHistory(customer.id)])
+      .then(([statusResult, historyResult, overrideResult]) => {
+        if (!active) return;
+        setCreditStatus(statusResult.status === 'fulfilled' ? statusResult.value : null);
+        setCreditHistory(historyResult.status === 'fulfilled' ? historyResult.value : []);
+        setCreditOverrides(overrideResult.status === 'fulfilled' ? overrideResult.value : []);
+        const failures = [statusResult, historyResult, overrideResult]
+          .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+          .map((result) => result.reason instanceof Error ? result.reason.message : 'Unable to load credit information');
+        setCreditHistoryError(failures.join(' '));
+      });
+    return () => { active = false; };
+  }, [customer?.id]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -993,6 +1046,17 @@ function CustomerHistoryModal({
               <strong>Account activity · balances update as payments are recorded</strong>
               <button type="button" className="button button--secondary button--small" aria-label="Filter customer dashboard by date" aria-expanded={filterOpen} onClick={() => setFilterOpen((value) => !value)}><Filter size={15} /> Filter</button>
             </div>
+            <section className="customer-credit-panel" aria-label="Customer credit limit">
+              <div><small>Approved credit limit</small><strong>{creditStatus ? cash(creditStatus.creditLimit, creditStatus.currency) : cash(String(customer.creditLimit ?? '0'))}</strong></div>
+              <div><small>Outstanding credit</small><strong>{creditStatus ? cash(creditStatus.outstandingBalance, creditStatus.currency) : '—'}</strong></div>
+              <div><small>Available credit</small><strong>{creditStatus ? cash(creditStatus.availableCredit, creditStatus.currency) : '—'}</strong></div>
+              {creditStatus?.nearLimit && <p className="banking-alert" role="status">Customer has used {creditStatus.usagePercent}% of the approved credit limit.</p>}
+              {creditStatus?.exceeded && <p className="form-error" role="alert">Outstanding credit currently exceeds the approved limit.</p>}
+              {canEdit && <button className="button button--secondary button--small" onClick={() => onAdjustCredit(customer)}>Adjust credit limit</button>}
+              {creditHistoryError && <p className="banking-alert" role="alert">Credit information is incomplete: {creditHistoryError}</p>}
+              {!!creditHistory.length && <details className="customer-credit-history"><summary>Credit limit changes ({creditHistory.length})</summary>{creditHistory.map((entry) => <p key={entry.id}><strong>{cash(entry.previousLimit, creditStatus?.currency)} → {cash(entry.newLimit, creditStatus?.currency)}</strong> · {entry.reason}<small>{new Date(entry.createdAt).toLocaleString()} · {entry.actor?.firstName || entry.actor?.email || 'Staff'}</small></p>)}</details>}
+              {!!creditOverrides.length && <details className="customer-credit-history"><summary>Credit exceptions approved ({creditOverrides.length})</summary>{creditOverrides.map((entry) => <p key={entry.id}><strong>{entry.targetType} · {entry.targetId}</strong> · {entry.reason}<small>Exposure {cash(entry.existingExposure, creditStatus?.currency)} + requested {cash(entry.requestedAmount, creditStatus?.currency)} · {new Date(entry.createdAt).toLocaleString()} · {entry.approver?.firstName || entry.approver?.email || 'Approver'}</small></p>)}</details>}
+            </section>
             {filterOpen && <div className="customer-dashboard-date-filter"><label>From<input type="date" max={toDate || undefined} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label><label>To<input type="date" min={fromDate || undefined} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label><button type="button" className="button button--ghost button--small" onClick={() => { setFromDate(''); setToDate(''); }}>Clear dates</button></div>}
             {currencies.map((currency) => (
               <section className="customer-dashboard-currency" key={currency}>
@@ -1244,6 +1308,7 @@ function CreateModal({
   customerPresetId,
   projects,
   customers,
+  canApproveCredit,
   invoices,
   busy,
   error,
@@ -1256,6 +1321,7 @@ function CreateModal({
   customerPresetId: string;
   projects: Array<{ id: string; code: string; name: string }>;
   customers: Customer[];
+  canApproveCredit: boolean;
   invoices: Invoice[];
   busy: boolean;
   error: string;
@@ -1272,6 +1338,11 @@ function CreateModal({
   const [paymentInvoiceId, setPaymentInvoiceId] = useState('');
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [creditStatus, setCreditStatus] = useState<Awaited<ReturnType<typeof salesApi.customerCreditStatus>> | null>(null);
+  const [creditStatusError, setCreditStatusError] = useState('');
+  const [approveCredit, setApproveCredit] = useState(false);
+  const [approvalReason, setApprovalReason] = useState('');
+  const [creditCheckMessage, setCreditCheckMessage] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('Generating…');
   useEffect(() => {
     if (!open) return;
@@ -1282,6 +1353,14 @@ function CreateModal({
     setPaymentAmount('');
   }, [open, view]);
   useEffect(() => setCustomerSelect(customerPresetId), [customerPresetId, open]);
+  useEffect(() => {
+    setCreditStatus(null); setCreditStatusError(''); setApproveCredit(false); setApprovalReason('');
+    if (!open || view !== 'invoices' || !customerSelect) return;
+    let active = true;
+    void salesApi.customerCreditStatus(customerSelect).then((status) => { if (active) setCreditStatus(status); })
+      .catch((caught) => { if (active) setCreditStatusError(caught instanceof Error ? caught.message : 'Unable to check customer credit'); });
+    return () => { active = false; };
+  }, [open, view, customerSelect]);
   useEffect(() => {
     if (!open || !document) return;
     const request =
@@ -1394,6 +1473,19 @@ function CreateModal({
             get = (n: string) => String(f.get(n) || '');
           const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
           const intent = submitter?.value === 'send' ? 'send' : 'draft';
+          if (view === 'invoices' && intent === 'send' && isWorkingOffline()) {
+            setCreditCheckMessage('Sending an invoice requires an online credit limit check. Save it as a draft and send after reconnecting.');
+            return;
+          }
+          if (view === 'invoices' && intent === 'send' && creditStatus &&
+            Number(creditStatus.outstandingBalance) + quotationTotal + Number(get('shippingAmount') || 0) > Number(creditStatus.creditLimit) &&
+            (!canApproveCredit || !approveCredit || !approvalReason.trim())) {
+            setCreditCheckMessage(canApproveCredit
+              ? 'This invoice exceeds the credit limit. Approve the exception and enter a reason to send it.'
+              : 'This invoice exceeds the customer credit limit and requires an authorized approver.');
+            return;
+          }
+          setCreditCheckMessage('');
           if (document && intent === 'send') {
             const customerField = e.currentTarget.querySelector<HTMLSelectElement>('select[name="customerId"]');
             const selectedCustomer = customers.find((customer) => customer.id === get('customerId'));
@@ -1404,6 +1496,13 @@ function CreateModal({
             }
           }
           if (view === 'customers')
+            if (selected && Number(get('creditLimit') || 0) !== Number(selected.creditLimit ?? 0) && !get('creditLimitReason').trim()) {
+              const reasonField = e.currentTarget.querySelector<HTMLInputElement>('input[name="creditLimitReason"]');
+              reasonField?.setCustomValidity('Enter a reason for changing the credit limit.');
+              reasonField?.reportValidity();
+              return;
+            }
+          if (view === 'customers')
             submit({
               name: get('name'),
               displayName: get('displayName'),
@@ -1411,6 +1510,8 @@ function CreateModal({
               phone: get('phone') || undefined,
               companyName: get('companyName') || undefined,
               billingAddress: get('billingAddress') || undefined,
+              creditLimit: Number(get('creditLimit') || 0),
+              ...(get('creditLimitReason').trim() ? { creditLimitReason: get('creditLimitReason').trim() } : {}),
             });
           else if (document)
             submit({
@@ -1432,6 +1533,7 @@ function CreateModal({
                 taxRate: Number(get('taxRate')),
               })),
               notes: get('notes') || undefined,
+              ...(view === 'invoices' ? { creditLimitOverride: approveCredit, creditLimitOverrideReason: approvalReason.trim() || undefined } : {}),
             }, intent);
           else if (view === 'credit-notes')
             submit({
@@ -1452,6 +1554,7 @@ function CreateModal({
             });
         }}
       >
+        {creditCheckMessage && <p className="form-error full" role="alert">{creditCheckMessage}</p>}
         {view === 'customers' ? (
           <>
             <label>
@@ -1473,6 +1576,14 @@ function CreateModal({
             <label>
               Phone
               <input name="phone" defaultValue={selected?.phone} />
+            </label>
+            <label>
+              Approved credit limit
+              <input name="creditLimit" type="number" min="0" step="0.01" defaultValue={selected?.creditLimit ?? '0'} />
+            </label>
+            <label>
+              Credit limit adjustment reason <small>{selected ? 'Required when changed' : 'Optional'}</small>
+              <input name="creditLimitReason" maxLength={1000} onChange={(event) => event.currentTarget.setCustomValidity('')} placeholder="Reason for setting or changing the limit" />
             </label>
             <label className="full">
               <span className="field-label">
@@ -1533,6 +1644,15 @@ function CreateModal({
                 <small className="field-hint">Add a customer with a name before creating an invoice.</small>
               )}
             </label>
+            {view === 'invoices' && creditStatus && (() => {
+              const shipping = Number((window.document.querySelector<HTMLInputElement>('input[name="shippingAmount"]')?.value) || 0);
+              const exceeds = Number(creditStatus.outstandingBalance) + quotationTotal + shipping > Number(creditStatus.creditLimit);
+              return <div className={(exceeds ? 'banking-alert' : 'field-hint') + ' full'} role={exceeds ? 'alert' : 'status'}>
+                Outstanding {cash(creditStatus.outstandingBalance, creditStatus.currency)} · available {cash(creditStatus.availableCredit, creditStatus.currency)}. {exceeds ? 'This invoice would exceed the approved credit limit.' : creditStatus.nearLimit ? 'Customer is approaching the approved credit limit.' : ''}
+                {exceeds && canApproveCredit && <div><label><input type="checkbox" checked={approveCredit} onChange={(event) => setApproveCredit(event.target.checked)} /> Approve this credit exception</label>{approveCredit && <input aria-label="Credit exception approval reason" required maxLength={1000} value={approvalReason} onChange={(event) => setApprovalReason(event.target.value)} placeholder="Approval reason" />}</div>}
+              </div>;
+            })()}
+            {view === 'invoices' && creditStatusError && <p className="field-hint full">Credit balance could not be verified. Sending will still be checked securely by the server.</p>}
             {document && (
               <>
                 {view === 'quotations' && (

@@ -532,6 +532,7 @@ export function PosHistoryPage({
                     {selectedSale.items.find((item) => item.productId === returned.productId)
                       ?.description || 'Item'}{' '}
                     · {returned.quantity} · {money(Number(returned.amount), selectedSale.currency)}{' '}
+                    · Credit balance reduced {money(Number(returned.creditAmount || 0), selectedSale.currency)} · Cash refunded {money(Math.max(0, Number(returned.amount) - Number(returned.creditAmount || 0)), selectedSale.currency)}
                     · {returned.reason}
                   </p>
                 ))}

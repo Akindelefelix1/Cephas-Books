@@ -3110,6 +3110,23 @@
   display: grid;
   gap: 18px;
 }
+.customer-credit-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  align-items: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e1e6ee;
+  border-radius: 12px;
+  background: #f8faff;
+}
+.customer-credit-panel > div { display: grid; gap: 5px; min-width: 0; }
+.customer-credit-panel small { color: #687286; font-size: .72rem; }
+.customer-credit-panel strong { color: #172033; overflow-wrap: anywhere; }
+.customer-credit-panel > p { grid-column: 1 / -1; margin: 0; }
+.customer-credit-history { grid-column: 1 / -1; min-width: 0; }
+.customer-credit-history summary { cursor: pointer; font-weight: 650; }
+.customer-credit-history p { display: grid; gap: 4px; padding: 10px 0; margin: 0; border-bottom: 1px solid #e1e6ee; overflow-wrap: anywhere; }
 .customer-history__summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

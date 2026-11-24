@@ -48,6 +48,7 @@ const rolePermissionGroups = [
     permissions: [
       { key: 'sales.view', label: 'View' },
       { key: 'sales.manage', label: 'Manage' },
+      { key: 'credit.limit.approve', label: 'Approve customer credit limit exceptions' },
     ],
   },
   {

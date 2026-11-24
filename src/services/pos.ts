@@ -52,6 +52,7 @@ export interface PosSale {
     productId: string;
     quantity: string;
     amount: string;
+    creditAmount?: string;
     reason: string;
     createdAt: string;
   }>;

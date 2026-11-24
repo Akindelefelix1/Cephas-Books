@@ -304,6 +304,7 @@ export function App() {
       return (
         <PosPage
           canConfigurePos={!identity.customRoleId && identity.role === 'OWNER'}
+          canApproveCredit={(!identity.customRoleId && ['OWNER', 'ADMIN', 'APPROVER'].includes(identity.role)) || identity.permissions.includes('credit.limit.approve')}
           onNavigate={navigate}
           salesperson={
             [identity.firstName, identity.lastName].filter(Boolean).join(' ') || identity.email
@@ -344,6 +345,7 @@ export function App() {
               'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables'
           }
           role={roleFor('sales.manage')}
+          canApproveCredit={(!identity.customRoleId && ['OWNER', 'ADMIN', 'APPROVER'].includes(identity.role)) || identity.permissions.includes('credit.limit.approve')}
           onNavigate={navigate}
         />
       );

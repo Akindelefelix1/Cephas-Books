@@ -9,7 +9,21 @@ export interface Customer {
   taxId?: string;
   billingAddress?: string;
   notes?: string;
+  creditLimit?: string;
   isActive: boolean;
+}
+export interface CustomerCreditStatus {
+  customerId: string; creditLimit: string; outstandingBalance: string; availableCredit: string;
+  currency: string; usagePercent: number; nearLimit: boolean; exceeded: boolean;
+}
+export interface CustomerCreditLimitAdjustment {
+  id: string; previousLimit: string; newLimit: string; reason: string; createdAt: string;
+  actor?: { firstName?: string; lastName?: string; email?: string };
+}
+export interface CustomerCreditOverride {
+  id: string; targetType: string; targetId: string; creditLimit: string; existingExposure: string;
+  requestedAmount: string; reason: string; createdAt: string;
+  approver?: { firstName?: string; lastName?: string; email?: string };
 }
 export interface Line {
   name: string;
@@ -115,6 +129,9 @@ export const salesApi = {
     ),
   customerPurchaseHistory: (id: string) =>
     authorizedRequest<Invoice[]>(`/customers/${id}/purchase-history`),
+  customerCreditStatus: (id: string) => authorizedRequest<CustomerCreditStatus>(`/customers/${id}/credit-status`),
+  customerCreditLimitHistory: (id: string) => authorizedRequest<CustomerCreditLimitAdjustment[]>(`/customers/${id}/credit-limit-history`),
+  customerCreditOverrideHistory: (id: string) => authorizedRequest<CustomerCreditOverride[]>(`/customers/${id}/credit-override-history`),
   createCustomer: (data: Partial<Customer>) =>
     authorizedRequest<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) }),
   updateCustomer: (id: string, data: Partial<Customer>) =>
@@ -129,8 +146,8 @@ export const salesApi = {
   nextInvoiceNumber: () => authorizedRequest<{ number: string }>('/invoices/next-number'),
   createInvoice: (data: object) =>
     authorizedRequest<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) }),
-  sendInvoice: (id: string) =>
-    authorizedRequest<{ sent: true }>(`/invoices/${id}/send`, { method: 'POST' }),
+  sendInvoice: (id: string, approval?: { creditLimitOverride?: boolean; creditLimitOverrideReason?: string }) =>
+    authorizedRequest<{ sent: true }>(`/invoices/${id}/send`, { method: 'POST', body: JSON.stringify(approval ?? {}) }),
   quotations: (filters: Record<string, string>) =>
     authorizedRequest<Quotation[]>(`/sales/quotations?${q(filters)}`),
   nextQuotationNumber: () => authorizedRequest<{ number: string }>('/sales/quotations/next-number'),
