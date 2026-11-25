@@ -17,7 +17,7 @@ import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
 import { getOfflineQueue, isWorkingOffline } from '@/services/offline';
 import { PaymentTermsField } from '@/components/ui/PaymentTermsField';
-import { addDaysToDateInput, duePeriodForDate, dueTimingLabel, todayDateInput } from '@/utils/payment-terms';
+import { addDaysToDateInput, receivableAgeingLabel, receivableAgeingPeriod, RECEIVABLE_AGEING_PERIODS, todayDateInput } from '@/utils/payment-terms';
 type View = 'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables';
 type Row = Customer | Quotation | Invoice | Payment | CreditNote;
 const cash = (v: string, c = getDefaultCurrency()) =>
@@ -104,6 +104,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
     [search, setSearch] = useState(''),
     [status, setStatus] = useState(''),
     [duePeriod, setDuePeriod] = useState(''),
+    [ageingCustomerId, setAgeingCustomerId] = useState(''),
     [filterOpen, setFilterOpen] = useState(false),
     [queuedQuotationSends, setQueuedQuotationSends] = useState<Set<string>>(() => queuedQuotationSendIds()),
     [loading, setLoading] = useState(true),
@@ -178,7 +179,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
         ));
       }
       else if (view === 'credit-notes') setRows(await salesApi.credits({ search }));
-      else setRows(await salesApi.receivables({ search }));
+      else setRows(await salesApi.receivables({}));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load sales data');
     } finally {
@@ -308,12 +309,34 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
     receivables: 'Receivables',
   };
   const receivableRows = view === 'receivables' ? rows as Invoice[] : [];
-  const duePeriodCounts = ['OVERDUE', 'DUE_7', 'DUE_8_30', 'DUE_30_PLUS'].map((period) => ({
+  const reportRows = receivableRows.filter((invoice) =>
+    invoiceOutstanding(invoice) > 0 &&
+    (!search.trim() || `${invoice.number} ${invoice.customer.displayName}`.toLowerCase().includes(search.trim().toLowerCase())),
+  );
+  const ageingCustomers = [...new Map(
+    receivableRows
+      .filter((invoice) => invoiceOutstanding(invoice) > 0)
+      .map((invoice) => [invoice.customerId, invoice.customer]),
+  ).values()]
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const overdueCountsByCustomer = new Map<string, number>();
+  for (const invoice of receivableRows) {
+    if (invoiceOutstanding(invoice) > 0 && receivableAgeingPeriod(invoice.dueDate) !== 'CURRENT') {
+      overdueCountsByCustomer.set(invoice.customerId, (overdueCountsByCustomer.get(invoice.customerId) ?? 0) + 1);
+    }
+  }
+  const duePeriodCounts = RECEIVABLE_AGEING_PERIODS.map(({ value: period }) => ({
     period,
-    count: receivableRows.filter((invoice) => duePeriodForDate(invoice.dueDate) === period && invoiceOutstanding(invoice) > 0).length,
+    count: reportRows.filter((invoice) =>
+      (!ageingCustomerId || invoice.customerId === ageingCustomerId) &&
+      receivableAgeingPeriod(invoice.dueDate) === period,
+    ).length,
   }));
-  const visibleRows = view === 'receivables' && duePeriod
-    ? rows.filter((row) => duePeriodForDate((row as Invoice).dueDate) === duePeriod)
+  const visibleRows = view === 'receivables'
+    ? reportRows.filter((invoice) =>
+        (!duePeriod || receivableAgeingPeriod(invoice.dueDate) === duePeriod) &&
+        (!ageingCustomerId || invoice.customerId === ageingCustomerId),
+      )
     : rows;
   const action =
     view === 'customers'
@@ -331,7 +354,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
     const body = [
       columns(view).join(','),
       ...visibleRows.map((r) =>
-        values(view, r)
+        values(view, r, view === 'receivables' ? overdueCountsByCustomer.get((r as Invoice).customerId) ?? 0 : 0)
           .map((x) => `"${String(x).replace(/"/g, '""')}"`)
           .join(','),
       ),
@@ -356,7 +379,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
               <Filter size={15} /> Filter
             </button>
           )}
-          <button className="button button--secondary" onClick={exportCsv}>
+          <button className="button button--secondary" onClick={exportCsv} disabled={loading || Boolean(error)}>
             <Download size={17} /> Export CSV
           </button>
           {canEdit && action && (
@@ -391,17 +414,16 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
           ]}
         />
       )}
-      {view === 'receivables' && <StatsGrid stats={[
-        { label: 'Overdue invoices', value: String(duePeriodCounts[0].count), tone: 'warning' },
-        { label: 'Due within 7 days', value: String(duePeriodCounts[1].count) },
-        { label: 'Due in 8–30 days', value: String(duePeriodCounts[2].count) },
-        { label: 'Due after 30 days', value: String(duePeriodCounts[3].count) },
-      ]} />}
+      {view === 'receivables' && <div className="receivables-ageing-stats"><StatsGrid stats={duePeriodCounts.map(({ period, count }) => ({
+        label: RECEIVABLE_AGEING_PERIODS.find((item) => item.value === period)?.label ?? period,
+        value: String(count),
+        ...(period !== 'CURRENT' && count ? { tone: 'warning' as const } : {}),
+      }))} /></div>}
       <section className="panel register-panel">
-        <div className="banking-filters">
+        <div className={view === 'receivables' ? 'banking-filters banking-filters--ageing' : 'banking-filters'}>
           <input
-            placeholder={`Search ${title[view].toLowerCase()}`}
-            aria-label="Search"
+            placeholder={view === 'receivables' ? 'Search customer or invoice number' : `Search ${title[view].toLowerCase()}`}
+            aria-label={view === 'receivables' ? 'Search customer or invoice number' : 'Search'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -414,13 +436,16 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
             </select>
           )}
           {view === 'receivables' && (
-            <select aria-label="Filter receivables by due period" value={duePeriod} onChange={(event) => setDuePeriod(event.target.value)}>
-              <option value="">All due periods</option>
-              <option value="OVERDUE">Overdue</option>
-              <option value="DUE_7">Due within 7 days</option>
-              <option value="DUE_8_30">Due in 8–30 days</option>
-              <option value="DUE_30_PLUS">Due after 30 days</option>
-            </select>
+            <>
+              <select aria-label="Filter receivables by ageing period" value={duePeriod} onChange={(event) => setDuePeriod(event.target.value)}>
+                <option value="">All ageing periods</option>
+                {RECEIVABLE_AGEING_PERIODS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <select aria-label="Filter receivables by customer" value={ageingCustomerId} onChange={(event) => setAgeingCustomerId(event.target.value)}>
+                <option value="">All customers</option>
+                {ageingCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.displayName}</option>)}
+              </select>
+            </>
           )}
         </div>
         {error && (
@@ -515,7 +540,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
               <tbody>
                 {visibleRows.map((r) => (
                   <tr key={r.id}>
-                    {values(view, r).map((x, j) => (
+                    {values(view, r, view === 'receivables' ? overdueCountsByCustomer.get((r as Invoice).customerId) ?? 0 : 0).map((x, j) => (
                       <td key={j}>{x}</td>
                     ))}
                     {(canEdit || view === 'customers' || (view === 'invoices' && canApproveCredit)) && (
@@ -563,7 +588,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
                       className="table-empty"
                       colSpan={columns(view).length + (canEdit || view === 'customers' || (view === 'invoices' && canApproveCredit) ? 1 : 0)}
                     >
-                      No records found.
+                      {view === 'receivables' ? 'No outstanding invoices match these filters.' : 'No records found.'}
                     </td>
                   </tr>
                 )}
@@ -660,9 +685,9 @@ function columns(v: View) {
           ? ['Reference', 'Customer', 'Invoice Number', 'Receipt type', 'Amount', 'Date', 'Method']
           : v === 'credit-notes'
             ? ['Number', 'Customer', 'Invoice', 'Amount', 'Date', 'Status']
-            : ['Invoice', 'Customer', 'Due date', 'Original', 'Outstanding', 'Age'];
+            : ['Customer', 'Invoice number', 'Due date', 'Outstanding balance', 'Ageing period', 'Overdue pattern'];
 }
-function values(v: View, r: Row): string[] {
+function values(v: View, r: Row, customerOverdueCount = 0): string[] {
   if (v === 'customers') {
     const x = r as Customer;
     return [
@@ -699,12 +724,12 @@ function values(v: View, r: Row): string[] {
           invoiceStatusLabel(x),
         ]
       : [
-          x.number,
           x.customer.displayName,
+          x.number,
           day(x.dueDate),
-          cash(x.total, x.currency),
           cash(String(out), x.currency),
-          dueTimingLabel(x.dueDate),
+          receivableAgeingLabel(x.dueDate),
+          customerOverdueCount >= 2 ? '2+ overdue invoices' : '—',
         ];
   }
   if (v === 'payments') {
