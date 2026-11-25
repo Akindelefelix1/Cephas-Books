@@ -103,7 +103,7 @@ function ReportingPage({ analytics }: { analytics: boolean }) {
         </button>
       </div>
       <section className="panel">
-        <div className="banking-filters">
+        <div className="banking-filters financial-period-filters">
           <label>
             Accounting period
             <select aria-label="Select accounting period" value={periodValue} onChange={(event) => applyPeriod(event.target.value)}>
@@ -130,7 +130,7 @@ function ReportingPage({ analytics }: { analytics: boolean }) {
           >
             Clear dates
           </button>
-          <small className="full">The financial year runs {fiscalYear.start} to {fiscalYear.end}; reporting periods use {getReportingTimeZone()}.</small>
+          <small className="financial-period-note">The financial year runs {fiscalYear.start} to {fiscalYear.end}; reporting periods use {getReportingTimeZone()}.</small>
         </div>
         {error && (
           <div className="banking-alert">

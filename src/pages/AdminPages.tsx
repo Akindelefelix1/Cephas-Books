@@ -28,6 +28,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { confirmAction } from '@/utils/actions';
+import { getReportingTimeZone } from '@/utils/financial-configuration';
 import { authApi } from '@/services/auth';
 import { organizationApi, type CustomRole } from '@/services/organization';
 
@@ -655,7 +656,7 @@ function OrganisationSettings({
           className="button"
           onClick={() => {
             setSavedAt(
-              `Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+              `Saved ${new Intl.DateTimeFormat('en-NG', { hour: '2-digit', minute: '2-digit', timeZone: getReportingTimeZone() }).format(new Date())}`,
             );
             confirmAction('Organisation settings saved');
           }}
@@ -1214,6 +1215,7 @@ function formatPasswordChangedAt(value: string | null) {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    timeZone: getReportingTimeZone(),
   }).format(new Date(value))}`;
 }
 
@@ -1266,7 +1268,7 @@ export function ProfilePage({
     .map((part) => part[0]?.toUpperCase())
     .join('');
   const memberSince = profile.createdAt
-    ? new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(
+    ? new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: getReportingTimeZone() }).format(
         new Date(profile.createdAt),
       )
     : 'Not available';

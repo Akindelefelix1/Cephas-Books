@@ -31,7 +31,7 @@ import {
 import { confirmAction } from '@/utils/actions';
 import { setDefaultCurrency } from '@/utils/currency';
 import { getOfflineQueue } from '@/services/offline';
-import { FISCAL_YEAR_MONTHS, formatBusinessDate, formatBusinessDateTime, getFiscalYearRange, getFiscalYearStartMonth, getReportingTimeZone, getTimeZoneOptions, setFiscalYearStartMonth, setReportingTimeZone } from '@/utils/financial-configuration';
+import { FISCAL_YEAR_MONTHS, formatBusinessDate, formatBusinessDateTime, getFiscalYearRange, getFiscalYearStartMonth, getReportingTimeZone, getTimeZoneOptions, isValidReportingTimeZone, setFiscalYearStartMonth, setReportingTimeZone } from '@/utils/financial-configuration';
 
 type Branch = {
   id: string;
@@ -415,7 +415,7 @@ export function OrganizationSettingsPage({
       )}
       {view === 'settings' && (
         <form
-          className="panel settings-api-panel"
+          className="panel settings-api-panel financial-config-panel"
           onSubmit={(event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
@@ -425,6 +425,8 @@ export function OrganizationSettingsPage({
               timezone: String(data.get('timezone')),
             };
             void run(async () => {
+              if (!isValidReportingTimeZone(next.timezone))
+                throw new Error('Enter a valid IANA reporting time zone, such as America/Toronto.');
               await organizationApi.updateSection('preferences', next);
               setFiscalYearStartMonth(next.fiscalYearStart);
               setReportingTimeZone(next.timezone);

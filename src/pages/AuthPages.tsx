@@ -18,7 +18,7 @@ import { confirmAction } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
 import type { View } from '@/types/app';
 import { activateOfflineMode, cacheBulkWorkspace, createOfflineLogin, deactivateOfflineMode, getOfflineBulkSnapshot, getOfflineSnapshot, getOfflineSnapshotIdentity, restoreOfflineTokens, type OfflineSnapshot } from '@/services/offline';
-import { FISCAL_YEAR_MONTHS, getTimeZoneOptions } from '@/utils/financial-configuration';
+import { FISCAL_YEAR_MONTHS, getTimeZoneOptions, isValidReportingTimeZone } from '@/utils/financial-configuration';
 
 export function AuthPage({
   mode,
@@ -710,6 +710,8 @@ export function OnboardingPage({
     setSaving(true);
     try {
       const values = saveForm();
+      if (step === 1 && !isValidReportingTimeZone(values.timezone ?? ''))
+        throw new Error('Enter a valid IANA reporting time zone, such as America/Toronto.');
       await saveCurrentStep(values);
       if (step === setupSteps.length - 1) {
         await onboardingApi.complete();

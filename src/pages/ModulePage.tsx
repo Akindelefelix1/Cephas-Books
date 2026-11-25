@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import type { ModuleDefinition } from '@/types/app';
-import { getBusinessToday } from '@/utils/financial-configuration';
+import { formatBusinessDate, getBusinessToday, getReportingTimeZone } from '@/utils/financial-configuration';
 
 export function ModulePage({ definition }: { definition: ModuleDefinition }) {
   const [modal, setModal] = useState(false);
@@ -32,7 +32,8 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
       const currentMonth = new Intl.DateTimeFormat('en-GB', {
         month: 'short',
         year: 'numeric',
-      }).format(new Date());
+        timeZone: getReportingTimeZone(),
+      }).format(new Date(`${getBusinessToday()}T12:00:00Z`));
       const matchesFilter =
         !normalizedFilter ||
         normalizedFilter.startsWith('all ') ||
@@ -168,9 +169,7 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
                 {
                   party: displayName || companyName || name,
                   reference: `CUS-${String(Date.now()).slice(-5)}`,
-                  date: new Date().toLocaleDateString('en-GB', {
-                    day: '2-digit', month: 'short', year: 'numeric',
-                  }),
+                  date: formatBusinessDate(getBusinessToday(), 'en-GB'),
                   amount: '₦0',
                   status: 'Active',
                 },

@@ -13,7 +13,7 @@ import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiError } from '@/services/auth';
 import { getDefaultCurrency } from '@/utils/currency';
-import { formatBusinessDateTime } from '@/utils/financial-configuration';
+import { formatBusinessDate, formatBusinessDateTime } from '@/utils/financial-configuration';
 import {
   bankingApi,
   type BankAccount,
@@ -29,8 +29,7 @@ const money = (value: string | number, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency, maximumFractionDigits: 2 }).format(
     Number(value),
   );
-const date = (value: string) =>
-  new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium' }).format(new Date(value));
+const date = (value: string) => formatBusinessDate(value);
 const errorMessage = (error: unknown) =>
   error instanceof ApiError || error instanceof Error ? error.message : 'Something went wrong.';
 

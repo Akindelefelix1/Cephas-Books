@@ -526,6 +526,12 @@ async function resolveOfflineRead<T>(
   );
   if (compatiblePath) {
     const resource = bulk.resources[compatiblePath];
+    if (basePath === '/insights/reports' || basePath === '/insights/analytics') {
+      const range = (resource as { range?: { from?: string | null; to?: string | null } } | null)?.range;
+      if ((query.has('from') || query.has('to')) &&
+        (!range || (query.get('from') || null) !== (range.from || null) || (query.get('to') || null) !== (range.to || null)))
+        return { found: false };
+    }
     if (Array.isArray(resource)) {
       const search = query.get('search')?.toLowerCase() ?? '';
       const status = query.get('status') ?? '';
@@ -710,6 +716,12 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
       );
       if (compatiblePath) {
         const resource = bulk.resources[compatiblePath];
+        if (basePath === '/insights/reports' || basePath === '/insights/analytics') {
+          const range = (resource as { range?: { from?: string | null; to?: string | null } } | null)?.range;
+          if ((query.has('from') || query.has('to')) &&
+            (!range || (query.get('from') || null) !== (range.from || null) || (query.get('to') || null) !== (range.to || null)))
+            throw new ApiError('This reporting period is not available in the offline snapshot. Reconnect to load this date range.', 0);
+        }
         if (Array.isArray(resource)) {
           const search = query.get('search')?.toLowerCase() ?? '';
           const status = query.get('status') ?? '';

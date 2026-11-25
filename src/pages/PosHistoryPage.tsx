@@ -20,7 +20,6 @@ import { formatBusinessDate, formatBusinessDateTime, getBusinessToday, getReport
 
 const money = (value: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(value);
-const monthFormatter = new Intl.DateTimeFormat('en-NG', { month: 'short', timeZone: getReportingTimeZone() });
 const paymentLabel = (method: string) =>
   ({ CASH: 'Cash', CARD: 'POS / Card', TRANSFER: 'Bank transfer', CREDIT: 'Customer credit' })[
     method
@@ -71,7 +70,7 @@ export function PosHistoryPage({
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showVoidForm, setShowVoidForm] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
-  const [analyticsYear, setAnalyticsYear] = useState(new Date().getFullYear());
+  const [analyticsYear, setAnalyticsYear] = useState(todayYear);
   const [annualSales, setAnnualSales] = useState<PosSale[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState('');
@@ -292,10 +291,11 @@ export function PosHistoryPage({
     }
   };
   const monthlySales = Array.from({ length: 12 }, (_, month) => {
-    const monthSales = annualSales.filter((sale) => new Date(sale.createdAt).getMonth() === month);
+    const monthKey = `${analyticsYear}-${String(month + 1).padStart(2, '0')}`;
+    const monthSales = annualSales.filter((sale) => getBusinessToday(new Date(sale.createdAt)).slice(0, 7) === monthKey);
     return {
       month,
-      label: monthFormatter.format(new Date(analyticsYear, month, 1)),
+      label: new Intl.DateTimeFormat('en-NG', { month: 'short', timeZone: getReportingTimeZone() }).format(new Date(Date.UTC(analyticsYear, month, 15, 12))),
       isCurrent: analyticsYear === currentYear && month === currentMonthIndex,
       total: monthSales.reduce((sum, sale) => sum + Number(sale.total), 0),
       transactions: monthSales.length,

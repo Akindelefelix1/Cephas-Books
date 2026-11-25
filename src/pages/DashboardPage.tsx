@@ -30,7 +30,7 @@ import { accountingApi, type FinanceRecord } from '@/services/accounting';
 import { workflowApi, type AppNotification, type WorkflowSummary } from '@/services/workflow';
 import type { Invoice } from '@/services/sales';
 import { can, canAccessRoute, type PermissionIdentity } from '@/utils/permissions';
-import { formatBusinessDateTime, getReportingTimeZone } from '@/utils/financial-configuration';
+import { daysBetweenBusinessDates, formatBusinessDateTime, getReportingTimeZone } from '@/utils/financial-configuration';
 
 const dateUntil = (value: string | undefined, now: number) => {
   if (!value) return 'No end date';
@@ -200,7 +200,8 @@ export function DashboardPage({
         Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount),
       );
       if (!outstanding || !invoice.dueDate || Number.isNaN(new Date(invoice.dueDate).getTime())) return buckets;
-      const days = Math.floor((dashboardNow - new Date(invoice.dueDate).getTime()) / 86400000);
+      const days = daysBetweenBusinessDates(invoice.dueDate);
+      if (days === null) return buckets;
       const index = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : days <= 90 ? 3 : 4;
       buckets[index] += outstanding;
       return buckets;

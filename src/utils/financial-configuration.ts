@@ -28,6 +28,15 @@ export function getReportingTimeZone() {
   }
 }
 
+export function isValidReportingTimeZone(timeZone: string) {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function setReportingTimeZone(timeZone: string) {
   localStorage.setItem(TIME_ZONE_KEY, timeZone);
   window.dispatchEvent(new CustomEvent('cephas:financial-configuration-changed'));
@@ -50,6 +59,17 @@ export function getBusinessToday(now = new Date()) {
   }).formatToParts(now);
   const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+export function daysBetweenBusinessDates(earlier: string, later = getBusinessToday()) {
+  const earlierDate = /^\d{4}-\d{2}-\d{2}/.exec(earlier)?.[0];
+  const laterDate = /^\d{4}-\d{2}-\d{2}/.exec(later)?.[0];
+  if (!earlierDate || !laterDate) return null;
+  const toUtcDay = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return Date.UTC(year, month - 1, day) / 86_400_000;
+  };
+  return toUtcDay(laterDate) - toUtcDay(earlierDate);
 }
 
 export function formatBusinessDate(value: string | Date, locale = 'en-NG') {
