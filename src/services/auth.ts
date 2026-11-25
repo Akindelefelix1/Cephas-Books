@@ -560,6 +560,21 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
 
   if (method !== 'GET') {
     if (isWorkingOffline()) {
+      if (/^\/accounting\/assets\/[^/]+\/depreciation(?:\/settings)?$/.test(path))
+        throw new ApiError('Connect to the internet to change asset depreciation settings or post its journal entry.', 0);
+      if (path === '/accounting/records' && method === 'POST') {
+        try {
+          const body = JSON.parse(String(init.body ?? '{}')) as { kind?: string };
+          if (body.kind === 'ASSET')
+            throw new ApiError('Connect to the internet to register a fixed asset and post its acquisition entry.', 0);
+        } catch (caught) {
+          if (caught instanceof ApiError) throw caught;
+        }
+      }
+      if (/^\/accounting\/records\/[^/]+\/status$/.test(path))
+        throw new ApiError('Connect to the internet to change accounting record status and keep the ledger in sync.', 0);
+      if (path === '/accounting/journals' || /^\/accounting\/journals\/[^/]+\/(?:post|reverse)$/.test(path))
+        throw new ApiError('Connect to the internet to create, post, or reverse journal entries and keep the ledger in sync.', 0);
       if (path === '/purchases/goods-received-notes')
         throw new ApiError('Connect to the internet before recording a goods receipt so stock and remaining quantities can be verified.', 0);
       if (/^\/pos\/sales\/[^/]+\/(?:returns|void|credit-payments)$/.test(path))
@@ -607,8 +622,6 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
   const branchId = localStorage.getItem('cephas:active-branch') ?? '';
   const key = `${cacheIdentity}:${branchId}:${path}`;
   if (isWorkingOffline()) {
-    const local = await resolveOfflineRead<T>(path, key, cacheIdentity);
-    if (local.found) return local.value;
     const savedKey = `cephas:offline:api:${key}`;
     const savedRaw = localStorage.getItem(savedKey);
     if (savedRaw !== null) {
@@ -618,6 +631,8 @@ export async function authorizedRequest<T>(path: string, init: RequestInit = {})
         localStorage.removeItem(savedKey);
       }
     }
+    const local = await resolveOfflineRead<T>(path, key, cacheIdentity);
+    if (local.found) return local.value;
     const bulk = await getOfflineBulkSnapshot();
     if (
       bulk?.version === 1 &&

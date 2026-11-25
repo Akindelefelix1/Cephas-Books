@@ -123,6 +123,9 @@ export async function cacheBulkWorkspace(
   } finally {
     db.close();
   }
+  // A newly prepared bulk snapshot supersedes any per-request responses saved
+  // before it, so stale exact-path entries cannot shadow the refreshed data.
+  clearOfflineApiSnapshots();
   const expected = expectedOfflineReads(profile ?? getOfflineSnapshot('profile') ?? undefined);
   const saved = expected.filter((path) => Object.prototype.hasOwnProperty.call(snapshot.resources, path)).length;
   return { saved, failed: expected.length - saved };

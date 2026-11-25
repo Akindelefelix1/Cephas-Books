@@ -1966,3 +1966,50 @@
     width: 100%;
   }
 }
+
+.asset-depreciation {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.asset-depreciation__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.asset-depreciation__summary > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e1e6ef;
+  border-radius: 12px;
+  background: #f8faff;
+}
+.asset-depreciation__summary span,
+.asset-depreciation__method {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+.asset-depreciation__summary strong {
+  overflow-wrap: anywhere;
+}
+.asset-depreciation__table {
+  width: 100%;
+  min-width: 0;
+  max-height: 340px;
+  overflow: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.asset-depreciation__settings > p {
+  margin: 0;
+}
+@media (max-width: 760px) {
+  .asset-depreciation__summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .asset-depreciation__table {
+    max-width: 100%;
+  }
+}

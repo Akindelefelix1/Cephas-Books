@@ -62,6 +62,46 @@ export interface FinanceRecord {
   status: string;
   data: Record<string, unknown>;
 }
+export interface AssetDepreciationPeriod {
+  period: number;
+  periodStart: string;
+  periodEnd: string;
+  openingCarryingAmount: string;
+  depreciationAmount: string;
+  accumulatedDepreciation: string;
+  carryingAmount: string;
+  status: string;
+  journalId: string | null;
+}
+export interface AssetDepreciationHistory {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  amount: string;
+  accumulatedDepreciation: string;
+  carryingAmount: string;
+  status: string;
+  journal?: { id: string; number: string; status: string } | null;
+  createdAt: string;
+}
+export interface AssetDepreciationSummary {
+  asset: FinanceRecord;
+  configured: boolean;
+  settings: {
+    residualValue: number;
+    usefulLifeYears: number;
+    method: 'STRAIGHT_LINE' | 'REDUCING_BALANCE';
+    frequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY';
+    reducingBalanceRate?: number;
+  } | null;
+  cost: string;
+  accumulatedDepreciation: string;
+  carryingAmount: string;
+  throughDate: string;
+  nextDue: AssetDepreciationPeriod | null;
+  schedule: AssetDepreciationPeriod[];
+  history: AssetDepreciationHistory[];
+}
 const req = <T>(path: string, method = 'GET', body?: object) =>
   authorizedRequest<T>(path, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
 export const accountingApi = {
@@ -73,7 +113,7 @@ export const accountingApi = {
     req<Journal[]>(`/accounting/journals?search=${encodeURIComponent(search)}`),
   createJournal: (d: object) => req<Journal>('/accounting/journals', 'POST', d),
   postJournal: (id: string) => req(`/accounting/journals/${id}/post`, 'POST'),
-  reverseJournal: (id: string) => req(`/accounting/journals/${id}/reverse`, 'POST'),
+  reverseJournal: (id: string) => req<Journal & { depreciationAssetId?: string }>(`/accounting/journals/${id}/reverse`, 'POST'),
   ledger: (accountId = '') => req<LedgerRow[]>(`/accounting/ledger?accountId=${accountId}`),
   trial: () =>
     req<{ rows: TrialRow[]; totalDebit: string; totalCredit: string }>('/accounting/trial-balance'),
@@ -82,4 +122,10 @@ export const accountingApi = {
   createRecord: (d: object) => req<FinanceRecord>('/accounting/records', 'POST', d),
   recordStatus: (id: string, status: string) =>
     req(`/accounting/records/${id}/status`, 'PATCH', { status }),
+  assetDepreciation: (id: string) =>
+    req<AssetDepreciationSummary>(`/accounting/assets/${id}/depreciation`),
+  configureAssetDepreciation: (id: string, data: NonNullable<AssetDepreciationSummary['settings']>) =>
+    req<FinanceRecord>(`/accounting/assets/${id}/depreciation/settings`, 'PATCH', data),
+  runAssetDepreciation: (id: string, throughDate: string) =>
+    req<AssetDepreciationSummary>(`/accounting/assets/${id}/depreciation`, 'POST', { throughDate }),
 };
