@@ -19,6 +19,8 @@ import { isOfflineEnabledForCurrentAccount, isWorkingOffline } from '@/services/
 import { operationsApi } from '@/services/operations';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
+import { PaymentTermsField } from '@/components/ui/PaymentTermsField';
+import { addDaysToDateInput, duePeriodForDate, dueTimingLabel, todayDateInput } from '@/utils/payment-terms';
 const money = (v?: string, c = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: c }).format(Number(v ?? 0));
 const date = (v?: string) => (v ? new Date(v).toLocaleDateString('en-NG') : '—');
@@ -48,6 +50,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     [summary, setSummary] = useState<PurchaseSummary | null>(null),
     [search, setSearch] = useState(''),
     [status, setStatus] = useState(''),
+    [duePeriod, setDuePeriod] = useState(''),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -178,13 +181,21 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
     return saved;
   };
   const cols = columns(view);
+  const payableRows = view === 'payables' ? rows as PurchaseRow[] : [];
+  const duePeriodCounts = ['OVERDUE', 'DUE_7', 'DUE_8_30', 'DUE_30_PLUS'].map((period) => ({
+    period,
+    count: payableRows.filter((bill) => duePeriodForDate(bill.dueDate ?? '') === period && Number(bill.total ?? 0) - Number(bill.paidAmount ?? 0) > 0).length,
+  }));
+  const visibleRows = view === 'payables' && duePeriod
+    ? rows.filter((row) => duePeriodForDate((row as PurchaseRow).dueDate ?? '') === duePeriod)
+    : rows;
   const showActions = canEdit || canApprove || view === 'goods-received-notes';
   const exportCsv = () =>
     downloadText(
       `${view}.csv`,
       [
         cols.join(','),
-        ...rows.map((r) =>
+        ...visibleRows.map((r) =>
           values(view, r)
             .map((x) => `"${x.replace(/"/g, '""')}"`)
             .join(','),
@@ -228,6 +239,12 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
           ]}
         />
       )}
+      {view === 'payables' && <StatsGrid stats={[
+        { label: 'Overdue bills', value: String(duePeriodCounts[0].count), tone: 'warning' },
+        { label: 'Due within 7 days', value: String(duePeriodCounts[1].count) },
+        { label: 'Due in 8–30 days', value: String(duePeriodCounts[2].count) },
+        { label: 'Due after 30 days', value: String(duePeriodCounts[3].count) },
+      ]} />}
       <section className="panel register-panel">
         {view === 'goods-received-notes' && offlineMode && (
           <p className="banking-alert" role="status">
@@ -252,6 +269,15 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
               ))}
             </select>
           )}
+          {view === 'payables' && (
+            <select aria-label="Filter payables by due period" value={duePeriod} onChange={(event) => setDuePeriod(event.target.value)}>
+              <option value="">All due periods</option>
+              <option value="OVERDUE">Overdue</option>
+              <option value="DUE_7">Due within 7 days</option>
+              <option value="DUE_8_30">Due in 8–30 days</option>
+              <option value="DUE_30_PLUS">Due after 30 days</option>
+            </select>
+          )}
         </div>
         {error && (
           <div className="banking-alert">
@@ -273,7 +299,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {visibleRows.map((r) => (
                   <tr key={r.id}>
                     {values(view, r).map((x, i) => (
                       <td key={i}>{x}</td>
@@ -318,7 +344,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
                     )}
                   </tr>
                 ))}
-                {!rows.length && (
+                {!visibleRows.length && (
                   <tr>
                     <td className="table-empty" colSpan={cols.length + (showActions ? 1 : 0)}>
                       No records found.
@@ -419,7 +445,7 @@ function columns(v: PurchaseView) {
       'Recorded by',
     ];
   if (v === 'bills' || v === 'payables')
-    return ['Bill', 'Supplier', 'Due', 'Total', 'Outstanding', 'Status'];
+    return ['Bill', 'Supplier', 'Due', 'Payment timing', 'Total', 'Outstanding', 'Status'];
   if (v === 'supplier-payments')
     return ['Reference', 'Supplier', 'Bill', 'Date', 'Amount', 'Method'];
   return ['Reference', 'Merchant', 'Category', 'Project / receipt type', 'Date', 'Amount', 'Status'];
@@ -431,7 +457,7 @@ function values(v: PurchaseView, r: PurchaseRow | Supplier) {
       x.displayName,
       x.email || '—',
       x.phone || '—',
-      x.paymentTerms || '—',
+      x.paymentTermsDays === 0 ? 'Due on receipt' : x.paymentTerms || `Net ${x.paymentTermsDays ?? 30}`,
       x.isActive ? 'Active' : 'Archived',
     ];
   }
@@ -477,6 +503,7 @@ function values(v: PurchaseView, r: PurchaseRow | Supplier) {
       x.number ?? '',
       x.supplier?.displayName ?? '',
       date(x.dueDate),
+      dueTimingLabel(x.dueDate ?? ''),
       money(x.total, x.currency),
       money(String(Number(x.total) - Number(x.paidAmount)), x.currency),
       x.status ?? '',
@@ -1201,8 +1228,10 @@ function PurchaseModal({
   submit: (d: Record<string, unknown>) => void;
 }) {
   const line = ['purchase-requests', 'purchase-orders', 'bills'].includes(view),
-    today = new Date().toISOString().slice(0, 10);
+    today = todayDateInput();
   const bank = supplierBankDetails(selected?.bankDetails);
+  const [billSupplierId, setBillSupplierId] = useState('');
+  const [billIssueDate, setBillIssueDate] = useState(today);
   const [lineItems, setLineItems] = useState([
     { name: '', description: '', quantity: '', unitPrice: '' },
   ]);
@@ -1214,6 +1243,14 @@ function PurchaseModal({
     setLineItems((items) =>
       items.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)),
     );
+  useEffect(() => {
+    if (!open) return;
+    setBillSupplierId('');
+    setBillIssueDate(todayDateInput());
+  }, [open, view, selected?.id]);
+  const selectedBillSupplier = suppliers.find((supplier) => supplier.id === billSupplierId);
+  const billTermsDays = selectedBillSupplier?.paymentTermsDays ?? 30;
+  const billDuePreview = addDaysToDateInput(billIssueDate, billTermsDays);
   return (
     <Modal
       open={open}
@@ -1244,7 +1281,7 @@ function PurchaseModal({
               companyName: optional('companyName'),
               email: optional('email'),
               phone: optional('phone'),
-              paymentTerms: optional('paymentTerms'),
+              paymentTermsDays: Number(g('paymentTermsDays') || 30),
               bankDetails: JSON.stringify({
                 bankName: optional('bankName'),
                 accountName: optional('accountName'),
@@ -1327,14 +1364,12 @@ function PurchaseModal({
               Phone
               <input name="phone" defaultValue={selected?.phone} />
             </label>
-            <label>
-              Payment terms
-              <input
-                name="paymentTerms"
-                placeholder="Net 30"
-                defaultValue={selected?.paymentTerms}
-              />
-            </label>
+            <PaymentTermsField
+              key={selected?.id ?? 'new-supplier'}
+              name="paymentTermsDays"
+              value={selected?.paymentTermsDays ?? 30}
+              title="Supplier payment terms"
+            />
             <fieldset className="form-fieldset full">
               <legend>
                 Bank details <small>Optional</small>
@@ -1445,7 +1480,13 @@ function PurchaseModal({
               <>
                 <label className="full">
                   Supplier
-                  <select name="supplierId" required defaultValue="">
+                  <select
+                    name="supplierId"
+                    required
+                    value={view === 'bills' ? billSupplierId : undefined}
+                    defaultValue={view === 'bills' ? undefined : ''}
+                    onChange={view === 'bills' ? (event) => setBillSupplierId(event.target.value) : undefined}
+                  >
                     <option value="" disabled>
                       Select supplier
                     </option>
@@ -1478,7 +1519,14 @@ function PurchaseModal({
             {(view === 'purchase-orders' || view === 'bills') && (
               <label>
                 {view === 'bills' ? 'Issue' : 'Order'} date
-                <input name="startDate" type="date" defaultValue={today} required />
+                <input
+                  name="startDate"
+                  type="date"
+                  required
+                  value={view === 'bills' ? billIssueDate : undefined}
+                  defaultValue={view === 'purchase-orders' ? today : undefined}
+                  onChange={view === 'bills' ? (event) => setBillIssueDate(event.target.value) : undefined}
+                />
               </label>
             )}
             <label>
@@ -1492,7 +1540,15 @@ function PurchaseModal({
                       ? 'Expense'
                       : 'Payment'}{' '}
               date
-              <input name="date" type="date" defaultValue={today} required />
+              <input
+                name="date"
+                type="date"
+                defaultValue={view === 'bills' ? undefined : today}
+                value={view === 'bills' ? billDuePreview : undefined}
+                readOnly={view === 'bills'}
+                required
+              />
+              {view === 'bills' && <small className="field-hint">Calculated from supplier terms: {billTermsDays === 0 ? 'due on receipt' : `${billTermsDays} days`}.</small>}
             </label>
             {line && (
               <div className="invoice-line-editor full">

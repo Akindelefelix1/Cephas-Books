@@ -16,6 +16,8 @@ import {
 import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
 import { getOfflineQueue, isWorkingOffline } from '@/services/offline';
+import { PaymentTermsField } from '@/components/ui/PaymentTermsField';
+import { addDaysToDateInput, duePeriodForDate, dueTimingLabel, todayDateInput } from '@/utils/payment-terms';
 type View = 'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables';
 type Row = Customer | Quotation | Invoice | Payment | CreditNote;
 const cash = (v: string, c = getDefaultCurrency()) =>
@@ -86,6 +88,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
     [rows, setRows] = useState<Row[]>([]),
     [search, setSearch] = useState(''),
     [status, setStatus] = useState(''),
+    [duePeriod, setDuePeriod] = useState(''),
     [filterOpen, setFilterOpen] = useState(false),
     [queuedQuotationSends, setQueuedQuotationSends] = useState<Set<string>>(() => queuedQuotationSendIds()),
     [loading, setLoading] = useState(true),
@@ -288,6 +291,14 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
     'credit-notes': 'Credit notes',
     receivables: 'Receivables',
   };
+  const receivableRows = view === 'receivables' ? rows as Invoice[] : [];
+  const duePeriodCounts = ['OVERDUE', 'DUE_7', 'DUE_8_30', 'DUE_30_PLUS'].map((period) => ({
+    period,
+    count: receivableRows.filter((invoice) => duePeriodForDate(invoice.dueDate) === period && invoiceOutstanding(invoice) > 0).length,
+  }));
+  const visibleRows = view === 'receivables' && duePeriod
+    ? rows.filter((row) => duePeriodForDate((row as Invoice).dueDate) === duePeriod)
+    : rows;
   const action =
     view === 'customers'
       ? 'Add customer'
@@ -303,7 +314,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
   const exportCsv = () => {
     const body = [
       columns(view).join(','),
-      ...rows.map((r) =>
+      ...visibleRows.map((r) =>
         values(view, r)
           .map((x) => `"${String(x).replace(/"/g, '""')}"`)
           .join(','),
@@ -364,6 +375,12 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
           ]}
         />
       )}
+      {view === 'receivables' && <StatsGrid stats={[
+        { label: 'Overdue invoices', value: String(duePeriodCounts[0].count), tone: 'warning' },
+        { label: 'Due within 7 days', value: String(duePeriodCounts[1].count) },
+        { label: 'Due in 8–30 days', value: String(duePeriodCounts[2].count) },
+        { label: 'Due after 30 days', value: String(duePeriodCounts[3].count) },
+      ]} />}
       <section className="panel register-panel">
         <div className="banking-filters">
           <input
@@ -378,6 +395,15 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
               {['DRAFT', 'SENT', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID'].map((x) => (
                 <option key={x}>{x}</option>
               ))}
+            </select>
+          )}
+          {view === 'receivables' && (
+            <select aria-label="Filter receivables by due period" value={duePeriod} onChange={(event) => setDuePeriod(event.target.value)}>
+              <option value="">All due periods</option>
+              <option value="OVERDUE">Overdue</option>
+              <option value="DUE_7">Due within 7 days</option>
+              <option value="DUE_8_30">Due in 8–30 days</option>
+              <option value="DUE_30_PLUS">Due after 30 days</option>
             </select>
           )}
         </div>
@@ -471,7 +497,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {visibleRows.map((r) => (
                   <tr key={r.id}>
                     {values(view, r).map((x, j) => (
                       <td key={j}>{x}</td>
@@ -515,7 +541,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
                     )}
                   </tr>
                 ))}
-                {!rows.length && (
+                {!visibleRows.length && (
                   <tr>
                     <td
                       className="table-empty"
@@ -609,7 +635,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
 }
 function columns(v: View) {
   return v === 'customers'
-    ? ['Name', 'Email', 'Phone', 'Credit limit', 'Address', 'Status']
+    ? ['Name', 'Email', 'Phone', 'Payment terms', 'Credit limit', 'Address', 'Status']
     : v === 'quotations'
       ? ['Number', 'Customer', 'Total', 'Expiry', 'Status']
       : v === 'invoices'
@@ -627,6 +653,7 @@ function values(v: View, r: Row): string[] {
       x.displayName,
       x.email || '—',
       x.phone || '—',
+      x.paymentTermsDays === 0 ? 'Due on receipt' : `Net ${x.paymentTermsDays ?? 30}`,
       cash(String(x.creditLimit ?? '0')),
       x.billingAddress || '—',
       x.isActive ? 'Active' : 'Archived',
@@ -661,7 +688,7 @@ function values(v: View, r: Row): string[] {
           day(x.dueDate),
           cash(x.total, x.currency),
           cash(String(out), x.currency),
-          `${Math.max(0, Math.floor((Date.now() - new Date(x.dueDate).getTime()) / 86400000))} days`,
+          dueTimingLabel(x.dueDate),
         ];
   }
   if (v === 'payments') {
@@ -1337,6 +1364,7 @@ function CreateModal({
   ]);
   const [taxRate, setTaxRate] = useState('0');
   const [customerSelect, setCustomerSelect] = useState(customerPresetId);
+  const [invoiceIssueDate, setInvoiceIssueDate] = useState(todayDateInput());
   const [paymentInvoiceId, setPaymentInvoiceId] = useState('');
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -1353,8 +1381,12 @@ function CreateModal({
     setPaymentInvoiceId('');
     setInvoiceSearch('');
     setPaymentAmount('');
+    setInvoiceIssueDate(todayDateInput());
   }, [open, view]);
   useEffect(() => setCustomerSelect(customerPresetId), [customerPresetId, open]);
+  const selectedCustomerForInvoice = customers.find((customer) => customer.id === customerSelect);
+  const invoiceTermsDays = selectedCustomerForInvoice?.paymentTermsDays ?? 30;
+  const invoiceDuePreview = addDaysToDateInput(invoiceIssueDate, invoiceTermsDays);
   useEffect(() => {
     setCreditStatus(null); setCreditStatusError(''); setApproveCredit(false); setApprovalReason('');
     if (!open || view !== 'invoices' || !customerSelect) return;
@@ -1512,6 +1544,7 @@ function CreateModal({
               phone: get('phone') || undefined,
               companyName: get('companyName') || undefined,
               billingAddress: get('billingAddress') || undefined,
+              paymentTermsDays: Number(get('paymentTermsDays') || 30),
               creditLimit: Number(get('creditLimit') || 0),
               ...(get('creditLimitReason').trim() ? { creditLimitReason: get('creditLimitReason').trim() } : {}),
             });
@@ -1575,6 +1608,12 @@ function CreateModal({
               Email
               <input name="email" type="email" defaultValue={selected?.email} />
             </label>
+            <PaymentTermsField
+              key={selected?.id ?? 'new-customer'}
+              name="paymentTermsDays"
+              value={selected?.paymentTermsDays ?? 30}
+              title="Customer payment terms"
+            />
             <label>
               Phone
               <input name="phone" defaultValue={selected?.phone} />
@@ -1698,11 +1737,25 @@ function CreateModal({
                 )}
                 <label>
                   {view === 'quotations' ? 'Date' : 'Issue date'}
-                  <input name="issueDate" type="date" required />
+                  <input
+                    name="issueDate"
+                    type="date"
+                    required
+                    value={view === 'invoices' ? invoiceIssueDate : undefined}
+                    defaultValue={view === 'quotations' ? todayDateInput() : undefined}
+                    onChange={view === 'invoices' ? (event) => setInvoiceIssueDate(event.target.value) : undefined}
+                  />
                 </label>
                 <label>
                   {view === 'quotations' ? 'Expiry' : 'Due'} date
-                  <input name="dueDate" type="date" required />
+                  <input
+                    name="dueDate"
+                    type="date"
+                    required
+                    value={view === 'invoices' ? invoiceDuePreview : undefined}
+                    readOnly={view === 'invoices'}
+                  />
+                  {view === 'invoices' && <small className="field-hint">Calculated from customer terms: {invoiceTermsDays === 0 ? 'due on receipt' : `${invoiceTermsDays} days`}.</small>}
                 </label>
                 <div className="invoice-line-editor full">
                   <div className="invoice-line-editor__heading">

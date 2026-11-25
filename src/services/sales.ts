@@ -9,6 +9,7 @@ export interface Customer {
   taxId?: string;
   billingAddress?: string;
   notes?: string;
+  paymentTermsDays?: number;
   creditLimit?: string;
   isActive: boolean;
 }
