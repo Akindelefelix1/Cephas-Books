@@ -15,6 +15,7 @@ import {
   type TrialRow,
 } from '@/services/accounting';
 import { confirmAction } from '@/utils/actions';
+import { formatBusinessDate } from '@/utils/financial-configuration';
 const titles: Record<AccountingView, string> = {
   'chart-of-accounts': 'Chart of accounts',
   journals: 'Journal entries',
@@ -246,7 +247,7 @@ function cells(
     const x = r as Journal;
     return [
       x.number,
-      new Date(x.journalDate).toLocaleDateString(),
+      formatBusinessDate(x.journalDate),
       x.description,
       money(x.total),
       x.status,
@@ -256,7 +257,7 @@ function cells(
     const x = r as LedgerRow;
     return [
       x.number,
-      new Date(x.date).toLocaleDateString(),
+      formatBusinessDate(x.date),
       x.account ? `${x.account.code} — ${x.account.name}` : 'Unknown account',
       x.description,
       money(x.debit),
@@ -271,7 +272,7 @@ function cells(
   return [
     x.reference,
     x.name,
-    new Date(x.startDate).toLocaleDateString(),
+    formatBusinessDate(x.startDate),
     money(x.amount),
     x.status,
   ];

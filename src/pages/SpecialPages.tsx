@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { getBusinessToday } from '@/utils/financial-configuration';
 import {
   ArrowRight,
   Bot,
@@ -707,7 +708,7 @@ export function AccountingPage({ type }: { type: string }) {
             </label>
             <label>
               Posting date
-              <input type="date" defaultValue={new Date().toLocaleDateString('en-CA')} />
+              <input type="date" defaultValue={getBusinessToday()} />
             </label>
             <label>
               Reference

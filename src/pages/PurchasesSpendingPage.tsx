@@ -20,10 +20,11 @@ import { operationsApi } from '@/services/operations';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
 import { PaymentTermsField } from '@/components/ui/PaymentTermsField';
+import { formatBusinessDate } from '@/utils/financial-configuration';
 import { addDaysToDateInput, duePeriodForDate, dueTimingLabel, parsePaymentTermDays, todayDateInput } from '@/utils/payment-terms';
 const money = (v?: string, c = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: c }).format(Number(v ?? 0));
-const date = (v?: string) => (v ? new Date(v).toLocaleDateString('en-NG') : '—');
+const date = (v?: string) => (v ? formatBusinessDate(v) : '—');
 function applyQueuedSupplierTerms(suppliers: Supplier[]): Supplier[] {
   const queuedTerms = new Map<string, number>();
   for (const entry of getOfflineQueue()) {

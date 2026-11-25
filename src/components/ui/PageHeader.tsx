@@ -1,5 +1,6 @@
 import { Download, Plus } from 'lucide-react';
 import { downloadText } from '@/utils/actions';
+import { formatBusinessDateTime } from '@/utils/financial-configuration';
 
 interface PageHeaderProps {
   title: string;
@@ -10,7 +11,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, action, onAction }: PageHeaderProps) {
   const exportPage = () => {
-    const content = `${title}\n${description}\nExported ${new Date().toLocaleString()}`;
+    const content = `${title}\n${description}\nExported ${formatBusinessDateTime(new Date())}`;
     downloadText(`${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-export.txt`, content);
   };
   return (

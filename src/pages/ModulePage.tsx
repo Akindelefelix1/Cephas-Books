@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import type { ModuleDefinition } from '@/types/app';
+import { getBusinessToday } from '@/utils/financial-configuration';
 
 export function ModulePage({ definition }: { definition: ModuleDefinition }) {
   const [modal, setModal] = useState(false);
@@ -210,7 +211,7 @@ export function ModulePage({ definition }: { definition: ModuleDefinition }) {
 }
 
 function QuotationForm() {
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = getBusinessToday();
   const [items, setItems] = useState([['Business software licence', '1', '₦0', '₦0']]);
   return (
     <form id="quotation-form" className="quotation-form" onSubmit={(event) => event.preventDefault()}>
@@ -289,7 +290,7 @@ function PaymentForm() {
       <label className="full">Invoice number<input name="invoice" placeholder="e.g. INV-00245" required /></label>
       <label>Customer<input name="customer" placeholder="Customer name" required /></label>
       <label>Amount<input name="amount" type="number" min="0.01" step="0.01" placeholder="₦ 0.00" required /></label>
-      <label>Date<input name="date" type="date" defaultValue={new Date().toLocaleDateString('en-CA')} required /></label>
+      <label>Date<input name="date" type="date" defaultValue={getBusinessToday()} required /></label>
       <label>Method<select name="method"><option>Bank transfer</option><option>Card</option><option>POS</option><option>Cash</option><option>Mobile payment</option></select></label>
       <label className="full">Reference / notes<textarea name="notes" placeholder="Payment reference or notes" /></label>
     </form>
@@ -297,7 +298,7 @@ function PaymentForm() {
 }
 
 function GenericForm({ title, onSubmit }: { title: string; onSubmit: (form: FormData) => void }) {
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = getBusinessToday();
   return (
     <form
       id="generic-record-form"
@@ -354,9 +355,9 @@ function GenericForm({ title, onSubmit }: { title: string; onSubmit: (form: Form
 }
 
 function InvoiceForm() {
-  const today = new Date();
-  const dueDate = new Date(today);
-  dueDate.setDate(today.getDate() + 30);
+  const today = getBusinessToday();
+  const dueDate = new Date(`${today}T00:00:00.000Z`);
+  dueDate.setUTCDate(dueDate.getUTCDate() + 30);
   const [lineItems, setLineItems] = useState([
     ['Business software licence', '2', '₦500,000', 'VAT 7.5%', '₦1,000,000'],
     ['Implementation service', '1', '₦250,000', 'VAT 7.5%', '₦250,000'],
@@ -378,11 +379,11 @@ function InvoiceForm() {
         </label>
         <label>
           Invoice date
-          <input type="date" defaultValue={today.toLocaleDateString('en-CA')} />
+          <input type="date" defaultValue={today} />
         </label>
         <label>
           Due date
-          <input type="date" defaultValue={dueDate.toLocaleDateString('en-CA')} />
+          <input type="date" defaultValue={dueDate.toISOString().slice(0, 10)} />
         </label>
         <label>
           Currency

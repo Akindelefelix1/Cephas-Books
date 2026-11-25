@@ -16,18 +16,19 @@ import { SalesReceipt } from '@/components/ui/SalesReceipt';
 import { posApi, type PosAuditEntry, type PosSale } from '@/services/pos';
 import { salesApi, type Customer } from '@/services/sales';
 import { getDefaultCurrency } from '@/utils/currency';
+import { formatBusinessDate, formatBusinessDateTime, getBusinessToday, getReportingTimeZone } from '@/utils/financial-configuration';
 
 const money = (value: number, currency = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(value);
-const monthFormatter = new Intl.DateTimeFormat('en-NG', { month: 'short' });
+const monthFormatter = new Intl.DateTimeFormat('en-NG', { month: 'short', timeZone: getReportingTimeZone() });
 const paymentLabel = (method: string) =>
   ({ CASH: 'Cash', CARD: 'POS / Card', TRANSFER: 'Bank transfer', CREDIT: 'Customer credit' })[
     method
   ] ?? method;
 const quantityLabel = (value: number) =>
   new Intl.NumberFormat('en-NG', { maximumFractionDigits: 3 }).format(value);
-const localDateKey = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const calendarDate = (year: number, monthIndex: number, day: number) =>
+  new Date(Date.UTC(year, monthIndex, day)).toISOString().slice(0, 10);
 
 export function PosHistoryPage({
   canReprint = false,
@@ -42,14 +43,14 @@ export function PosHistoryPage({
   canViewAudit?: boolean;
   canCollectCredit?: boolean;
 }) {
-  const currentYear = new Date().getFullYear();
-  const currentMonthIndex = new Date().getMonth();
+  const [todayYear, todayMonth] = getBusinessToday().split('-').map(Number);
+  const currentYear = todayYear;
+  const currentMonthIndex = todayMonth - 1;
   const [sales, setSales] = useState<PosSale[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [page, setPage] = useState(1);
   const [historyMonth, setHistoryMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    return new Date(todayYear, currentMonthIndex, 1);
   });
   const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [filters, setFilters] = useState({ search: '', from: '', to: '', customerId: '' });
@@ -64,7 +65,7 @@ export function PosHistoryPage({
   const [showCreditPaymentForm, setShowCreditPaymentForm] = useState(false);
   const [creditPaymentAmount, setCreditPaymentAmount] = useState('');
   const [creditPaymentMethod, setCreditPaymentMethod] = useState<'CASH' | 'CARD' | 'TRANSFER'>('CASH');
-  const [creditPaymentDate, setCreditPaymentDate] = useState(() => localDateKey(new Date()));
+  const [creditPaymentDate, setCreditPaymentDate] = useState(() => getBusinessToday());
   const [creditPaymentReference, setCreditPaymentReference] = useState('');
   const [actionNotice, setActionNotice] = useState('');
   const [showReturnForm, setShowReturnForm] = useState(false);
@@ -84,8 +85,8 @@ export function PosHistoryPage({
       .catch(() => undefined);
   }, []);
   useEffect(() => {
-    const from = localDateKey(new Date(historyMonth.getFullYear(), historyMonth.getMonth(), 1));
-    const to = localDateKey(new Date(historyMonth.getFullYear(), historyMonth.getMonth() + 1, 0));
+    const from = calendarDate(historyMonth.getFullYear(), historyMonth.getMonth(), 1);
+    const to = calendarDate(historyMonth.getFullYear(), historyMonth.getMonth() + 1, 0);
     const query = Object.fromEntries(
       Object.entries({ ...filters, from, to, page: String(page), limit: '10' }).filter(([, value]) => value),
     );
@@ -150,7 +151,7 @@ export function PosHistoryPage({
     setPage(1);
     setFilters((current) => ({ ...current, [key]: value }));
   };
-  const currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const currentMonth = new Date(currentYear, currentMonthIndex, 1);
   const isCurrentMonth = historyMonth.getFullYear() === currentMonth.getFullYear() &&
     historyMonth.getMonth() === currentMonth.getMonth();
   const changeHistoryMonth = (offset: number) => {
@@ -425,7 +426,7 @@ export function PosHistoryPage({
             <ChevronLeft size={16} /> Previous month
           </button>
           <h2 aria-live="polite">
-            {historyMonth.toLocaleDateString('en-NG', { month: 'long', year: 'numeric' })}
+            {new Intl.DateTimeFormat('en-NG', { month: 'long', year: 'numeric', timeZone: getReportingTimeZone() }).format(new Date(Date.UTC(historyMonth.getFullYear(), historyMonth.getMonth(), 15, 12)))}
           </h2>
           <button
             type="button"
@@ -478,7 +479,7 @@ export function PosHistoryPage({
             {sales.map((sale) => (
               <tr key={sale.id}>
                 <td className="is-primary">{sale.receiptNumber}</td>
-                <td>{new Date(sale.createdAt).toLocaleString()}</td>
+                <td>{formatBusinessDateTime(sale.createdAt)}</td>
                 <td>{sale.customer?.displayName ?? 'Walk-in customer'}</td>
                 <td>
                   {sale.payments
@@ -569,7 +570,7 @@ export function PosHistoryPage({
             {creditSold > 0 && <section className="pos-sale-returns">
               <h3>Customer credit balance</h3>
               <p>Credit sale {money(creditSold, selectedSale.currency)} · returned to balance {money(creditReturned, selectedSale.currency)} · payments received {money(creditPaid, selectedSale.currency)} · <strong>outstanding {money(posCreditOutstanding, selectedSale.currency)}</strong></p>
-              {!!selectedSale.creditPayments?.length && <div className="pos-credit-payment-history">{selectedSale.creditPayments.map((payment) => <p key={payment.id}><strong>{money(Number(payment.amount), payment.currency)} · {payment.method}</strong><small>{payment.reference} · {new Date(payment.paymentDate).toLocaleDateString('en-NG')} · {payment.receivedBy?.firstName || payment.receivedBy?.email || 'Staff'}</small></p>)}</div>}
+              {!!selectedSale.creditPayments?.length && <div className="pos-credit-payment-history">{selectedSale.creditPayments.map((payment) => <p key={payment.id}><strong>{money(Number(payment.amount), payment.currency)} · {payment.method}</strong><small>{payment.reference} · {formatBusinessDate(payment.paymentDate)} · {payment.receivedBy?.firstName || payment.receivedBy?.email || 'Staff'}</small></p>)}</div>}
               {canCollectCredit && posCreditOutstanding > 0 && !showCreditPaymentForm && <button type="button" className="button button--secondary button--small" onClick={() => setShowCreditPaymentForm(true)}>Record customer payment</button>}
               {canCollectCredit && posCreditOutstanding > 0 && showCreditPaymentForm && <form className="form-grid pos-action-form" onSubmit={(event) => void submitCreditPayment(event)}>
                 <label>Amount<input type="number" min="0.01" max={posCreditOutstanding} step="0.01" required value={creditPaymentAmount} onChange={(event) => setCreditPaymentAmount(event.target.value)} /></label>
@@ -725,7 +726,7 @@ export function PosHistoryPage({
                     {auditEntries.map((entry) => (
                       <li key={entry.id}>
                         <strong>{entry.action.replaceAll('_', ' ')}</strong>
-                        <time>{new Date(entry.createdAt).toLocaleString()}</time>
+                        <time>{formatBusinessDateTime(entry.createdAt)}</time>
                         {typeof entry.metadata?.reason === 'string' && (
                           <p>Reason: {entry.metadata.reason}</p>
                         )}

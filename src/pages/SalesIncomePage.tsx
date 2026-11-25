@@ -17,12 +17,13 @@ import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
 import { getOfflineQueue, isWorkingOffline } from '@/services/offline';
 import { PaymentTermsField } from '@/components/ui/PaymentTermsField';
+import { formatBusinessDate, formatBusinessDateTime } from '@/utils/financial-configuration';
 import { addDaysToDateInput, receivableAgeingLabel, receivableAgeingPeriod, RECEIVABLE_AGEING_PERIODS, todayDateInput } from '@/utils/payment-terms';
 type View = 'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables';
 type Row = Customer | Quotation | Invoice | Payment | CreditNote;
 const cash = (v: string, c = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: c }).format(Number(v));
-const day = (v: string) => new Date(v).toLocaleDateString('en-NG');
+const day = (v: string) => formatBusinessDate(v);
 const todayIso = () => {
   const date = new Date();
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
@@ -1123,8 +1124,8 @@ function CustomerHistoryModal({
               {creditStatus?.exceeded && <p className="form-error" role="alert">Outstanding credit currently exceeds the approved limit.</p>}
               {canEdit && <button className="button button--secondary button--small" onClick={() => onAdjustCredit(customer)}>Adjust credit limit</button>}
               {creditHistoryError && <p className="banking-alert" role="alert">Credit information is incomplete: {creditHistoryError}</p>}
-              {!!creditHistory.length && <details className="customer-credit-history"><summary>Credit limit changes ({creditHistory.length})</summary>{creditHistory.map((entry) => <p key={entry.id}><strong>{cash(entry.previousLimit, creditStatus?.currency)} → {cash(entry.newLimit, creditStatus?.currency)}</strong> · {entry.reason}<small>{new Date(entry.createdAt).toLocaleString()} · {entry.actor?.firstName || entry.actor?.email || 'Staff'}</small></p>)}</details>}
-              {!!creditOverrides.length && <details className="customer-credit-history"><summary>Credit exceptions approved ({creditOverrides.length})</summary>{creditOverrides.map((entry) => <p key={entry.id}><strong>{entry.targetType} · {entry.targetId}</strong> · {entry.reason}<small>Exposure {cash(entry.existingExposure, creditStatus?.currency)} + requested {cash(entry.requestedAmount, creditStatus?.currency)} · {new Date(entry.createdAt).toLocaleString()} · {entry.approver?.firstName || entry.approver?.email || 'Approver'}</small></p>)}</details>}
+              {!!creditHistory.length && <details className="customer-credit-history"><summary>Credit limit changes ({creditHistory.length})</summary>{creditHistory.map((entry) => <p key={entry.id}><strong>{cash(entry.previousLimit, creditStatus?.currency)} → {cash(entry.newLimit, creditStatus?.currency)}</strong> · {entry.reason}<small>{formatBusinessDateTime(entry.createdAt)} · {entry.actor?.firstName || entry.actor?.email || 'Staff'}</small></p>)}</details>}
+              {!!creditOverrides.length && <details className="customer-credit-history"><summary>Credit exceptions approved ({creditOverrides.length})</summary>{creditOverrides.map((entry) => <p key={entry.id}><strong>{entry.targetType} · {entry.targetId}</strong> · {entry.reason}<small>Exposure {cash(entry.existingExposure, creditStatus?.currency)} + requested {cash(entry.requestedAmount, creditStatus?.currency)} · {formatBusinessDateTime(entry.createdAt)} · {entry.approver?.firstName || entry.approver?.email || 'Approver'}</small></p>)}</details>}
               {!!posCreditPayments.length && <details className="customer-credit-history"><summary>POS credit payments ({posCreditPayments.length})</summary>{posCreditPayments.map((payment) => <p key={payment.id}><strong>{cash(payment.amount, payment.currency)} · {payment.method} · {payment.sale.receiptNumber}</strong><small>{payment.reference} · {day(payment.paymentDate)} · {payment.receivedBy?.firstName || payment.receivedBy?.email || 'Staff'}</small></p>)}</details>}
             </section>
             {filterOpen && <div className="customer-dashboard-date-filter"><label>From<input type="date" max={toDate || undefined} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label><label>To<input type="date" min={fromDate || undefined} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label><button type="button" className="button button--ghost button--small" onClick={() => { setFromDate(''); setToDate(''); }}>Clear dates</button></div>}

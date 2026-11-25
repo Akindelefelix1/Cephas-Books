@@ -5,6 +5,7 @@ import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
+import { formatBusinessDate, formatBusinessDateTime, getFiscalPeriods, getFiscalYearRange, getReportingTimeZone } from '@/utils/financial-configuration';
 import {
   insightsApi,
   type AiInsight,
@@ -21,10 +22,7 @@ const money = (value: string | number, currency = 'NGN') =>
   );
 const date = (value?: string) =>
   value
-    ? new Date(value).toLocaleString('en-NG', {
-        dateStyle: 'medium',
-        timeStyle: value.includes('T') ? 'short' : undefined,
-      })
+    ? value.includes('T') && !value.endsWith('T00:00:00.000Z') ? formatBusinessDateTime(value) : formatBusinessDate(value)
     : 'Never';
 const title: Record<InsightsView, string> = {
   reports: 'Reports',
@@ -50,6 +48,22 @@ function ReportingPage({ analytics }: { analytics: boolean }) {
     [error, setError] = useState('');
   const [from, setFrom] = useState(''),
     [to, setTo] = useState('');
+  const fiscalYear = getFiscalYearRange();
+  const fiscalPeriods = getFiscalPeriods();
+  const periodValue = from === fiscalYear.start && to === fiscalYear.end
+    ? 'fiscal-year'
+    : fiscalPeriods.find((period) => period.from === from && period.to === to)
+      ? `period-${fiscalPeriods.find((period) => period.from === from && period.to === to)!.period}`
+      : from || to ? 'custom' : 'all';
+  const applyPeriod = (value: string) => {
+    if (value === 'all' || value === 'custom') {
+      if (value === 'all') { setFrom(''); setTo(''); }
+      return;
+    }
+    if (value === 'fiscal-year') { setFrom(fiscalYear.start); setTo(fiscalYear.end); return; }
+    const selectedPeriod = fiscalPeriods[Number(value.replace('period-', '')) - 1];
+    if (selectedPeriod) { setFrom(selectedPeriod.from); setTo(selectedPeriod.to); }
+  };
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -91,6 +105,15 @@ function ReportingPage({ analytics }: { analytics: boolean }) {
       <section className="panel">
         <div className="banking-filters">
           <label>
+            Accounting period
+            <select aria-label="Select accounting period" value={periodValue} onChange={(event) => applyPeriod(event.target.value)}>
+              <option value="all">All dates</option>
+              <option value="fiscal-year">Financial year ({fiscalYear.start} – {fiscalYear.end})</option>
+              {fiscalPeriods.map((period) => <option key={period.period} value={`period-${period.period}`}>Period {period.period}: {period.name}</option>)}
+              {periodValue === 'custom' && <option value="custom">Custom range</option>}
+            </select>
+          </label>
+          <label>
             From
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </label>
@@ -107,6 +130,7 @@ function ReportingPage({ analytics }: { analytics: boolean }) {
           >
             Clear dates
           </button>
+          <small className="full">The financial year runs {fiscalYear.start} to {fiscalYear.end}; reporting periods use {getReportingTimeZone()}.</small>
         </div>
         {error && (
           <div className="banking-alert">

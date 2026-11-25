@@ -13,6 +13,7 @@ import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ApiError } from '@/services/auth';
 import { getDefaultCurrency } from '@/utils/currency';
+import { formatBusinessDateTime } from '@/utils/financial-configuration';
 import {
   bankingApi,
   type BankAccount,
@@ -588,7 +589,7 @@ function ReversalHistory({ rows }: { rows: BankTransaction[] }) {
               return (
                 <tr key={row.id}>
                   <td className="is-primary">
-                    {row.reversedAt ? new Date(row.reversedAt).toLocaleString('en-NG') : '—'}
+                    {row.reversedAt ? formatBusinessDateTime(row.reversedAt) : '—'}
                   </td>
                   <td>{date(row.transactionDate)}</td>
                   <td>{row.name || '—'}</td>

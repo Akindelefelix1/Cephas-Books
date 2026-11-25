@@ -38,6 +38,7 @@ import { salesApi, type Customer, type CustomerCreditStatus } from '@/services/s
 import { organizationApi, type OrganizationMember } from '@/services/organization';
 import { bankingApi, type BankAccount } from '@/services/banking';
 import { getDefaultCurrency } from '@/utils/currency';
+import { formatBusinessDate } from '@/utils/financial-configuration';
 import { confirmAction } from '@/utils/actions';
 import { isWorkingOffline } from '@/services/offline';
 const money = (v: number, currency = getDefaultCurrency()) =>
@@ -826,7 +827,7 @@ export function PosPage({
                     <td>
                       <strong>{recentSale.receiptNumber}</strong>
                     </td>
-                    <td>{new Date(recentSale.createdAt).toLocaleDateString()}</td>
+                    <td>{formatBusinessDate(recentSale.createdAt)}</td>
                     <td>{recentSale.customer?.displayName ?? 'Walk-in customer'}</td>
                     <td className="is-right">
                       <strong>{money(Number(recentSale.total))}</strong>

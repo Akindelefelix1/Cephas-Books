@@ -5,6 +5,7 @@ import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
+import { formatBusinessDateTime } from '@/utils/financial-configuration';
 import {
   workflowApi,
   type AppNotification,
@@ -29,7 +30,7 @@ const descriptions: Record<WorkflowView, string> = {
 };
 const date = (value?: string) =>
   value
-    ? new Date(value).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })
+    ? formatBusinessDateTime(value)
     : 'Never';
 const money = (value?: string) =>
   value

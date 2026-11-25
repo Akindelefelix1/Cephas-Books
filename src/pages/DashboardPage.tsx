@@ -30,6 +30,7 @@ import { accountingApi, type FinanceRecord } from '@/services/accounting';
 import { workflowApi, type AppNotification, type WorkflowSummary } from '@/services/workflow';
 import type { Invoice } from '@/services/sales';
 import { can, canAccessRoute, type PermissionIdentity } from '@/utils/permissions';
+import { formatBusinessDateTime, getReportingTimeZone } from '@/utils/financial-configuration';
 
 const dateUntil = (value: string | undefined, now: number) => {
   if (!value) return 'No end date';
@@ -38,9 +39,7 @@ const dateUntil = (value: string | undefined, now: number) => {
 };
 
 const formatNotificationDate = (value: string) =>
-  new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(value),
-  );
+  formatBusinessDateTime(value);
 
 export function DashboardPage({
   onNavigate,
@@ -162,8 +161,9 @@ export function DashboardPage({
       ? canAccessRoute(access, id) && can(access, 'banking.manage')
       : canAccessRoute(access, id),
   );
-  const today = new Intl.DateTimeFormat('en-NG', { dateStyle: 'full' }).format(new Date());
-  const hour = new Date().getHours();
+  const now = new Date();
+  const today = new Intl.DateTimeFormat('en-NG', { dateStyle: 'full', timeZone: getReportingTimeZone() }).format(now);
+  const hour = Number(new Intl.DateTimeFormat('en-US', { hour: '2-digit', hourCycle: 'h23', timeZone: getReportingTimeZone() }).format(now));
   const dayPeriod = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
   const displayCompany = companyName || 'your company';
   const formatMoney = (value: string, currency: string) =>
@@ -377,7 +377,7 @@ export function DashboardPage({
                       />
                     </span>
                     <small>
-                      {new Date(`${item.month}-01`).toLocaleDateString('en-NG', { month: 'short' })}
+                      {new Intl.DateTimeFormat('en-NG', { month: 'short', timeZone: getReportingTimeZone() }).format(new Date(`${item.month}-01T12:00:00Z`))}
                     </small>
                   </div>
                 );
@@ -544,7 +544,7 @@ export function DashboardPage({
           <div className="margin-months">
             {trend.map((item) => (
               <span key={item.month}>
-                {new Date(`${item.month}-01`).toLocaleDateString('en-NG', { month: 'short' })}
+                {new Intl.DateTimeFormat('en-NG', { month: 'short', timeZone: getReportingTimeZone() }).format(new Date(`${item.month}-01T12:00:00Z`))}
               </span>
             ))}
           </div>

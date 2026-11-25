@@ -18,6 +18,7 @@ import { confirmAction } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
 import type { View } from '@/types/app';
 import { activateOfflineMode, cacheBulkWorkspace, createOfflineLogin, deactivateOfflineMode, getOfflineBulkSnapshot, getOfflineSnapshot, getOfflineSnapshotIdentity, restoreOfflineTokens, type OfflineSnapshot } from '@/services/offline';
+import { FISCAL_YEAR_MONTHS, getTimeZoneOptions } from '@/utils/financial-configuration';
 
 export function AuthPage({
   mode,
@@ -627,7 +628,7 @@ function getStepPayload(step: number, data: SetupData): Record<string, string> {
   const payload: Record<string, string> = {};
   for (const key of setupFieldNames[step]) {
     const value = data[key]?.trim();
-    if (value) payload[key] = value;
+    if (value) payload[key] = key === 'baseCurrency' ? value.toUpperCase() : value;
   }
   return payload;
 }
@@ -916,20 +917,16 @@ function SetupFields({ step, data }: { step: number; data: SetupData }) {
       <>
         <label>
           Base currency
-          <select name="baseCurrency" defaultValue={data.baseCurrency ?? 'NGN'}>
-            <option value="NGN">₦ NGN — Nigerian Naira</option>
-            <option value="USD">$ USD — US Dollar</option>
-            <option value="GBP">£ GBP — British Pound</option>
-            <option value="GHS">₵ GHS — Ghanaian Cedi</option>
-          </select>
+          <input name="baseCurrency" defaultValue={data.baseCurrency ?? 'NGN'} list="iso4217-currency-codes" maxLength={3} minLength={3} pattern="[A-Za-z]{3}" autoCapitalize="characters" required />
+          <datalist id="iso4217-currency-codes">
+            {['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR', 'CAD', 'AUD', 'JPY', 'CNY', 'INR', 'AED', 'SAR', 'CHF', 'SEK', 'NOK', 'DKK', 'NZD', 'SGD'].map((code) => <option key={code} value={code} />)}
+          </datalist>
+          <small>Enter any internationally recognised ISO 4217 currency code.</small>
         </label>
         <label>
           Fiscal year starts
           <select name="fiscalYearStart" defaultValue={data.fiscalYearStart ?? 'January'}>
-            <option>January</option>
-            <option>April</option>
-            <option>July</option>
-            <option>October</option>
+            {FISCAL_YEAR_MONTHS.map((month) => <option key={month}>{month}</option>)}
           </select>
         </label>
         <label>
@@ -960,11 +957,9 @@ function SetupFields({ step, data }: { step: number; data: SetupData }) {
         </label>
         <label>
           Reporting timezone
-          <select name="timezone" defaultValue={data.timezone ?? 'Africa/Lagos'}>
-            <option>Africa/Lagos</option>
-            <option>Africa/Accra</option>
-            <option>UTC</option>
-          </select>
+          <input name="timezone" defaultValue={data.timezone ?? 'Africa/Lagos'} list="iana-time-zones" maxLength={80} required />
+          <datalist id="iana-time-zones">{getTimeZoneOptions().map((zone) => <option key={zone} value={zone} />)}</datalist>
+          <small>Select or enter an IANA time zone, such as America/Toronto.</small>
         </label>
       </>
     );

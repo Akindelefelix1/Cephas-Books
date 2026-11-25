@@ -1,6 +1,7 @@
+import { getBusinessToday } from './financial-configuration';
+
 export const todayDateInput = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return getBusinessToday();
 };
 
 export function addDaysToDateInput(date: string, days: number) {

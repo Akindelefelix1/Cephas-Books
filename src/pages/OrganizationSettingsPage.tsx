@@ -30,6 +30,8 @@ import {
 } from '@/services/organization';
 import { confirmAction } from '@/utils/actions';
 import { setDefaultCurrency } from '@/utils/currency';
+import { getOfflineQueue } from '@/services/offline';
+import { FISCAL_YEAR_MONTHS, formatBusinessDate, formatBusinessDateTime, getFiscalYearRange, getFiscalYearStartMonth, getReportingTimeZone, getTimeZoneOptions, setFiscalYearStartMonth, setReportingTimeZone } from '@/utils/financial-configuration';
 
 type Branch = {
   id: string;
@@ -265,7 +267,28 @@ export function OrganizationSettingsPage({
       </div>
     );
 
-  const structure = objectValue(admin.settings.branches);
+  const queuedSettings = getOfflineQueue().reduce<Record<string, Record<string, unknown>>>((result, item) => {
+    const match = /^\/organizations\/current\/admin\/([a-z-]+)$/.exec(item.path);
+    if (!match || item.method !== 'PATCH' || !item.body) return result;
+    try {
+      const body = JSON.parse(item.body) as { data?: Record<string, unknown> };
+      if (body.data) result[match[1]] = { ...(result[match[1]] ?? {}), ...body.data };
+    } catch { /* Preserve cached settings when a queued change is malformed. */ }
+    return result;
+  }, {});
+  const settings = { ...admin.settings, ...queuedSettings };
+  const queuedOnboardingFinancial = getOfflineQueue().reduce<Record<string, unknown>>((values, item) => {
+    if (item.path !== '/organizations/current/onboarding/financial' || item.method !== 'PATCH' || !item.body) return values;
+    try { return { ...values, ...(JSON.parse(item.body) as Record<string, unknown>) }; }
+    catch { return values; }
+  }, {});
+  const queuedDefaultCurrency = typeof queuedSettings.currencies?.defaultCurrency === 'string'
+    ? queuedSettings.currencies.defaultCurrency
+    : typeof queuedOnboardingFinancial.baseCurrency === 'string'
+      ? queuedOnboardingFinancial.baseCurrency.toUpperCase()
+      : admin.organization.baseCurrency;
+  const baseCurrency = queuedDefaultCurrency;
+  const structure = objectValue(settings.branches);
   const storedHierarchy = objectValue(structure.hierarchy);
   const hierarchy: LocationHierarchy = {
     levels: storedHierarchy.levels === 2 ? 2 : 3,
@@ -285,20 +308,24 @@ export function OrganizationSettingsPage({
       typeof (item as Branch).id === 'string' && typeof (item as Branch).regionId === 'string',
   );
   const legacyBranches = storedBranches.filter((item) => !('id' in item) || !('regionId' in item));
-  const storedCurrencies = arrayValue<Currency>(objectValue(admin.settings.currencies).items);
+  const storedCurrencies = arrayValue<Currency>(objectValue(settings.currencies).items);
   const currencies = storedCurrencies.length
     ? storedCurrencies
     : [
         {
-          code: admin.organization.baseCurrency,
+          code: baseCurrency,
           name: 'Base currency',
           symbol: '',
           rate: '1',
           active: true,
         },
       ];
-  const integrations = arrayValue<Integration>(objectValue(admin.settings.integrations).items);
-  const security = objectValue(admin.settings.security) as Security;
+  const integrations = arrayValue<Integration>(objectValue(settings.integrations).items);
+  const security = objectValue(settings.security) as Security;
+  const preferences = objectValue(settings.preferences);
+  const fiscalYearStart = getFiscalYearStartMonth();
+  const reportingTimeZone = getReportingTimeZone();
+  const fiscalYear = getFiscalYearRange(fiscalYearStart);
 
   return (
     <>
@@ -359,7 +386,7 @@ export function OrganizationSettingsPage({
             </label>
             <label>
               Base currency
-              <select defaultValue={admin.organization.baseCurrency} disabled>
+              <select defaultValue={baseCurrency} disabled>
                 {currencies
                   .filter((item) => item.active)
                   .map((item) => (
@@ -368,12 +395,12 @@ export function OrganizationSettingsPage({
                     </option>
                   ))}
               </select>
-              <input type="hidden" name="baseCurrency" value={admin.organization.baseCurrency} />
+              <input type="hidden" name="baseCurrency" value={baseCurrency} />
               <small>Change the default from Currency management.</small>
             </label>
             <label>
               Last updated
-              <input value={new Date(admin.organization.updatedAt).toLocaleString()} readOnly />
+              <input value={formatBusinessDateTime(admin.organization.updatedAt)} readOnly />
             </label>
           </div>
           {canManage && (
@@ -384,6 +411,47 @@ export function OrganizationSettingsPage({
               </button>
             </div>
           )}
+        </form>
+      )}
+      {view === 'settings' && (
+        <form
+          className="panel settings-api-panel"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            const next = {
+              ...preferences,
+              fiscalYearStart: String(data.get('fiscalYearStart')),
+              timezone: String(data.get('timezone')),
+            };
+            void run(async () => {
+              await organizationApi.updateSection('preferences', next);
+              setFiscalYearStartMonth(next.fiscalYearStart);
+              setReportingTimeZone(next.timezone);
+            }, 'Financial configuration saved');
+          }}
+        >
+          <header className="settings-heading">
+            <h2>Financial year and reporting time zone</h2>
+            <p>These settings control accounting period boundaries and how transaction times are displayed.</p>
+          </header>
+          <div className="form-grid">
+            <label>
+              Financial year starts
+              <select name="fiscalYearStart" defaultValue={fiscalYearStart} disabled={!canManage}>
+                {FISCAL_YEAR_MONTHS.map((month) => <option key={month}>{month}</option>)}
+              </select>
+            </label>
+            <label>
+              Reporting time zone
+              <input name="timezone" list="settings-iana-time-zones" defaultValue={reportingTimeZone} maxLength={80} required disabled={!canManage} />
+              <datalist id="settings-iana-time-zones">{getTimeZoneOptions().map((zone) => <option key={zone} value={zone} />)}</datalist>
+            </label>
+            <div className="full banking-alert" role="status">
+              Current financial year: {fiscalYear.start} to {fiscalYear.end}. Accounting periods are calculated as the 12 calendar months beginning in {fiscalYearStart}.
+            </div>
+          </div>
+          {canManage && <div className="settings-save"><span>Changes are saved to organisation preferences and the audit log.</span><button className="button" disabled={busy}>{busy ? 'Saving…' : 'Save financial configuration'}</button></div>}
         </form>
       )}
       {view === 'settings' && role === 'OWNER' && (
@@ -664,7 +732,7 @@ export function OrganizationSettingsPage({
           <header className="settings-heading">
             <div>
               <h2>Currency management</h2>
-              <p>Rates are expressed against {admin.organization.baseCurrency}.</p>
+              <p>Rates are expressed against {baseCurrency}.</p>
             </div>
             {canManage && (
               <button
@@ -690,7 +758,7 @@ export function OrganizationSettingsPage({
                 <strong>{item.rate}</strong>
               </span>
               <Badge>
-                {item.code === admin.organization.baseCurrency
+                {item.code === baseCurrency
                   ? 'Base currency'
                   : item.active
                     ? 'Active'
@@ -727,7 +795,7 @@ export function OrganizationSettingsPage({
                         type="button"
                         role="menuitem"
                         disabled={
-                          busy || !item.active || item.code === admin.organization.baseCurrency
+                          busy || !item.active || item.code === baseCurrency
                         }
                         onClick={() => {
                           setCurrencyMenu(null);
@@ -752,7 +820,7 @@ export function OrganizationSettingsPage({
                           );
                         }}
                       >
-                        {item.code === admin.organization.baseCurrency
+                        {item.code === baseCurrency
                           ? 'Current default'
                           : 'Set as default'}
                       </button>
@@ -1047,20 +1115,22 @@ export function OrganizationSettingsPage({
           if (kind === 'currency') {
             const code = String(form.get('code')).toUpperCase();
             const catalogueItem = currencyCatalogue.find(([itemCode]) => itemCode === code);
-            if (!catalogueItem) return;
+            const name = String(form.get('name') || catalogueItem?.[1] || code).trim();
+            const symbol = String(form.get('symbol') || catalogueItem?.[2] || code).trim();
+            if (!/^[A-Z]{3}$/.test(code) || !name || !symbol) return;
             void saveSection(
               'currencies',
               {
-                defaultCurrency: admin.organization.baseCurrency,
+                defaultCurrency: baseCurrency,
                 items: [
                   ...currencies.filter((_, index) => index !== editingIndex),
                   {
                     code,
-                    name: catalogueItem[1],
-                    symbol: catalogueItem[2],
-                    rate: code === admin.organization.baseCurrency ? '1' : String(form.get('rate')),
+                    name,
+                    symbol,
+                    rate: code === baseCurrency ? '1' : String(form.get('rate')),
                     active:
-                      code === admin.organization.baseCurrency ||
+                      code === baseCurrency ||
                       String(form.get('active')) !== 'false',
                   },
                 ],
@@ -1717,7 +1787,7 @@ function LocationDetails({
                   </strong>
                   <small>
                     {row.recordType || row.type || row.status || 'Active'}
-                    {row.date ? ` · ${new Date(row.date).toLocaleDateString()}` : ''}
+                    {row.date ? ` · ${formatBusinessDate(row.date)}` : ''}
                   </small>
                 </span>
                 {row.amount && <b>{Number(row.amount).toLocaleString()}</b>}
@@ -1770,7 +1840,7 @@ function AuditSection({
           <tbody>
             {logs.map((log) => (
               <tr key={log.id}>
-                <td>{new Date(log.createdAt).toLocaleString()}</td>
+                <td>{formatBusinessDateTime(log.createdAt)}</td>
                 <td>{log.actor?.email || 'System'}</td>
                 <td>{log.action.replaceAll('_', ' ').toLowerCase()}</td>
                 <td>{log.entityType}</td>
@@ -1966,28 +2036,19 @@ function CreateDialog({
         {dialog === 'currency' && (
           <>
             <label>
-              Currency
-              <select
-                name={editingCurrency ? undefined : 'code'}
-                defaultValue={editingCurrency?.code}
-                required
-                autoFocus
-                disabled={Boolean(editingCurrency)}
-              >
-                <option value="">Select a currency</option>
-                {currencyCatalogue
-                  .filter(
-                    ([code]) =>
-                      editingCurrency?.code === code ||
-                      !currencies.some((item) => item.code === code),
-                  )
-                  .map(([code, name, symbol]) => (
-                    <option value={code} key={code}>
-                      {code} — {name} ({symbol})
-                    </option>
-                  ))}
-              </select>
+              ISO 4217 currency code
+              <input name="code" list="iso4217-settings-currency-codes" defaultValue={editingCurrency?.code} maxLength={3} minLength={3} pattern="[A-Za-z]{3}" autoCapitalize="characters" required autoFocus disabled={Boolean(editingCurrency)} />
+              <datalist id="iso4217-settings-currency-codes">{currencyCatalogue.map(([code]) => <option key={code} value={code} />)}</datalist>
               {editingCurrency && <input type="hidden" name="code" value={editingCurrency.code} />}
+              <small>Enter any internationally recognised three-letter ISO code.</small>
+            </label>
+            <label>
+              Currency name
+              <input name="name" defaultValue={editingCurrency?.name} maxLength={80} required />
+            </label>
+            <label>
+              Currency symbol
+              <input name="symbol" defaultValue={editingCurrency?.symbol} maxLength={16} required />
             </label>
             <label>
               Exchange rate

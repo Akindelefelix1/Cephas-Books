@@ -20,6 +20,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
 import { isWorkingOffline } from '@/services/offline';
+import { formatBusinessDate, formatBusinessDateTime, getBusinessToday, getReportingTimeZone } from '@/utils/financial-configuration';
 import { purchasesApi } from '@/services/purchases';
 import { salesApi } from '@/services/sales';
 import {
@@ -52,7 +53,7 @@ const money = (value: string | number, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value));
 const quantity = (value: string | number) =>
   new Intl.NumberFormat('en-NG', { maximumFractionDigits: 4 }).format(Number(value));
-const date = (value?: string) => (value ? new Date(value).toLocaleDateString('en-NG') : '—');
+const date = (value?: string) => (value ? formatBusinessDate(value) : '—');
 const titles: Record<OperationsView, string> = {
   products: 'Products & services',
   warehouses: 'Branches & stock locations',
@@ -846,7 +847,7 @@ function buildInventoryMonths(products: Product[], movements: StockMovement[]): 
     );
     rows.push({
       key: `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`,
-      label: month.toLocaleDateString('en-NG', { month: 'long', year: 'numeric' }),
+      label: new Intl.DateTimeFormat('en-NG', { month: 'long', year: 'numeric', timeZone: getReportingTimeZone() }).format(month),
       totalUnits: stockedProducts.reduce((sum, product) => sum + product.quantity, 0),
       inventoryValue: stockedProducts.reduce(
         (sum, product) => sum + product.quantity * product.salePrice,
@@ -1410,7 +1411,7 @@ function ProductDetailsModal({
               <div className="product-overview-grid">
                 <div>
                   <small>Date added</small>
-                  <strong>{new Date(product.createdAt).toLocaleString('en-NG')}</strong>
+                  <strong>{formatBusinessDateTime(product.createdAt)}</strong>
                 </div>
                 <div>
                   <small>Added by</small>
@@ -1511,7 +1512,7 @@ function ProductDetailsModal({
                 empty="No product activity has been recorded yet."
                 rows={product.activity.map((entry) => [
                   entry.action,
-                  new Date(entry.createdAt).toLocaleString('en-NG'),
+                  formatBusinessDateTime(entry.createdAt),
                   personName(entry.actor),
                 ])}
               />
@@ -1543,7 +1544,7 @@ function RestockModal({
   submit: (data: Record<string, unknown>) => void;
 }) {
   if (!product) return null;
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = getBusinessToday();
   return (
     <Modal
       open={open}
@@ -1721,7 +1722,7 @@ function OperationsModal({
   const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>(
     view === 'products' ? ((selected as Product | null)?.type ?? 'PRODUCT') : 'PRODUCT',
   );
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = getBusinessToday();
   const closeModal = () => {
     setTransfer(false);
     close();

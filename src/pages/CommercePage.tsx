@@ -25,6 +25,7 @@ import { operationsApi, type Warehouse } from '@/services/operations';
 import { posApi, type PosBranch } from '@/services/pos';
 import { confirmAction } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
+import { formatBusinessDate, formatBusinessDateTime } from '@/utils/financial-configuration';
 
 const titles: Record<CommerceView, [string, string]> = {
   'commerce-dashboard': ['Commerce', 'One view of channels, orders, sales, and inventory.'],
@@ -60,7 +61,7 @@ const money = (value: string | number, currency = getDefaultCurrency()) =>
 const number = (value: string | number) => new Intl.NumberFormat('en-NG').format(Number(value));
 const dateTime = (value?: string | null) =>
   value
-    ? new Date(value).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })
+    ? formatBusinessDateTime(value)
     : 'Never';
 const channelLabel = (type: CommerceChannel['type']) =>
   channelTypes.find(([value]) => value === type)?.[1] ?? type;
@@ -553,7 +554,7 @@ function CommerceOrders({ orders }: { orders: CommerceOrder[] }) {
                 </td>
                 <td>{order.source}</td>
                 <td>{order.customer}</td>
-                <td>{new Date(order.createdAt).toLocaleDateString('en-NG')}</td>
+                <td>{formatBusinessDate(order.createdAt)}</td>
                 <td>{money(order.total, order.currency)}</td>
                 <td>
                   <span className="badge">{order.status.replaceAll('_', ' ')}</span>

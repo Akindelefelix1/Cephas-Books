@@ -35,6 +35,7 @@ import { WorkflowRecordsPage } from '@/pages/WorkflowRecordsPage';
 import type { WorkflowView } from '@/services/workflow';
 import { ProfilePage } from '@/pages/AdminPages';
 import { setDefaultCurrency } from '@/utils/currency';
+import { setFiscalYearStartMonth, setReportingTimeZone } from '@/utils/financial-configuration';
 import { OrganizationSettingsPage } from '@/pages/OrganizationSettingsPage';
 import type { OrganizationView } from '@/services/organization';
 import { Modal } from '@/components/ui/Modal';
@@ -222,7 +223,32 @@ export function App() {
     if (!hasAuthTokens() || (view !== 'app' && view !== 'onboarding')) return;
     Promise.all([onboardingApi.get(), authApi.me()])
       .then(([progress, profile]) => {
-        setDefaultCurrency(profile.organization.baseCurrency);
+        const queuedWrites = getOfflineQueue();
+        const queuedCurrency = queuedWrites.reduce((current, item) => {
+          try {
+            const body = JSON.parse(item.body ?? '{}') as { data?: { defaultCurrency?: unknown }; baseCurrency?: unknown };
+            if (item.method !== 'PATCH') return current;
+            if (item.path === '/organizations/current/admin/currencies' && typeof body.data?.defaultCurrency === 'string') return body.data.defaultCurrency;
+            if (item.path === '/organizations/current/onboarding/financial' && typeof body.baseCurrency === 'string') return body.baseCurrency.toUpperCase();
+            return current;
+          } catch { return current; }
+        }, profile.organization.baseCurrency);
+        setDefaultCurrency(queuedCurrency);
+        const queuedPreferences = queuedWrites.reduce<Record<string, string>>((current, item) => {
+          try {
+            const body = JSON.parse(item.body ?? '{}') as { data?: Record<string, unknown> } & Record<string, unknown>;
+            if (item.method !== 'PATCH') return current;
+            const values = item.path === '/organizations/current/admin/preferences'
+              ? body.data
+              : item.path === '/organizations/current/onboarding/financial' ? body : undefined;
+            for (const [key, value] of Object.entries(values ?? {}))
+              if (typeof value === 'string') current[key] = value;
+            return current;
+          } catch { return current; }
+        }, {});
+        const financial: Record<string, string> = { ...(progress.onboardingData.financial ?? {}), ...queuedPreferences };
+        if (financial.timezone) setReportingTimeZone(financial.timezone);
+        if (financial.fiscalYearStart) setFiscalYearStartMonth(financial.fiscalYearStart);
         const complete = Boolean(progress.onboardingCompletedAt);
         setOnboardingComplete(complete);
         localStorage.setItem('cephas:onboarding-complete', String(complete));
@@ -235,7 +261,7 @@ export function App() {
           isActive: profile.isActive,
           companyName: profile.organization.name,
           role: profile.role,
-          baseCurrency: profile.organization.baseCurrency,
+          baseCurrency: queuedCurrency,
           countryCode: profile.organization.countryCode,
           customRoleId: profile.customRoleId,
           permissions: profile.permissions,
