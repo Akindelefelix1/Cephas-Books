@@ -48,6 +48,21 @@ type QueuedCustomerPayment = {
   amount: number;
   method: string;
 };
+function applyQueuedCustomerTerms(customers: Customer[]): Customer[] {
+  const queuedTerms = new Map<string, number>();
+  for (const entry of getOfflineQueue()) {
+    const id = /^\/customers\/([^/?]+)$/.exec(entry.path)?.[1];
+    if (!id || entry.method !== 'PATCH' || !entry.body) continue;
+    try {
+      const body = JSON.parse(entry.body) as Record<string, unknown>;
+      const days = Number(body.paymentTermsDays);
+      if (Number.isInteger(days) && days >= 0 && days <= 3650) queuedTerms.set(id, days);
+    } catch { /* keep the cached customer values if a queue entry is malformed */ }
+  }
+  return customers.map((customer) => queuedTerms.has(customer.id)
+    ? { ...customer, paymentTermsDays: queuedTerms.get(customer.id)! }
+    : customer);
+}
 const queuedCustomerPayments = (): QueuedCustomerPayment[] =>
   getOfflineQueue().flatMap((entry) => {
     if (entry.path !== '/sales/payments' || entry.method !== 'POST' || !entry.body) return [];
@@ -117,12 +132,13 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
         view === 'invoices' ? salesApi.projects().catch(() => []) : Promise.resolve([]),
       ]);
       setSummary(s);
-      setCustomers(c.data.filter((customer) => customer.isActive));
+      const customersWithQueuedTerms = applyQueuedCustomerTerms(c.data);
+      setCustomers(customersWithQueuedTerms.filter((customer) => customer.isActive));
       setInvoices(i);
       setProjects(projectOptions);
       if (view === 'customers')
         setRows(
-          c.data.filter(
+          customersWithQueuedTerms.filter(
             (x) => !search || x.displayName.toLowerCase().includes(search.toLowerCase()),
           ),
         );

@@ -35,3 +35,10 @@ export function dueTimingLabel(date: string) {
   if (days === 0) return 'Due today';
   return `Due in ${days} day${days === 1 ? '' : 's'}`;
 }
+
+export function parsePaymentTermDays(value?: string) {
+  if (!value?.trim()) return 30;
+  if (/^(due on receipt|due immediately|immediate)$/i.test(value.trim())) return 0;
+  const match = value.match(/\d+/);
+  return match ? Math.min(3650, Math.max(0, Number(match[0]))) : 30;
+}

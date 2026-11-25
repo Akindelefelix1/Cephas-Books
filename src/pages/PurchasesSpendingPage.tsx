@@ -15,15 +15,35 @@ import {
   type GoodsReceivedOptions,
   type PurchaseProjectOption,
 } from '@/services/purchases';
-import { isOfflineEnabledForCurrentAccount, isWorkingOffline } from '@/services/offline';
+import { getOfflineQueue, isOfflineEnabledForCurrentAccount, isWorkingOffline } from '@/services/offline';
 import { operationsApi } from '@/services/operations';
 import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
 import { PaymentTermsField } from '@/components/ui/PaymentTermsField';
-import { addDaysToDateInput, duePeriodForDate, dueTimingLabel, todayDateInput } from '@/utils/payment-terms';
+import { addDaysToDateInput, duePeriodForDate, dueTimingLabel, parsePaymentTermDays, todayDateInput } from '@/utils/payment-terms';
 const money = (v?: string, c = getDefaultCurrency()) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: c }).format(Number(v ?? 0));
 const date = (v?: string) => (v ? new Date(v).toLocaleDateString('en-NG') : '—');
+function applyQueuedSupplierTerms(suppliers: Supplier[]): Supplier[] {
+  const queuedTerms = new Map<string, number>();
+  for (const entry of getOfflineQueue()) {
+    const id = /^\/purchases\/suppliers\/([^/?]+)$/.exec(entry.path)?.[1];
+    if (!id || entry.method !== 'PATCH' || !entry.body) continue;
+    try {
+      const body = JSON.parse(entry.body) as Record<string, unknown>;
+      const days = Number(body.paymentTermsDays);
+      if (Number.isInteger(days) && days >= 0 && days <= 3650) queuedTerms.set(id, days);
+    } catch { /* keep the cached supplier values if a queue entry is malformed */ }
+  }
+  return suppliers.map((supplier) => {
+    const days = queuedTerms.get(supplier.id);
+    return days === undefined ? supplier : {
+      ...supplier,
+      paymentTermsDays: days,
+      paymentTerms: days === 0 ? 'Due on receipt' : `Net ${days}`,
+    };
+  });
+}
 const titles: Record<PurchaseView, string> = {
   suppliers: 'Suppliers',
   'purchase-requests': 'Purchase requests',
@@ -81,8 +101,12 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
           ? purchasesApi.list('purchase-orders')
           : Promise.resolve([]),
       ]);
+      const suppliersWithQueuedTerms = applyQueuedSupplierTerms(sup);
+      const visibleSupplierRows = view === 'suppliers'
+        ? applyQueuedSupplierTerms(data as Supplier[])
+        : data as (PurchaseRow | Supplier)[];
       setSummary(sum);
-      setSuppliers(sup.filter((x) => x.isActive));
+      setSuppliers(suppliersWithQueuedTerms.filter((x) => x.isActive));
       setBills(
         bill.filter(
           (x) =>
@@ -92,7 +116,7 @@ export function PurchasesSpendingPage({ view, role }: { view: PurchaseView; role
       );
       setRequests(req);
       setAccounts(acc);
-      setRows(data as (PurchaseRow | Supplier)[]);
+      setRows(visibleSupplierRows);
       setOrders(orderRows);
       setProjects(view === 'expenses' ? await purchasesApi.projects().catch(() => []) : []);
     } catch (e) {
@@ -1249,7 +1273,7 @@ function PurchaseModal({
     setBillIssueDate(todayDateInput());
   }, [open, view, selected?.id]);
   const selectedBillSupplier = suppliers.find((supplier) => supplier.id === billSupplierId);
-  const billTermsDays = selectedBillSupplier?.paymentTermsDays ?? 30;
+  const billTermsDays = selectedBillSupplier?.paymentTermsDays ?? parsePaymentTermDays(selectedBillSupplier?.paymentTerms);
   const billDuePreview = addDaysToDateInput(billIssueDate, billTermsDays);
   return (
     <Modal
@@ -1484,7 +1508,6 @@ function PurchaseModal({
                     name="supplierId"
                     required
                     value={view === 'bills' ? billSupplierId : undefined}
-                    defaultValue={view === 'bills' ? undefined : ''}
                     onChange={view === 'bills' ? (event) => setBillSupplierId(event.target.value) : undefined}
                   >
                     <option value="" disabled>

@@ -194,11 +194,12 @@ export function DashboardPage({
     budgetTotal > 0 ? Math.min(100, Math.round((budgetSpent / budgetTotal) * 100)) : 0;
   const ageing = invoices.reduce(
     (buckets, invoice) => {
+      if (['DRAFT', 'VOID', 'PAID'].includes(invoice.status)) return buckets;
       const outstanding = Math.max(
         0,
         Number(invoice.total) - Number(invoice.paidAmount) - Number(invoice.creditedAmount),
       );
-      if (!outstanding) return buckets;
+      if (!outstanding || !invoice.dueDate || Number.isNaN(new Date(invoice.dueDate).getTime())) return buckets;
       const days = Math.floor((dashboardNow - new Date(invoice.dueDate).getTime()) / 86400000);
       const index = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : days <= 90 ? 3 : 4;
       buckets[index] += outstanding;
