@@ -907,6 +907,9 @@
   margin: 6px 0;
   font-size: 0.68rem;
 }
+.pos-credit-payment-history { display: grid; gap: 6px; }
+.pos-credit-payment-history p { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.pos-credit-payment-history small { color: #7f8798; font-size: 0.62rem; }
 .pos-sale-audit ul {
   display: grid;
   gap: 8px;

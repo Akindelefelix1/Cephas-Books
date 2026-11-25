@@ -245,7 +245,6 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
       setCustomerPresetId('');
       await load();
       if (result && typeof result === 'object' && 'emailSent' in result && result.emailSent === false) {
-        const documentName = view === 'invoices' ? 'Invoice' : 'Quotation';
         const failure = 'emailError' in result ? String(result.emailError) : 'Email delivery failed.';
         setError(view === 'invoices'
           ? `Invoice recorded as sent, but the email could not be delivered: ${failure}`
@@ -884,17 +883,19 @@ function CustomerHistoryModal({
   const [creditStatus, setCreditStatus] = useState<Awaited<ReturnType<typeof salesApi.customerCreditStatus>> | null>(null);
   const [creditHistory, setCreditHistory] = useState<Awaited<ReturnType<typeof salesApi.customerCreditLimitHistory>>>([]);
   const [creditOverrides, setCreditOverrides] = useState<Awaited<ReturnType<typeof salesApi.customerCreditOverrideHistory>>>([]);
+  const [posCreditPayments, setPosCreditPayments] = useState<Awaited<ReturnType<typeof salesApi.customerPosCreditPayments>>>([]);
   const [creditHistoryError, setCreditHistoryError] = useState('');
   useEffect(() => {
-    if (!customer) { setCreditStatus(null); setCreditHistory([]); setCreditOverrides([]); return; }
+    if (!customer) { setCreditStatus(null); setCreditHistory([]); setCreditOverrides([]); setPosCreditPayments([]); return; }
     let active = true;
-    Promise.allSettled([salesApi.customerCreditStatus(customer.id), salesApi.customerCreditLimitHistory(customer.id), salesApi.customerCreditOverrideHistory(customer.id)])
-      .then(([statusResult, historyResult, overrideResult]) => {
+    Promise.allSettled([salesApi.customerCreditStatus(customer.id), salesApi.customerCreditLimitHistory(customer.id), salesApi.customerCreditOverrideHistory(customer.id), salesApi.customerPosCreditPayments(customer.id)])
+      .then(([statusResult, historyResult, overrideResult, posPaymentsResult]) => {
         if (!active) return;
         setCreditStatus(statusResult.status === 'fulfilled' ? statusResult.value : null);
         setCreditHistory(historyResult.status === 'fulfilled' ? historyResult.value : []);
         setCreditOverrides(overrideResult.status === 'fulfilled' ? overrideResult.value : []);
-        const failures = [statusResult, historyResult, overrideResult]
+        setPosCreditPayments(posPaymentsResult.status === 'fulfilled' ? posPaymentsResult.value : []);
+        const failures = [statusResult, historyResult, overrideResult, posPaymentsResult]
           .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
           .map((result) => result.reason instanceof Error ? result.reason.message : 'Unable to load credit information');
         setCreditHistoryError(failures.join(' '));
@@ -908,7 +909,7 @@ function CustomerHistoryModal({
   const [openCard, setOpenCard] = useState<string | null>(null);
   if (!customer) return null;
   const offlineWrites = getOfflineQueue();
-  const labels: Record<string, string> = { outstanding: 'Outstanding balance', invoiced: 'Invoiced', payments: 'Payments received', credits: 'Credits applied', overdue: 'Overdue balance' };
+  const labels: Record<string, string> = { outstanding: 'Invoice outstanding balance', invoiced: 'Invoiced', payments: 'Invoice payments received', credits: 'Credits applied', overdue: 'Overdue balance' };
   const dateInRange = (value: string) => {
     const date = value.slice(0, 10);
     return (!fromDate || date >= fromDate) && (!toDate || date <= toDate);
@@ -1056,6 +1057,7 @@ function CustomerHistoryModal({
               {creditHistoryError && <p className="banking-alert" role="alert">Credit information is incomplete: {creditHistoryError}</p>}
               {!!creditHistory.length && <details className="customer-credit-history"><summary>Credit limit changes ({creditHistory.length})</summary>{creditHistory.map((entry) => <p key={entry.id}><strong>{cash(entry.previousLimit, creditStatus?.currency)} → {cash(entry.newLimit, creditStatus?.currency)}</strong> · {entry.reason}<small>{new Date(entry.createdAt).toLocaleString()} · {entry.actor?.firstName || entry.actor?.email || 'Staff'}</small></p>)}</details>}
               {!!creditOverrides.length && <details className="customer-credit-history"><summary>Credit exceptions approved ({creditOverrides.length})</summary>{creditOverrides.map((entry) => <p key={entry.id}><strong>{entry.targetType} · {entry.targetId}</strong> · {entry.reason}<small>Exposure {cash(entry.existingExposure, creditStatus?.currency)} + requested {cash(entry.requestedAmount, creditStatus?.currency)} · {new Date(entry.createdAt).toLocaleString()} · {entry.approver?.firstName || entry.approver?.email || 'Approver'}</small></p>)}</details>}
+              {!!posCreditPayments.length && <details className="customer-credit-history"><summary>POS credit payments ({posCreditPayments.length})</summary>{posCreditPayments.map((payment) => <p key={payment.id}><strong>{cash(payment.amount, payment.currency)} · {payment.method} · {payment.sale.receiptNumber}</strong><small>{payment.reference} · {day(payment.paymentDate)} · {payment.receivedBy?.firstName || payment.receivedBy?.email || 'Staff'}</small></p>)}</details>}
             </section>
             {filterOpen && <div className="customer-dashboard-date-filter"><label>From<input type="date" max={toDate || undefined} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label><label>To<input type="date" min={fromDate || undefined} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label><button type="button" className="button button--ghost button--small" onClick={() => { setFromDate(''); setToDate(''); }}>Clear dates</button></div>}
             {currencies.map((currency) => (

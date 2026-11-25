@@ -330,6 +330,10 @@ export function App() {
             (!identity.customRoleId && ['OWNER', 'ADMIN'].includes(identity.role)) ||
             identity.permissions.includes('sales.manage')
           }
+          canCollectCredit={
+            (!identity.customRoleId && ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(identity.role)) ||
+            identity.permissions.includes('sales.manage')
+          }
         />
       );
     if (

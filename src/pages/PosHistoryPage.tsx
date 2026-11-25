@@ -34,11 +34,13 @@ export function PosHistoryPage({
   canReturn = false,
   canVoid = false,
   canViewAudit = false,
+  canCollectCredit = false,
 }: {
   canReprint?: boolean;
   canReturn?: boolean;
   canVoid?: boolean;
   canViewAudit?: boolean;
+  canCollectCredit?: boolean;
 }) {
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth();
@@ -59,6 +61,11 @@ export function PosHistoryPage({
   const [returnQuantity, setReturnQuantity] = useState('1');
   const [returnReason, setReturnReason] = useState('');
   const [voidReason, setVoidReason] = useState('');
+  const [showCreditPaymentForm, setShowCreditPaymentForm] = useState(false);
+  const [creditPaymentAmount, setCreditPaymentAmount] = useState('');
+  const [creditPaymentMethod, setCreditPaymentMethod] = useState<'CASH' | 'CARD' | 'TRANSFER'>('CASH');
+  const [creditPaymentDate, setCreditPaymentDate] = useState(() => localDateKey(new Date()));
+  const [creditPaymentReference, setCreditPaymentReference] = useState('');
   const [actionNotice, setActionNotice] = useState('');
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showVoidForm, setShowVoidForm] = useState(false);
@@ -179,6 +186,14 @@ export function PosHistoryPage({
   const returnRemaining = selectedReturnItem
     ? Math.max(0, Number(selectedReturnItem.quantity) - returnedQuantity(returnItemId))
     : 0;
+  const creditSold = (selectedSale?.payments || [])
+    .filter((payment) => payment.method === 'CREDIT' && payment.status !== 'REVERSED' && payment.status !== 'DECLINED')
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const creditReturned = (selectedSale?.returns || [])
+    .reduce((sum, returned) => sum + Number(returned.creditAmount || 0), 0);
+  const creditPaid = (selectedSale?.creditPayments || [])
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const posCreditOutstanding = Math.max(0, creditSold - creditReturned - creditPaid);
   const refreshSale = async (saleId: string) => {
     const refreshed = await posApi.receipt(saleId);
     setSelectedSale(refreshed);
@@ -214,6 +229,37 @@ export function PosHistoryPage({
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to process item return');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+  const submitCreditPayment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedSale || !creditPaymentAmount) return;
+    setActionBusy(true);
+    setError('');
+    setActionNotice('');
+    try {
+      const reference = creditPaymentReference.trim() ||
+        `POS-PAY-${selectedSale.receiptNumber}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+      setCreditPaymentReference(reference);
+      await posApi.recordCreditPayment(selectedSale.id, {
+        amount: Number(creditPaymentAmount),
+        method: creditPaymentMethod,
+        paymentDate: creditPaymentDate,
+        reference,
+      });
+      setShowCreditPaymentForm(false);
+      setCreditPaymentAmount('');
+      setCreditPaymentReference('');
+      setActionNotice('Customer credit payment recorded and outstanding balance updated.');
+      try {
+        await refreshSale(selectedSale.id);
+      } catch (caught) {
+        setActionNotice(`Payment recorded, but sale details could not be refreshed: ${caught instanceof Error ? caught.message : 'Unknown error'}`);
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to record POS credit payment');
     } finally {
       setActionBusy(false);
     }
@@ -520,12 +566,25 @@ export function PosHistoryPage({
                 ))}
               </span>
             </div>
+            {creditSold > 0 && <section className="pos-sale-returns">
+              <h3>Customer credit balance</h3>
+              <p>Credit sale {money(creditSold, selectedSale.currency)} · returned to balance {money(creditReturned, selectedSale.currency)} · payments received {money(creditPaid, selectedSale.currency)} · <strong>outstanding {money(posCreditOutstanding, selectedSale.currency)}</strong></p>
+              {!!selectedSale.creditPayments?.length && <div className="pos-credit-payment-history">{selectedSale.creditPayments.map((payment) => <p key={payment.id}><strong>{money(Number(payment.amount), payment.currency)} · {payment.method}</strong><small>{payment.reference} · {new Date(payment.paymentDate).toLocaleDateString('en-NG')} · {payment.receivedBy?.firstName || payment.receivedBy?.email || 'Staff'}</small></p>)}</div>}
+              {canCollectCredit && posCreditOutstanding > 0 && !showCreditPaymentForm && <button type="button" className="button button--secondary button--small" onClick={() => setShowCreditPaymentForm(true)}>Record customer payment</button>}
+              {canCollectCredit && posCreditOutstanding > 0 && showCreditPaymentForm && <form className="form-grid pos-action-form" onSubmit={(event) => void submitCreditPayment(event)}>
+                <label>Amount<input type="number" min="0.01" max={posCreditOutstanding} step="0.01" required value={creditPaymentAmount} onChange={(event) => setCreditPaymentAmount(event.target.value)} /></label>
+                <label>Method<select value={creditPaymentMethod} onChange={(event) => setCreditPaymentMethod(event.target.value as 'CASH' | 'CARD' | 'TRANSFER')}><option value="CASH">Cash</option><option value="CARD">POS / Card</option><option value="TRANSFER">Bank transfer</option></select></label>
+                <label>Date<input type="date" required value={creditPaymentDate} onChange={(event) => setCreditPaymentDate(event.target.value)} /></label>
+                <label>Reference (optional)<input maxLength={128} value={creditPaymentReference} onChange={(event) => setCreditPaymentReference(event.target.value)} placeholder="Bank or receipt reference" /></label>
+                <div className="full inline-actions"><button type="button" className="button button--secondary" onClick={() => setShowCreditPaymentForm(false)} disabled={actionBusy}>Cancel</button><button className="button" type="submit" disabled={actionBusy || !creditPaymentAmount || Number(creditPaymentAmount) > posCreditOutstanding}>{actionBusy ? 'Recording…' : 'Record payment'}</button></div>
+              </form>}
+            </section>}
             {selectedSale.returns?.length ? (
               <section className="pos-sale-returns">
                 <h3>Returned items</h3>
                 <small>
-                  Processed returns restore eligible inventory and post the matching accounting
-                  adjustment.
+                  Processed returns restore eligible inventory, reduce the customer credit balance
+                  first, and refund any remaining amount in cash.
                 </small>
                 {selectedSale.returns.map((returned) => (
                   <p key={returned.id}>

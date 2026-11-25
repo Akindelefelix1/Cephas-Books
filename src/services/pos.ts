@@ -47,6 +47,16 @@ export interface PosSale {
     amount: string;
     reference?: string;
   }>;
+  creditPayments?: Array<{
+    id: string;
+    reference: string;
+    amount: string;
+    currency: string;
+    method: string;
+    paymentDate: string;
+    createdAt: string;
+    receivedBy?: { firstName?: string; lastName?: string; email?: string } | null;
+  }>;
   returns?: Array<{
     id: string;
     productId: string;
@@ -177,6 +187,10 @@ export const posApi = {
     }>(`/pos/sales/${saleId}/returns`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  recordCreditPayment: (saleId: string, data: { amount: number; method: 'CASH' | 'CARD' | 'TRANSFER'; paymentDate: string; reference?: string }) =>
+    authorizedRequest<NonNullable<PosSale['creditPayments']>[number]>(`/pos/sales/${saleId}/credit-payments`, {
+      method: 'POST', body: JSON.stringify(data),
     }),
   voidSale: (saleId: string, reason: string) =>
     authorizedRequest<{ id: string; status: 'VOIDED' }>(`/pos/sales/${saleId}/void`, {

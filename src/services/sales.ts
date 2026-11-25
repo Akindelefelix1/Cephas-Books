@@ -25,6 +25,11 @@ export interface CustomerCreditOverride {
   requestedAmount: string; reason: string; createdAt: string;
   approver?: { firstName?: string; lastName?: string; email?: string };
 }
+export interface CustomerPosCreditPayment {
+  id: string; reference: string; amount: string; currency: string; method: string;
+  paymentDate: string; sale: { id: string; receiptNumber: string };
+  receivedBy?: { firstName?: string; lastName?: string; email?: string } | null;
+}
 export interface Line {
   name: string;
   description: string;
@@ -132,6 +137,7 @@ export const salesApi = {
   customerCreditStatus: (id: string) => authorizedRequest<CustomerCreditStatus>(`/customers/${id}/credit-status`),
   customerCreditLimitHistory: (id: string) => authorizedRequest<CustomerCreditLimitAdjustment[]>(`/customers/${id}/credit-limit-history`),
   customerCreditOverrideHistory: (id: string) => authorizedRequest<CustomerCreditOverride[]>(`/customers/${id}/credit-override-history`),
+  customerPosCreditPayments: (id: string) => authorizedRequest<CustomerPosCreditPayment[]>(`/customers/${id}/pos-credit-payments`),
   createCustomer: (data: Partial<Customer>) =>
     authorizedRequest<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) }),
   updateCustomer: (id: string, data: Partial<Customer>) =>
