@@ -990,11 +990,13 @@ function CustomerHistoryModal({
     try {
       const data = JSON.parse(entry.body) as Record<string, unknown>;
       if (data.sendEmail !== true || data.customerId !== customer.id || typeof data.issueDate !== 'string' || typeof data.dueDate !== 'string' || !Array.isArray(data.items)) return [];
-      const total = data.items.reduce((sum: number, rawItem: unknown) => {
+      const totals = data.items.reduce((sum: { subtotal: number; taxTotal: number }, rawItem: unknown) => {
         const item = rawItem as Record<string, unknown>;
         const base = Number(item.quantity) * Number(item.unitPrice);
-        return sum + base + base * Number(item.taxRate ?? 0) / 100;
-      }, 0) + Number(data.shippingAmount ?? 0);
+        const tax = Math.round((base * Number(item.taxRate ?? 0) / 100 + Number.EPSILON) * 10000) / 10000;
+        return { subtotal: sum.subtotal + base, taxTotal: sum.taxTotal + tax };
+      }, { subtotal: 0, taxTotal: 0 });
+      const total = totals.subtotal + totals.taxTotal + Number(data.shippingAmount ?? 0);
       if (!Number.isFinite(total)) return [];
       return [{
         id: 'offline:' + entry.id,
@@ -1003,8 +1005,8 @@ function CustomerHistoryModal({
         currency: typeof data.currency === 'string' ? data.currency : getDefaultCurrency(),
         issueDate: data.issueDate,
         dueDate: data.dueDate,
-        subtotal: String(total),
-        taxTotal: '0',
+        subtotal: String(totals.subtotal),
+        taxTotal: String(totals.taxTotal),
         shippingAmount: String(data.shippingAmount ?? 0),
         total: String(total),
         paidAmount: '0',
@@ -1465,7 +1467,10 @@ function CreateModal({
       items.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)),
     );
   const taxableSubtotal = lineItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
-  const quotationTax = lineItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0) * Number(item.taxRate || 0) / 100, 0);
+  const quotationTax = lineItems.reduce((sum, item) => {
+    const base = Number(item.quantity || 0) * Number(item.unitPrice || 0);
+    return sum + Math.round((base * Number(item.taxRate || 0) / 100 + Number.EPSILON) * 10000) / 10000;
+  }, 0);
   const quotationTotal = taxableSubtotal + quotationTax;
   const pendingPayments = queuedCustomerPayments();
   const payableInvoices = invoices.filter((invoice) => {
@@ -1817,6 +1822,7 @@ function CreateModal({
                     <span>{view === 'invoices' ? 'Invoice' : 'Quotation'} items</span>
                     <small>Add as many line items as needed.</small>
                   </div>
+                  {isWorkingOffline() && !taxRates.length && <div className="banking-alert" role="status">No saved tax-rate list is available on this device. Reconnect and refresh the offline workspace before creating a document that needs a configured tax rate.</div>}
                   {lineItems.map((item, index) => (
                     <div className={`invoice-line-editor__row ${view === 'quotations' ? 'quotation-item-row' : ''}`} key={index}>
                       <label>
@@ -1878,11 +1884,11 @@ function CreateModal({
                       </label>
                       <label>
                         Tax amount
-                        <input readOnly value={cash(String(Number(item.quantity || 0) * Number(item.unitPrice || 0) * Number(item.taxRate || 0) / 100))} aria-label={`Tax amount for item ${index + 1}`} />
+                        <input readOnly value={cash(String(Math.round((Number(item.quantity || 0) * Number(item.unitPrice || 0) * Number(item.taxRate || 0) / 100 + Number.EPSILON) * 10000) / 10000))} aria-label={`Tax amount for item ${index + 1}`} />
                       </label>
                       <label>
                         Line total
-                        <input readOnly value={cash(String(Number(item.quantity || 0) * Number(item.unitPrice || 0) * (1 + Number(item.taxRate || 0) / 100)))} aria-label={`Total for item ${index + 1}`} />
+                        <input readOnly value={cash(String(Number(item.quantity || 0) * Number(item.unitPrice || 0) + Math.round((Number(item.quantity || 0) * Number(item.unitPrice || 0) * Number(item.taxRate || 0) / 100 + Number.EPSILON) * 10000) / 10000))} aria-label={`Total for item ${index + 1}`} />
                       </label>
                       <button
                         type="button"

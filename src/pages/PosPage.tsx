@@ -206,7 +206,11 @@ export function PosPage({
     subtotal = cart.reduce((s, x) => s + Number(x.salePrice) * x.quantity, 0),
     discountTotal = cart.reduce((s, x) => s + x.discount * x.quantity, 0),
     tax = cart.reduce(
-      (s, x) => s + ((Number(x.salePrice) - x.discount) * x.quantity * Number(x.taxRate)) / 100,
+      (s, x) => {
+        const taxable = (Number(x.salePrice) - x.discount) * x.quantity;
+        const lineTax = Math.round((taxable * Number(x.taxRate) / 100 + Number.EPSILON) * 10000) / 10000;
+        return s + lineTax;
+      },
       0,
     ),
     total = subtotal - discountTotal + tax,
@@ -428,7 +432,7 @@ export function PosPage({
           customer: customers.find((customer) => customer.id === customerId) ?? null,
           items: cart.map((item) => {
             const taxable = (Number(item.salePrice) - item.discount) * item.quantity;
-            const taxAmount = Math.round(taxable * Number(item.taxRate) / 100 * 10000) / 10000;
+            const taxAmount = Math.round((taxable * Number(item.taxRate) / 100 + Number.EPSILON) * 10000) / 10000;
             return { productId: item.id, description: item.name, quantity: String(item.quantity), unitPrice: String(item.salePrice), discount: String(item.discount * item.quantity), taxRate: item.taxRate, taxRateId: item.taxRateId ?? null, taxRateVersion: item.taxRateVersion ?? null, taxName: item.taxRateName ?? (Number(item.taxRate) > 0 ? 'Custom tax' : 'No tax'), taxAmount: String(taxAmount), lineTotal: String(taxable + taxAmount) };
           }),
           payments: settledPayments.map((payment) => ({ method: payment.method, amount: String(payment.amount) })),

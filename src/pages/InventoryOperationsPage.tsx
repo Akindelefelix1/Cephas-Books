@@ -646,6 +646,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
         products={products}
         categories={categories}
         taxRates={taxRates.filter((rate) => rate.isActive)}
+        offline={offlineMode}
         warehouses={warehouses}
         busy={busy}
         error={error}
@@ -1784,6 +1785,7 @@ function OperationsModal({
   products,
   categories,
   taxRates,
+  offline,
   warehouses,
   busy,
   error,
@@ -1796,6 +1798,7 @@ function OperationsModal({
   products: Product[];
   categories: ProductCategory[];
   taxRates: TaxRate[];
+  offline: boolean;
   warehouses: Warehouse[];
   busy: boolean;
   error: string;
@@ -2071,7 +2074,7 @@ function OperationsModal({
                   <option key={rate.id} value={rate.id}>{rate.name} · {rate.rate}%</option>
                 ))}
               </select>
-              {!taxRates.length && <small>Create a tax rate first to assign a tax treatment.</small>}
+              {!taxRates.length && <small>{offline ? 'No saved tax rates are available offline. Reconnect and refresh the offline workspace to assign a tax treatment.' : 'Create a tax rate first to assign a tax treatment.'}</small>}
             </label>
             <label>
               Reorder level
