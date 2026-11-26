@@ -37,6 +37,10 @@ export interface Line {
   quantity: number;
   unitPrice: number;
   taxRate: number;
+  taxRateId?: string | null;
+  taxRateVersion?: number | null;
+  taxName?: string;
+  taxAmount?: string | number;
   lineTotal?: string;
 }
 export interface Invoice {

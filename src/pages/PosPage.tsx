@@ -399,6 +399,8 @@ export function PosPage({
           productId: x.id,
           quantity: x.quantity,
           discount: x.discount,
+          ...(x.taxRateId ? { taxRateId: x.taxRateId } : {}),
+          ...(x.taxRateVersion ? { taxRateVersion: x.taxRateVersion } : {}),
         })),
         payments: settledPayments,
         creditLimitOverride: approveCredit,
@@ -424,7 +426,11 @@ export function PosPage({
           total: String(total), paidAmount: String(paid), changeAmount: String(change), createdAt: stamp,
           subtotal: String(subtotal), discountTotal: String(discountTotal), taxTotal: String(tax),
           customer: customers.find((customer) => customer.id === customerId) ?? null,
-          items: cart.map((item) => ({ productId: item.id, description: item.name, quantity: String(item.quantity), unitPrice: String(item.salePrice), discount: String(item.discount * item.quantity), lineTotal: String((Number(item.salePrice) - item.discount) * item.quantity * (1 + Number(item.taxRate) / 100)) })),
+          items: cart.map((item) => {
+            const taxable = (Number(item.salePrice) - item.discount) * item.quantity;
+            const taxAmount = Math.round(taxable * Number(item.taxRate) / 100 * 10000) / 10000;
+            return { productId: item.id, description: item.name, quantity: String(item.quantity), unitPrice: String(item.salePrice), discount: String(item.discount * item.quantity), taxRate: item.taxRate, taxRateId: item.taxRateId ?? null, taxRateVersion: item.taxRateVersion ?? null, taxName: item.taxRateName ?? (Number(item.taxRate) > 0 ? 'Custom tax' : 'No tax'), taxAmount: String(taxAmount), lineTotal: String(taxable + taxAmount) };
+          }),
           payments: settledPayments.map((payment) => ({ method: payment.method, amount: String(payment.amount) })),
         };
       }

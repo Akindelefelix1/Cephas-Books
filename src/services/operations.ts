@@ -14,6 +14,9 @@ export interface Product {
   salePrice: string;
   costPrice: string;
   taxRate: string;
+  taxRateId?: string | null;
+  taxRateVersion?: number | null;
+  taxRateName?: string;
   reorderLevel: string;
   allowFractionalSale: boolean;
   stockQuantity: string;
@@ -59,6 +62,16 @@ export interface ProductDetails extends Product {
 export interface ProductCategory {
   id: string;
   name: string;
+}
+export interface TaxRate {
+  id: string;
+  name: string;
+  rate: string;
+  version: number;
+  description?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface Warehouse {
   id: string;
@@ -222,6 +235,10 @@ const savePosCatalog = (warehouseId: string, products: Product[]) => {
 };
 export const operationsApi = {
   summary: () => req<OperationsSummary>('/operations/summary'),
+  taxRates: (includeInactive = false) => req<TaxRate[]>(`/operations/tax-rates${includeInactive ? '?includeInactive=true' : ''}`),
+  createTaxRate: (data: { name: string; rate: number; description?: string }) => req<TaxRate>('/operations/tax-rates', 'POST', data),
+  updateTaxRate: (id: string, data: { name: string; rate: number; description?: string }) => req<TaxRate>(`/operations/tax-rates/${id}`, 'PATCH', data),
+  taxRateStatus: (id: string, isActive: boolean) => req<TaxRate>(`/operations/tax-rates/${id}/status`, 'PATCH', { isActive }),
   branchInventory: async () => {
     const report = await req<BranchInventory>('/operations/branch-inventory');
     const queued = getOfflineQueue().filter(

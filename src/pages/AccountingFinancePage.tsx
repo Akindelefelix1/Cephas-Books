@@ -144,7 +144,7 @@ export function AccountingFinancePage({ view, role }: { view: AccountingView; ro
     if (!assetSchedule?.nextDue) return;
     setConfirmation({
       title: 'Generate depreciation journal?',
-      message: `This posts ${money(assetSchedule.nextDue.depreciationAmount)} for ${assetSchedule.nextDue.periodStart} to ${assetSchedule.nextDue.periodEnd} to depreciation expense and accumulated depreciation. The period cannot be generated twice.`,
+      message: `This posts ${money(assetSchedule.nextDue.depreciationAmount)} for ${assetSchedule.nextDue.periodStart} to ${assetSchedule.nextDue.periodEnd} to depreciation expense and accumulated depreciation.${assetSchedule.nextDue.status === 'REVERSED' ? ' This replaces the reversed journal for this period.' : ''}`,
       confirmLabel: 'Generate and post',
       onConfirm: () => void (async () => {
         setAssetScheduleBusy(true);
@@ -720,9 +720,9 @@ function AssetDepreciationModal({
       footer={
         <>
           <button className="button button--secondary" onClick={onClose}>Close</button>
-          {!loading && data?.configured && data.nextDue?.status === 'DUE' && canManage && data.asset.status === 'ACTIVE' && (
+          {!loading && data?.configured && ['DUE', 'REVERSED'].includes(data.nextDue?.status ?? '') && canManage && data.asset.status === 'ACTIVE' && (
             <button className="button" onClick={onGenerate} disabled={busy || offline}>
-              {busy ? 'Posting…' : 'Generate next due journal'}
+              {busy ? 'Posting…' : (data.nextDue?.status === 'REVERSED' ? 'Regenerate reversed period' : 'Generate next due journal')}
             </button>
           )}
         </>
@@ -770,7 +770,7 @@ function AssetDepreciationModal({
               </p>
               {data.asset.status === 'DISPOSED' && <div className="banking-alert">This asset has been disposed and cannot accrue further depreciation.</div>}
               {!['ACTIVE', 'DISPOSED'].includes(data.asset.status) && <div className="banking-alert">Only an active asset can generate depreciation journals. Activate this asset first if it is still in service.</div>}
-              {data.nextDue?.status === 'REVERSED' && <div className="banking-alert">An earlier depreciation journal was reversed. Resolve that period before posting additional depreciation.</div>}
+              {data.nextDue?.status === 'REVERSED' && <div className="banking-alert">This period was reversed and is ready to regenerate. If later periods were posted, reverse those in reverse chronological order first.</div>}
               {offline && <div className="banking-alert" role="status">You are offline. This schedule is read-only until you reconnect.</div>}
               {!data.nextDue && <div className="banking-alert">No unrecorded depreciation period is due through {formatBusinessDate(today)}.</div>}
               <h3>Depreciation schedule</h3>

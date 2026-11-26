@@ -32,6 +32,7 @@ import {
   type Product,
   type ProductDetails,
   type ProductCategory,
+  type TaxRate,
   type Project,
   type ProjectPlan,
   type ProjectVarianceReport,
@@ -71,6 +72,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [branchInventory, setBranchInventory] = useState<BranchInventory | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -83,6 +85,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(false);
+  const [taxRatesOpen, setTaxRatesOpen] = useState(false);
   const [selected, setSelected] = useState<Row | null>(null);
   const [display, setDisplay] = useState<'table' | 'cards'>('table');
   const [detail, setDetail] = useState<ProductDetails | null>(null);
@@ -156,16 +159,18 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
     setLoading(true);
     setError('');
     try {
-      const [s, p, w, c] = await Promise.all([
+      const [s, p, w, c, rates] = await Promise.all([
         operationsApi.summary(),
         view === 'products' ? Promise.resolve([]) : operationsApi.products(),
         operationsApi.warehouses(),
         operationsApi.categories(),
+        view === 'products' ? operationsApi.taxRates() : Promise.resolve([]),
       ]);
       setSummary(s);
       setProducts(p.filter((x) => x.isActive && x.type === 'PRODUCT'));
       setWarehouses(w.filter((x) => x.isActive));
       setCategories(c);
+      setTaxRates(rates);
       if (view === 'branch-inventory') setBranchInventory(await operationsApi.branchInventory());
       if (view === 'products') {
         const result = await operationsApi.productsPage({
@@ -397,6 +402,11 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
               onClick={() => void openInventoryAnalytics()}
             >
               <BarChart3 size={17} /> Monthly stock insights
+            </button>
+          )}
+          {view === 'products' && canEdit && (
+            <button className="button button--secondary" onClick={() => { setTaxRatesOpen(true); void operationsApi.taxRates(true).then(setTaxRates); }} disabled={offlineMode} title={offlineMode ? 'Connect to manage tax rates.' : undefined}>
+              Manage tax rates
             </button>
           )}
           <button
@@ -635,6 +645,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
         selected={selected}
         products={products}
         categories={categories}
+        taxRates={taxRates.filter((rate) => rate.isActive)}
         warehouses={warehouses}
         busy={busy}
         error={error}
@@ -645,6 +656,13 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
         submit={(data, transfer) =>
           void run(() => save(view, data, selected, transfer), `${titles[view]} saved`)
         }
+      />
+      <TaxRatesModal
+        open={taxRatesOpen}
+        rates={taxRates}
+        offline={offlineMode}
+        onClose={() => setTaxRatesOpen(false)}
+        onChanged={() => void operationsApi.taxRates(true).then(setTaxRates)}
       />
       <ProductDetailsModal
         key={detail?.id || (detailOpen ? 'loading' : 'closed')}
@@ -1427,7 +1445,7 @@ function ProductDetailsModal({
                 </div>
                 <div>
                   <small>Tax rate</small>
-                  <strong>{product.taxRate}%</strong>
+                  <strong>{product.taxRateName ?? 'Tax'} · {product.taxRate}%</strong>
                 </div>
                 <div>
                   <small>Reorder level</small>
@@ -1645,6 +1663,86 @@ function RestockModal({
   );
 }
 
+function TaxRatesModal({
+  open,
+  rates,
+  offline,
+  onClose,
+  onChanged,
+}: {
+  open: boolean;
+  rates: TaxRate[];
+  offline: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState<TaxRate | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (open) { setEditing(null); setError(''); }
+  }, [open]);
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true); setError('');
+    try {
+      const payload = {
+        name: String(form.get('name') ?? '').trim(),
+        rate: Number(form.get('rate')),
+        description: String(form.get('description') ?? '').trim() || undefined,
+      };
+      if (editing) await operationsApi.updateTaxRate(editing.id, payload);
+      else await operationsApi.createTaxRate(payload);
+      setEditing(null);
+      onChanged();
+      confirmAction(editing ? 'Tax rate updated' : 'Tax rate created');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to save tax rate');
+    } finally { setBusy(false); }
+  };
+  const toggle = async (rate: TaxRate) => {
+    setBusy(true); setError('');
+    try {
+      await operationsApi.taxRateStatus(rate.id, !rate.isActive);
+      onChanged();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to update tax rate');
+    } finally { setBusy(false); }
+  };
+  return (
+    <Modal open={open} onClose={onClose} wide title="Tax rates and treatments" footer={<button className="button button--secondary" onClick={onClose}>Close</button>}>
+      <div className="tax-rate-manager">
+        {offline && <div className="banking-alert" role="status">Tax rates are read-only offline. Reconnect to make changes.</div>}
+        <p>Configure rates once, assign them to products or services, and use the same treatment on sales documents. Saved invoices and receipts retain their original tax snapshots.</p>
+        <form key={editing?.id ?? 'new-tax-rate'} className="form-grid tax-rate-manager__form" onSubmit={(event) => void save(event)}>
+          <label>Rate name<input name="name" required maxLength={100} defaultValue={editing?.name ?? ''} placeholder="e.g. Standard VAT" /></label>
+          <label>Rate (%)<input name="rate" type="number" min="0" max="100" step=".0001" required defaultValue={editing?.rate ?? ''} /></label>
+          <label className="full">Description <small>Optional</small><input name="description" maxLength={500} defaultValue={editing?.description ?? ''} placeholder="Tax jurisdiction or treatment notes" /></label>
+          {error && <p className="form-error full" role="alert">{error}</p>}
+          <div className="tax-rate-manager__actions full">
+            {editing && <button type="button" className="button button--secondary" onClick={() => setEditing(null)}>Cancel edit</button>}
+            <button className="button" disabled={busy || offline}>{busy ? 'Saving…' : editing ? 'Save rate changes' : 'Add tax rate'}</button>
+          </div>
+        </form>
+        <div className="tax-rate-manager__list">
+          {!rates.length && <p>No tax rates configured yet.</p>}
+          {rates.map((rate) => (
+            <article className="tax-rate-manager__row" key={rate.id}>
+              <div><strong>{rate.name}</strong><span>{rate.rate}%{rate.description ? ` · ${rate.description}` : ''}</span></div>
+              <span className={`tax-rate-status ${rate.isActive ? 'tax-rate-status--active' : 'tax-rate-status--archived'}`}>{rate.isActive ? 'Active' : 'Archived'}</span>
+              <div className="inline-actions">
+                <button className="button button--small button--secondary" onClick={() => setEditing(rate)} disabled={busy || offline}>Edit</button>
+                <button className="button button--small button--secondary" onClick={() => void toggle(rate)} disabled={busy || offline}>{rate.isActive ? 'Archive' : 'Restore'}</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function HistoryTable({
   headers,
   rows,
@@ -1685,6 +1783,7 @@ function OperationsModal({
   selected,
   products,
   categories,
+  taxRates,
   warehouses,
   busy,
   error,
@@ -1696,6 +1795,7 @@ function OperationsModal({
   selected: Row | null;
   products: Product[];
   categories: ProductCategory[];
+  taxRates: TaxRate[];
   warehouses: Warehouse[];
   busy: boolean;
   error: string;
@@ -1743,7 +1843,8 @@ function OperationsModal({
           unit: get('unit'),
           salePrice: num('salePrice'),
           costPrice: num('costPrice'),
-          taxRate: num('taxRate'),
+          taxRateId: get('taxRateId') || undefined,
+          taxRate: Number(taxRates.find((rate) => rate.id === get('taxRateId'))?.rate ?? 0),
           reorderLevel: num('reorderLevel'),
           allowFractionalSale,
           defaultWarehouseId: get('defaultWarehouseId') || undefined,
@@ -1963,15 +2064,14 @@ function OperationsModal({
               />
             </label>
             <label>
-              Tax %
-              <input
-                name="taxRate"
-                type="number"
-                min="0"
-                step=".01"
-                required
-                defaultValue={p?.taxRate || 0}
-              />
+              Tax treatment
+              <select name="taxRateId" defaultValue={p?.taxRateId ?? ''}>
+                <option value="">No tax (0%)</option>
+                {taxRates.map((rate) => (
+                  <option key={rate.id} value={rate.id}>{rate.name} · {rate.rate}%</option>
+                ))}
+              </select>
+              {!taxRates.length && <small>Create a tax rate first to assign a tax treatment.</small>}
             </label>
             <label>
               Reorder level

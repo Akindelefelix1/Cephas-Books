@@ -17,6 +17,7 @@ import { confirmAction, downloadText } from '@/utils/actions';
 import { getDefaultCurrency } from '@/utils/currency';
 import { getOfflineQueue, isWorkingOffline } from '@/services/offline';
 import { PaymentTermsField } from '@/components/ui/PaymentTermsField';
+import { operationsApi, type TaxRate } from '@/services/operations';
 import { formatBusinessDate, formatBusinessDateTime } from '@/utils/financial-configuration';
 import { addDaysToDateInput, receivableAgeingLabel, receivableAgeingPeriod, RECEIVABLE_AGEING_PERIODS, todayDateInput } from '@/utils/payment-terms';
 type View = 'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables';
@@ -483,6 +484,7 @@ export function SalesIncomePage({ view, role, onNavigate, canApproveCredit = fal
                       <span>
                         {item.quantity} × {cash(String(item.unitPrice), quotation.currency)} ={' '}
                         {cash(String(Number(item.quantity) * Number(item.unitPrice)), quotation.currency)}
+                        <small>{item.taxName ?? 'Tax'} ({item.taxRate ?? 0}%): {cash(String(item.taxAmount ?? 0), quotation.currency)} · incl. tax {cash(String(Number(item.quantity) * Number(item.unitPrice) + Number(item.taxAmount ?? 0)), quotation.currency)}</small>
                       </span>
                     </div>
                   ))}
@@ -1265,7 +1267,10 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
               <th>Description</th>
               <th>Quantity/hrs</th>
               <th>Rate</th>
-              <th>Amount</th>
+              <th>Tax treatment</th>
+              <th>Sales value</th>
+              <th>Tax amount</th>
+              <th>Line total</th>
             </tr>
           </thead>
           <tbody>
@@ -1275,12 +1280,10 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
                 <td>{item.description}</td>
                 <td>{item.quantity}</td>
                 <td>{cash(String(item.unitPrice), invoice.currency)}</td>
-                <td>
-                  {cash(
-                    item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)),
-                    invoice.currency,
-                  )}
-                </td>
+                <td>{item.taxName ?? (item.taxRate ? 'Tax' : 'No tax')} ({item.taxRate ?? 0}%)</td>
+                <td>{cash(String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency)}</td>
+                <td>{cash(String(item.taxAmount ?? Math.max(0, Number(item.lineTotal ?? 0) - Number(item.quantity) * Number(item.unitPrice))), invoice.currency)}</td>
+                <td>{cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency)}</td>
               </tr>
             ))}
           </tbody>
@@ -1365,7 +1368,7 @@ function printInvoice(invoice: Invoice) {
   const subtotal =
     invoice.items?.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0) ??
     Number(invoice.subtotal);
-  const fallback = `<article class="invoice-paper"><div class="invoice-paper__accent"></div><div class="invoice-paper__content"><header class="invoice-paper__header"><div class="invoice-paper__brand"><div class="invoice-paper__logo">${safe(initials)}</div><strong>${safe(company)}</strong><span>Professional accounting made simple</span></div><h1>Invoice</h1></header><section class="invoice-paper__parties"><div><b>Bill to</b><strong>${safe(invoice.customer.displayName)}</strong><span>${safe(invoice.customer.companyName || invoice.customer.email || 'Valued customer')}</span><span>${safe(invoice.customer.billingAddress)}</span></div><div><b>Ship to</b><strong>${safe(invoice.customer.displayName)}</strong><span>${safe(invoice.shippingAddress || invoice.customer.billingAddress || invoice.customer.email || 'As agreed')}</span></div><div class="invoice-paper__details"><b>Details</b><span>Invoice # <strong>${safe(invoice.number)}</strong></span><span>Invoice date <strong>${safe(day(invoice.issueDate))}</strong></span><span>Terms <strong>Net ${terms}</strong></span><span>Due date <strong>${safe(day(invoice.dueDate))}</strong></span></div></section><table><thead><tr><th>Product/service</th><th>Description</th><th>Quantity/hrs</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${(invoice.items || []).map((item) => `<tr><td>${safe(item.name)}</td><td>${safe(item.description)}</td><td>${safe(item.quantity)}</td><td>${safe(cash(String(item.unitPrice), invoice.currency))}</td><td>${safe(cash(item.lineTotal || String(Number(item.quantity) * Number(item.unitPrice)), invoice.currency))}</td></tr>`).join('')}</tbody></table><footer class="invoice-paper__footer"><div class="invoice-paper__message"><b>Customer message</b><strong>Hello!</strong><p>${safe(invoice.notes || `Thank you for your business. Please remit this invoice by ${day(invoice.dueDate)}.`)}</p></div><div class="invoice-paper__totals"><span>Subtotal <b>${safe(cash(String(subtotal), invoice.currency))}</b></span><span>Sales tax <b>${safe(cash(invoice.taxTotal, invoice.currency))}</b></span><span>Shipping <b>${safe(cash(invoice.shippingAmount || '0', invoice.currency))}</b></span><strong>Total <b>${safe(cash(invoice.total, invoice.currency))}</b></strong></div></footer><div class="invoice-paper__bottom-line"></div></div></article>`;
+  const fallback = `<article class="invoice-paper"><div class="invoice-paper__accent"></div><div class="invoice-paper__content"><header class="invoice-paper__header"><div class="invoice-paper__brand"><div class="invoice-paper__logo">${safe(initials)}</div><strong>${safe(company)}</strong><span>Professional accounting made simple</span></div><h1>Invoice</h1></header><section class="invoice-paper__parties"><div><b>Bill to</b><strong>${safe(invoice.customer.displayName)}</strong><span>${safe(invoice.customer.companyName || invoice.customer.email || 'Valued customer')}</span><span>${safe(invoice.customer.billingAddress)}</span></div><div><b>Ship to</b><strong>${safe(invoice.customer.displayName)}</strong><span>${safe(invoice.shippingAddress || invoice.customer.billingAddress || invoice.customer.email || 'As agreed')}</span></div><div class="invoice-paper__details"><b>Details</b><span>Invoice # <strong>${safe(invoice.number)}</strong></span><span>Invoice date <strong>${safe(day(invoice.issueDate))}</strong></span><span>Terms <strong>Net ${terms}</strong></span><span>Due date <strong>${safe(day(invoice.dueDate))}</strong></span></div></section><table><thead><tr><th>Product/service</th><th>Description</th><th>Quantity/hrs</th><th>Rate</th><th>Sales value</th><th>Tax</th><th>Line total</th></tr></thead><tbody>${(invoice.items || []).map((item) => { const base = Number(item.quantity) * Number(item.unitPrice); const tax = Number(item.taxAmount ?? Math.max(Number(item.lineTotal || base) - base, 0)); const line = Number(item.lineTotal || base + tax); return `<tr><td>${safe(item.name)}</td><td>${safe(item.description)}</td><td>${safe(item.quantity)}</td><td>${safe(cash(String(item.unitPrice), invoice.currency))}</td><td>${safe(cash(String(base), invoice.currency))}</td><td>${safe(`${item.taxName || 'Tax'}${Number(item.taxRate || 0) ? ` (${Number(item.taxRate)}%)` : ''}: ${cash(String(tax), invoice.currency)}`)}</td><td>${safe(cash(String(line), invoice.currency))}</td></tr>`; }).join('')}</tbody></table><footer class="invoice-paper__footer"><div class="invoice-paper__message"><b>Customer message</b><strong>Hello!</strong><p>${safe(invoice.notes || `Thank you for your business. Please remit this invoice by ${day(invoice.dueDate)}.`)}</p></div><div class="invoice-paper__totals"><span>Subtotal <b>${safe(cash(String(subtotal), invoice.currency))}</b></span><span>Sales tax <b>${safe(cash(invoice.taxTotal, invoice.currency))}</b></span><span>Shipping <b>${safe(cash(invoice.shippingAmount || '0', invoice.currency))}</b></span><strong>Total <b>${safe(cash(invoice.total, invoice.currency))}</b></strong></div></footer><div class="invoice-paper__bottom-line"></div></div></article>`;
   popup.document.write(
     `<html><head><title>Invoice ${invoice.number}</title><style>${invoicePrintCss}</style></head><body>${source?.outerHTML || fallback}<script>window.onload=()=>window.print()</script></body></html>`,
   );
@@ -1402,11 +1405,12 @@ function CreateModal({
   const document = view === 'quotations' || view === 'invoices';
   const paymentForm = view === 'payments' || view === 'receivables';
   const [lineItems, setLineItems] = useState([
-    { name: '', description: '', quantity: '', unitPrice: '' },
+    { name: '', description: '', quantity: '', unitPrice: '', taxRateId: '', taxRateVersion: '', taxRate: '0', taxName: 'No tax' },
   ]);
-  const [taxRate, setTaxRate] = useState('0');
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [customerSelect, setCustomerSelect] = useState(customerPresetId);
   const [invoiceIssueDate, setInvoiceIssueDate] = useState(todayDateInput());
+  const [shippingPreview, setShippingPreview] = useState('0');
   const [paymentInvoiceId, setPaymentInvoiceId] = useState('');
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -1418,14 +1422,21 @@ function CreateModal({
   const [invoiceNumber, setInvoiceNumber] = useState('Generating…');
   useEffect(() => {
     if (!open) return;
-    setLineItems([{ name: '', description: '', quantity: '', unitPrice: '' }]);
-    setTaxRate('0');
+    setLineItems([{ name: '', description: '', quantity: '', unitPrice: '', taxRateId: '', taxRateVersion: '', taxRate: '0', taxName: 'No tax' }]);
     setPaymentInvoiceId('');
     setInvoiceSearch('');
     setPaymentAmount('');
     setInvoiceIssueDate(todayDateInput());
+    setShippingPreview('0');
   }, [open, view]);
   useEffect(() => setCustomerSelect(customerPresetId), [customerPresetId, open]);
+  useEffect(() => {
+    if (!open || !document) return;
+    let active = true;
+    void operationsApi.taxRates().then((rates) => { if (active) setTaxRates(rates); })
+      .catch(() => { if (active) setTaxRates([]); });
+    return () => { active = false; };
+  }, [open, document]);
   const selectedCustomerForInvoice = customers.find((customer) => customer.id === customerSelect);
   const invoiceTermsDays = selectedCustomerForInvoice?.paymentTermsDays ?? 30;
   const invoiceDuePreview = addDaysToDateInput(invoiceIssueDate, invoiceTermsDays);
@@ -1447,16 +1458,15 @@ function CreateModal({
   }, [document, open, view]);
   const updateLine = (
     index: number,
-    field: 'name' | 'description' | 'quantity' | 'unitPrice',
+    field: 'name' | 'description' | 'quantity' | 'unitPrice' | 'taxRateId' | 'taxRate' | 'taxName',
     value: string,
   ) =>
     setLineItems((items) =>
       items.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)),
     );
-  const quotationTotal = lineItems.reduce((sum, item) => {
-    const amount = Number(item.quantity || 0) * Number(item.unitPrice || 0);
-    return sum + amount + amount * (Number(taxRate || 0) / 100);
-  }, 0);
+  const taxableSubtotal = lineItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
+  const quotationTax = lineItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0) * Number(item.taxRate || 0) / 100, 0);
+  const quotationTotal = taxableSubtotal + quotationTax;
   const pendingPayments = queuedCustomerPayments();
   const payableInvoices = invoices.filter((invoice) => {
     const queued = pendingPayments.filter((payment) => payment.invoiceId === invoice.id).reduce((sum, payment) => sum + payment.amount, 0);
@@ -1607,7 +1617,10 @@ function CreateModal({
                 ...item,
                 quantity: Number(item.quantity),
                 unitPrice: Number(item.unitPrice),
-                taxRate: Number(get('taxRate')),
+                taxRateId: item.taxRateId || undefined,
+                taxRateVersion: item.taxRateVersion ? Number(item.taxRateVersion) : undefined,
+                taxRate: Number(item.taxRate),
+                taxName: item.taxName,
               })),
               notes: get('notes') || undefined,
               ...(view === 'invoices' ? { creditLimitOverride: approveCredit, creditLimitOverrideReason: approvalReason.trim() || undefined } : {}),
@@ -1844,16 +1857,33 @@ function CreateModal({
                           onChange={(event) => updateLine(index, 'unitPrice', event.target.value)}
                         />
                       </label>
-                      {view === 'quotations' && (
-                        <label>
-                          Amount
-                          <input
-                            readOnly
-                            value={cash(String(Number(item.quantity || 0) * Number(item.unitPrice || 0)), getDefaultCurrency())}
-                            aria-label={`Amount for item ${index + 1}`}
-                          />
-                        </label>
-                      )}
+                      <label>
+                        Tax treatment
+                        <select
+                          value={item.taxRateId}
+                          onChange={(event) => {
+                            const rate = taxRates.find((option) => option.id === event.target.value);
+                            setLineItems((items) => items.map((row, rowIndex) => rowIndex === index
+                              ? { ...row, taxRateId: rate?.id ?? '', taxRateVersion: rate ? String(rate.version) : '', taxRate: rate?.rate ?? '0', taxName: rate?.name ?? 'No tax' }
+                              : row));
+                          }}
+                        >
+                          <option value="">No tax (0%)</option>
+                          {taxRates.map((rate) => <option key={rate.id} value={rate.id}>{rate.name} · {rate.rate}%</option>)}
+                        </select>
+                      </label>
+                      <label>
+                        Sales value
+                        <input readOnly value={cash(String(Number(item.quantity || 0) * Number(item.unitPrice || 0)))} aria-label={`Sales value before tax for item ${index + 1}`} />
+                      </label>
+                      <label>
+                        Tax amount
+                        <input readOnly value={cash(String(Number(item.quantity || 0) * Number(item.unitPrice || 0) * Number(item.taxRate || 0) / 100))} aria-label={`Tax amount for item ${index + 1}`} />
+                      </label>
+                      <label>
+                        Line total
+                        <input readOnly value={cash(String(Number(item.quantity || 0) * Number(item.unitPrice || 0) * (1 + Number(item.taxRate || 0) / 100)))} aria-label={`Total for item ${index + 1}`} />
+                      </label>
                       <button
                         type="button"
                         className="icon-button"
@@ -1875,20 +1905,20 @@ function CreateModal({
                     onClick={() =>
                       setLineItems((items) => [
                         ...items,
-                        { name: '', description: '', quantity: '', unitPrice: '' },
+                        { name: '', description: '', quantity: '', unitPrice: '', taxRateId: '', taxRateVersion: '', taxRate: '0', taxName: 'No tax' },
                       ])
                     }
                   >
                     <Plus size={16} /> Add another item
                   </button>
                 </div>
-                <label>
-                  Tax %<input name="taxRate" type="number" min="0" step=".01" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} />
-                </label>
-                {view === 'quotations' && (
-                  <div className="quotation-total-card">
-                    <small>Quotation total</small>
-                    <strong>{cash(String(quotationTotal))}</strong>
+                {document && (
+                <div className="quotation-total-card">
+                    <small>{view === 'invoices' ? 'Invoice calculation' : 'Quotation calculation'}</small>
+                    <span>Sales value before tax <b>{cash(String(taxableSubtotal))}</b></span>
+                    <span>Tax <b>{cash(String(quotationTax))}</b></span>
+                    {view === 'invoices' && <span>Shipping <b>{cash(shippingPreview)}</b></span>}
+                    <strong>Total including tax{view === 'invoices' ? ' and shipping' : ''} <b>{cash(String(quotationTotal + (view === 'invoices' ? Number(shippingPreview || 0) : 0)))}</b></strong>
                   </div>
                 )}
                 {view === 'invoices' && (
@@ -1900,7 +1930,8 @@ function CreateModal({
                         type="number"
                         min="0"
                         step=".01"
-                        defaultValue="0"
+                        value={shippingPreview}
+                        onChange={(event) => setShippingPreview(event.target.value)}
                       />
                     </label>
                     <label className="full">

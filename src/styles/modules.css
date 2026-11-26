@@ -400,7 +400,7 @@
 }
 .invoice-line-editor__row {
   display: grid;
-  grid-template-columns: 1.4fr 2fr 0.7fr 0.9fr 32px;
+  grid-template-columns: minmax(95px, 1.2fr) minmax(120px, 1.5fr) minmax(60px, .65fr) minmax(75px, .8fr) minmax(105px, 1.05fr) repeat(3, minmax(85px, .9fr)) 32px;
   gap: 9px;
   align-items: end;
   margin-top: 9px;
@@ -2004,7 +2004,7 @@
   font-size: 0.68rem;
 }
 .quotation-item-row {
-  grid-template-columns: minmax(110px, 1.2fr) minmax(140px, 1.5fr) minmax(62px, 0.6fr) minmax(80px, 0.8fr) minmax(100px, 0.9fr) 32px;
+  grid-template-columns: minmax(95px, 1.2fr) minmax(120px, 1.5fr) minmax(60px, .65fr) minmax(75px, .8fr) minmax(105px, 1.05fr) repeat(3, minmax(85px, .9fr)) 32px;
 }
 .quotation-total-card {
   display: grid;
@@ -2024,6 +2024,26 @@
   color: #172b77;
   font-size: 0.95rem;
 }
+.quotation-total-card span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #596579;
+  font-size: .68rem;
+}
+.quotation-total-card span b,
+.quotation-total-card strong b { color: #172033; }
+.tax-rate-manager { display: grid; gap: 16px; min-width: 0; }
+.tax-rate-manager > p { margin: 0; color: #667085; font-size: .82rem; line-height: 1.55; }
+.tax-rate-manager__form { padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fafbff; }
+.tax-rate-manager__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.tax-rate-manager__list { display: grid; gap: 8px; }
+.tax-rate-manager__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e3e8f0; border-radius: 10px; }
+.tax-rate-manager__row > div:first-child { display: grid; gap: 3px; min-width: 0; }
+.tax-rate-manager__row > div:first-child span { color: #667085; font-size: .75rem; overflow-wrap: anywhere; }
+.tax-rate-status { justify-self: start; padding: 4px 9px; border-radius: 999px; font-size: .68rem; font-weight: 700; }
+.tax-rate-status--active { color: #14734b; background: #e9f8f0; }
+.tax-rate-status--archived { color: #667085; background: #eef1f5; }
 .quotation-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
@@ -2159,6 +2179,8 @@
   .quotation-item-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .tax-rate-manager__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tax-rate-manager__row .inline-actions { grid-column: 1 / -1; }
 }
 .invoice-send-option {
   display: flex;
