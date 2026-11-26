@@ -698,7 +698,7 @@ function values(v: View, r: Row, customerOverdueCount = 0): string[] {
       x.email || '—',
       x.phone || '—',
       x.paymentTermsDays === 0 ? 'Due on receipt' : `Net ${x.paymentTermsDays ?? 30}`,
-      cash(String(x.creditLimit ?? '0')),
+      Number(x.creditLimit ?? 0) > 0 ? cash(String(x.creditLimit)) : 'Cash-only (₦0)',
       x.billingAddress || '—',
       x.isActive ? 'Active' : 'Archived',
     ];
@@ -1416,6 +1416,9 @@ function CreateModal({
   const [paymentInvoiceId, setPaymentInvoiceId] = useState('');
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [creditFacility, setCreditFacility] = useState<'CASH_ONLY' | 'CREDIT'>(
+    Number(selected?.creditLimit ?? 0) > 0 ? 'CREDIT' : 'CASH_ONLY',
+  );
   const [creditStatus, setCreditStatus] = useState<Awaited<ReturnType<typeof salesApi.customerCreditStatus>> | null>(null);
   const [creditStatusError, setCreditStatusError] = useState('');
   const [approveCredit, setApproveCredit] = useState(false);
@@ -1430,7 +1433,8 @@ function CreateModal({
     setPaymentAmount('');
     setInvoiceIssueDate(todayDateInput());
     setShippingPreview('0');
-  }, [open, view]);
+    setCreditFacility(Number(selected?.creditLimit ?? 0) > 0 ? 'CREDIT' : 'CASH_ONLY');
+  }, [open, view, selected?.id]);
   useEffect(() => setCustomerSelect(customerPresetId), [customerPresetId, open]);
   useEffect(() => {
     if (!open || !document) return;
@@ -1587,12 +1591,18 @@ function CreateModal({
             }
           }
           if (view === 'customers')
-            if (selected && Number(get('creditLimit') || 0) !== Number(selected.creditLimit ?? 0) && !get('creditLimitReason').trim()) {
+            if (selected && (get('creditFacility') === 'CASH_ONLY' ? 0 : Number(get('creditLimit') || 0)) !== Number(selected.creditLimit ?? 0) && !get('creditLimitReason').trim()) {
               const reasonField = e.currentTarget.querySelector<HTMLInputElement>('input[name="creditLimitReason"]');
               reasonField?.setCustomValidity('Enter a reason for changing the credit limit.');
               reasonField?.reportValidity();
               return;
             }
+          if (view === 'customers' && get('creditFacility') === 'CREDIT' && Number(get('creditLimit')) <= 0) {
+            const limitField = e.currentTarget.querySelector<HTMLInputElement>('input[name="creditLimit"]');
+            limitField?.setCustomValidity('Enter a positive approved limit or choose cash-only.');
+            limitField?.reportValidity();
+            return;
+          }
           if (view === 'customers')
             submit({
               name: get('name'),
@@ -1602,7 +1612,7 @@ function CreateModal({
               companyName: get('companyName') || undefined,
               billingAddress: get('billingAddress') || undefined,
               paymentTermsDays: Number(get('paymentTermsDays') || 30),
-              creditLimit: Number(get('creditLimit') || 0),
+              creditLimit: get('creditFacility') === 'CASH_ONLY' ? 0 : Number(get('creditLimit')),
               ...(get('creditLimitReason').trim() ? { creditLimitReason: get('creditLimitReason').trim() } : {}),
             });
           else if (document)
@@ -1679,8 +1689,29 @@ function CreateModal({
               <input name="phone" defaultValue={selected?.phone} />
             </label>
             <label>
-              Approved credit limit
-              <input name="creditLimit" type="number" min="0" step="0.01" defaultValue={selected?.creditLimit ?? '0'} />
+              Credit access
+              <select
+                name="creditFacility"
+                value={creditFacility}
+                onChange={(event) => setCreditFacility(event.target.value as 'CASH_ONLY' | 'CREDIT')}
+              >
+                <option value="CASH_ONLY">Cash-only — no credit facility</option>
+                <option value="CREDIT">Approved credit facility</option>
+              </select>
+            </label>
+            <label>
+              Approved credit limit ({getDefaultCurrency()})
+              <input
+                name="creditLimit"
+                type="number"
+                min={creditFacility === 'CREDIT' ? '0.0001' : '0'}
+                step="0.0001"
+                required={creditFacility === 'CREDIT'}
+                disabled={creditFacility === 'CASH_ONLY'}
+                defaultValue={selected?.creditLimit ?? '0'}
+                onChange={(event) => event.currentTarget.setCustomValidity('')}
+              />
+              <small>{creditFacility === 'CASH_ONLY' ? 'Credit transactions will be blocked unless an authorized exception is approved.' : 'Credit transactions are limited to this approved amount.'}</small>
             </label>
             <label>
               Credit limit adjustment reason <small>{selected ? 'Required when changed' : 'Optional'}</small>
@@ -1822,7 +1853,7 @@ function CreateModal({
                     <span>{view === 'invoices' ? 'Invoice' : 'Quotation'} items</span>
                     <small>Add as many line items as needed.</small>
                   </div>
-                  {isWorkingOffline() && !taxRates.length && <div className="banking-alert" role="status">No saved tax-rate list is available on this device. Reconnect and refresh the offline workspace before creating a document that needs a configured tax rate.</div>}
+                  {isWorkingOffline() && !taxRates.length && <div className="banking-alert" role="status">No configured tax rates are saved on this device. No-tax, tax-exempt, and zero-rated treatments remain available; reconnect and refresh the offline workspace to use configured rates.</div>}
                   {lineItems.map((item, index) => (
                     <div className={`invoice-line-editor__row ${view === 'quotations' ? 'quotation-item-row' : ''}`} key={index}>
                       <label>
@@ -1866,15 +1897,21 @@ function CreateModal({
                       <label>
                         Tax treatment
                         <select
-                          value={item.taxRateId}
+                          value={item.taxRateId || (item.taxName === 'Tax-exempt' ? '__TAX_EXEMPT__' : item.taxName === 'Zero-rated' ? '__ZERO_RATED__' : '')}
                           onChange={(event) => {
-                            const rate = taxRates.find((option) => option.id === event.target.value);
+                            const treatment = event.target.value;
+                            const rate = taxRates.find((option) => option.id === treatment);
+                            const specialName = treatment === '__TAX_EXEMPT__'
+                              ? 'Tax-exempt'
+                              : treatment === '__ZERO_RATED__' ? 'Zero-rated' : undefined;
                             setLineItems((items) => items.map((row, rowIndex) => rowIndex === index
-                              ? { ...row, taxRateId: rate?.id ?? '', taxRateVersion: rate ? String(rate.version) : '', taxRate: rate?.rate ?? '0', taxName: rate?.name ?? 'No tax' }
+                              ? { ...row, taxRateId: rate?.id ?? '', taxRateVersion: rate ? String(rate.version) : '', taxRate: rate?.rate ?? '0', taxName: rate?.name ?? specialName ?? 'No tax' }
                               : row));
                           }}
                         >
-                          <option value="">No tax (0%)</option>
+                          <option value="">No tax applied (0%)</option>
+                          <option value="__TAX_EXEMPT__">Tax-exempt (0%)</option>
+                          <option value="__ZERO_RATED__">Zero-rated (0%)</option>
                           {taxRates.map((rate) => <option key={rate.id} value={rate.id}>{rate.name} · {rate.rate}%</option>)}
                         </select>
                       </label>
