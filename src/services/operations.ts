@@ -1,5 +1,5 @@
 import { authorizedRequest, getAuthCacheIdentity } from './auth';
-import { getOfflineQueue } from './offline';
+import { getOfflineQueue, isWorkingOffline, replaceOfflineWrite } from './offline';
 
 export type OperationsView =
   'products' | 'warehouses' | 'branch-inventory' | 'stock-movements' | 'stock-adjustments' | 'projects' | 'project-ai';
@@ -25,8 +25,11 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  pendingOffline?: boolean;
+  offlineQueueId?: string;
 }
 export interface ProductDetails extends Product {
+  offlineHistoryLimited?: boolean;
   createdBy: { email: string; firstName?: string; lastName?: string } | null;
   activity: Array<{
     id: string;
@@ -205,6 +208,59 @@ const query = (filters: Record<string, string> = {}) =>
   new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
 const req = <T>(path: string, method = 'GET', body?: object) =>
   authorizedRequest<T>(path, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
+const productWrites = () => getOfflineQueue().filter((write) =>
+  write.path === '/operations/products' ||
+  /^\/operations\/products\/[^/]+(?:\/status|\/restock)?$/.test(write.path),
+);
+const queuedProductId = (writeId: string) => `offline-product:${writeId}`;
+const applyQueuedProductWrites = (serverProducts: Product[]): Product[] => {
+  const products = serverProducts.map((product) => ({ ...product }));
+  for (const write of productWrites()) {
+    const id = write.path === '/operations/products'
+      ? queuedProductId(write.id)
+      : decodeURIComponent(write.path.match(/^\/operations\/products\/([^/]+)/)?.[1] ?? '');
+    let product = products.find((item) => item.id === id);
+    let body: Record<string, unknown>;
+    try { body = JSON.parse(write.body || '{}') as Record<string, unknown>; } catch { continue; }
+    if (write.path === '/operations/products') {
+      const quantity = Number(body.openingQuantity ?? 0);
+      product = {
+        id, sku: String(body.sku ?? ''), name: String(body.name ?? ''),
+        type: body.type === 'SERVICE' ? 'SERVICE' : 'PRODUCT',
+        category: typeof body.category === 'string' ? body.category : undefined,
+        description: typeof body.description === 'string' ? body.description : undefined,
+        unit: String(body.unit ?? 'unit'), salePrice: String(body.salePrice ?? 0),
+        costPrice: String(body.costPrice ?? 0), taxRate: String(body.taxRate ?? 0),
+        taxRateId: typeof body.taxRateId === 'string' ? body.taxRateId : null,
+        reorderLevel: String(body.reorderLevel ?? 0), allowFractionalSale: Boolean(body.allowFractionalSale),
+        stockQuantity: String(body.type === 'SERVICE' ? 0 : quantity),
+        stockValue: String(body.type === 'SERVICE' ? 0 : quantity * Number(body.costPrice ?? 0)),
+        defaultWarehouseId: typeof body.defaultWarehouseId === 'string' ? body.defaultWarehouseId : undefined,
+        isActive: true, createdAt: write.queuedAt, updatedAt: write.queuedAt,
+        pendingOffline: true, offlineQueueId: write.id,
+      };
+      products.unshift(product);
+      continue;
+    }
+    if (!product) continue;
+    if (write.path.endsWith('/restock')) {
+      const delta = Number(body.quantity ?? 0);
+      product.stockQuantity = String(Number(product.stockQuantity) + delta);
+      product.stockValue = String(Number(product.stockValue) + delta * Number(body.unitCost ?? product.costPrice));
+    } else if (write.path.endsWith('/status')) {
+      product.isActive = Boolean(body.isActive);
+    } else {
+      Object.assign(product, body);
+      if ('salePrice' in body) product.salePrice = String(body.salePrice);
+      if ('costPrice' in body) product.costPrice = String(body.costPrice);
+      if ('taxRate' in body) product.taxRate = String(body.taxRate);
+      if ('reorderLevel' in body) product.reorderLevel = String(body.reorderLevel);
+    }
+    product.pendingOffline = true;
+    product.updatedAt = write.queuedAt;
+  }
+  return products;
+};
 export const INVENTORY_CHANGED_EVENT = 'cephas:inventory-changed';
 const POS_CATALOG_TTL_MS = 10 * 60 * 1000;
 const posCatalogKey = (warehouseId: string) =>
@@ -291,8 +347,26 @@ export const operationsApi = {
     }
     return { ...report, pendingOfflineChanges: queued.length };
   },
-  products: (filters = {}) => req<Product[]>(`/operations/products?${query(filters)}`),
-  productsPage: (filters = {}) => req<ProductPage>(`/operations/products-page?${query(filters)}`),
+  products: async (filters: Record<string, string> = {}) => applyQueuedProductWrites(await req<Product[]>(`/operations/products?${query(filters)}`)),
+  productsPage: async (filters: Record<string, string> = {}) => {
+    if (isWorkingOffline() || productWrites().length) {
+      const all = await operationsApi.products();
+      const search = String(filters.search ?? '').toLowerCase();
+      const status = String(filters.status ?? '');
+      const category = String(filters.category ?? '').toLowerCase();
+      const filtered = all.filter((product) =>
+        (!search || `${product.name} ${product.sku} ${product.category ?? ''}`.toLowerCase().includes(search)) &&
+        (!category || (product.category ?? '').toLowerCase() === category) &&
+        (status === 'active' ? product.isActive : status === 'archived' ? !product.isActive :
+          status === 'low_stock' ? Number(product.stockQuantity) > 0 && Number(product.stockQuantity) <= Number(product.reorderLevel) :
+          status === 'out_of_stock' ? Number(product.stockQuantity) <= 0 : true),
+      );
+      const page = Math.max(1, Number(filters.page ?? 1));
+      const limit = Math.min(100, Math.max(1, Number(filters.limit ?? 15)));
+      return { data: filtered.slice((page - 1) * limit, page * limit), meta: { page, limit, total: filtered.length, totalPages: Math.max(1, Math.ceil(filtered.length / limit)) } };
+    }
+    return req<ProductPage>(`/operations/products-page?${query(filters)}`);
+  },
   posProducts: async (warehouseId: string) => {
     const cached = readPosCatalog(warehouseId);
     if (cached) return cached;
@@ -305,13 +379,44 @@ export const operationsApi = {
   },
   savePosProducts: (warehouseId: string, products: Product[]) =>
     savePosCatalog(warehouseId, products),
-  product: (id: string) => req<ProductDetails>(`/operations/products/${id}`),
+  product: async (id: string) => {
+    if (!isWorkingOffline()) return req<ProductDetails>(`/operations/products/${id}`);
+    const product = (await operationsApi.products()).find((item) => item.id === id);
+    if (!product) throw new Error('This product is not available in the saved offline workspace.');
+    const [movements, adjustments] = await Promise.all([
+      operationsApi.movements().catch(() => []), operationsApi.adjustments().catch(() => []),
+    ]);
+    const zero = '0';
+    return {
+      ...product, createdBy: null, activity: [],
+      movements: movements.filter((row) => row.product.id === id).map(({ product: _product, ...row }) => row),
+      adjustments: adjustments.filter((row) => row.product.id === id).map(({ product: _product, ...row }) => row),
+      salesSummary: { unitsSold: zero, grossSales: zero, returnedUnits: zero, returnsValue: zero, netSales: zero },
+      sales: [], offlineHistoryLimited: true,
+    } as ProductDetails;
+  },
   categories: () => req<ProductCategory[]>('/operations/product-categories'),
-  createCategory: (name: string) =>
-    req<ProductCategory>('/operations/product-categories', 'POST', { name }),
+  createCategory: async (name: string) => {
+    const result = await req<ProductCategory | { queuedOffline: true }>('/operations/product-categories', 'POST', { name });
+    if ('queuedOffline' in result) {
+      const queued = getOfflineQueue().filter((write) => write.path === '/operations/product-categories').at(-1);
+      return { id: `offline-category:${queued?.id ?? crypto.randomUUID()}`, name };
+    }
+    return result;
+  },
   createProduct: (data: object) => req<Product>('/operations/products', 'POST', data),
-  updateProduct: (id: string, data: object) =>
-    req<Product>(`/operations/products/${id}`, 'PATCH', data),
+  updateProduct: (id: string, data: object) => {
+    if (id.startsWith('offline-product:')) {
+      const queueId = id.slice('offline-product:'.length);
+      const create = getOfflineQueue().find((write) => write.id === queueId && write.path === '/operations/products');
+      if (!create) throw new Error('This pending item is no longer in the offline queue. Sync before editing it.');
+      let original: Record<string, unknown> = {};
+      try { original = JSON.parse(create.body || '{}') as Record<string, unknown>; } catch { /* preserve queue validation */ }
+      replaceOfflineWrite(queueId, create.path, create.method, JSON.stringify({ ...original, ...data }));
+      return Promise.resolve({ queuedOffline: true } as unknown as Product);
+    }
+    return req<Product>(`/operations/products/${id}`, 'PATCH', data);
+  },
   productStatus: (id: string, isActive: boolean) =>
     req<Product>(`/operations/products/${id}/status`, 'PATCH', { isActive }),
   deleteProduct: (id: string) => req<{ deleted: boolean }>(`/operations/products/${id}`, 'DELETE'),

@@ -31,7 +31,7 @@ export const OFFLINE_WORKSPACE_READS = [
   '/purchases/payments?search=&status=', '/purchases/payables?search=&status=',
   '/purchases/expenses?search=&status=', '/purchases/projects', '/operations/summary', '/operations/branch-inventory',
   '/operations/products?', '/operations/products-page?', '/operations/product-categories',
-  '/operations/warehouses?', '/operations/movements?', '/operations/adjustments?',
+  '/operations/tax-rates', '/operations/warehouses?', '/operations/movements?', '/operations/adjustments?',
   '/operations/projects?', '/accounting/accounts?includeArchived=false',
   '/accounting/accounts?includeArchived=true', '/accounting/journals?search=',
   '/accounting/ledger?accountId=', '/accounting/trial-balance',
@@ -88,7 +88,7 @@ function expectedOfflineReads(profile?: { role?: string; customRoleId?: string; 
       return can('banking.view') || can('banking.transactions.view') || can('banking.manage');
     if (path.startsWith('/accounting/')) return can('accounting.view');
     if (path.startsWith('/operations/')) {
-      if (['/operations/products?', '/operations/warehouses?'].includes(path))
+      if (['/operations/products?', '/operations/tax-rates', '/operations/warehouses?'].includes(path))
         return can('inventory.view') || can('sales.view');
       return can('inventory.view');
     }

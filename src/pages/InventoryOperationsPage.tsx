@@ -252,6 +252,14 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
   };
   const productAction = async (kind: 'status' | 'delete') => {
     if (!detail) return;
+    if (kind === 'delete' && isWorkingOffline()) {
+      setError('Permanently deleting products requires an internet connection.');
+      return;
+    }
+    if (kind === 'status' && detail.id.startsWith('offline-product:')) {
+      setError('Sync this newly created item before archiving or restoring it.');
+      return;
+    }
     if (kind === 'delete' && !await appDialog(
       'Permanently delete product?',
       `Delete ${detail.name}? This cannot be undone.`,
@@ -261,11 +269,15 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
     setActionBusy(kind);
     setError('');
     try {
-      if (kind === 'delete') await operationsApi.deleteProduct(detail.id);
-      else await operationsApi.productStatus(detail.id, !detail.isActive);
-      confirmAction(
-        kind === 'delete' ? 'Item deleted' : detail.isActive ? 'Item archived' : 'Item restored',
+      const result = kind === 'delete'
+        ? await operationsApi.deleteProduct(detail.id)
+        : await operationsApi.productStatus(detail.id, !detail.isActive);
+      const queuedOffline = Boolean(
+        result && typeof result === 'object' && 'queuedOffline' in result && result.queuedOffline === true,
       );
+      confirmAction(queuedOffline
+        ? `${detail.isActive ? 'Archive' : 'Restore'} change queued for sync`
+        : kind === 'delete' ? 'Item deleted' : detail.isActive ? 'Item archived' : 'Item restored');
       setDetailOpen(false);
       setDetail(null);
       await load();
@@ -280,9 +292,12 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
     setActionBusy('restock');
     setError('');
     try {
-      await operationsApi.restockProduct(detail.id, data);
+      const result = await operationsApi.restockProduct(detail.id, data);
       window.dispatchEvent(new Event(INVENTORY_CHANGED_EVENT));
-      confirmAction(`${detail.name} restocked`);
+      const queuedOffline = Boolean(
+        result && typeof result === 'object' && 'queuedOffline' in result && result.queuedOffline === true,
+      );
+      confirmAction(queuedOffline ? `${detail.name} restock queued for sync` : `${detail.name} restocked`);
       setRestockOpen(false);
       await load();
       setDetail(await operationsApi.product(detail.id));
@@ -673,6 +688,7 @@ export function InventoryOperationsPage({ view, role, onNavigate }: { view: Oper
         error={error}
         canEdit={canEdit}
         canDelete={['OWNER', 'ADMIN'].includes(role)}
+        offline={offlineMode}
         busy={actionBusy}
         currency={summary?.baseCurrency || 'NGN'}
         close={() => {
@@ -1275,6 +1291,7 @@ function ProductDetailsModal({
   error,
   canEdit,
   canDelete,
+  offline,
   busy,
   currency,
   close,
@@ -1289,6 +1306,7 @@ function ProductDetailsModal({
   error: string;
   canEdit: boolean;
   canDelete: boolean;
+  offline: boolean;
   busy: string;
   currency: string;
   close: () => void;
@@ -1324,13 +1342,14 @@ function ProductDetailsModal({
               <button
                 className="button button--secondary"
                 onClick={restock}
-                disabled={Boolean(busy)}
+                disabled={Boolean(busy) || (offline && Boolean(product.pendingOffline))}
+                title={offline && product.pendingOffline ? 'Sync this new item before recording stock against it.' : undefined}
               >
                 <PackagePlus size={16} /> Restock
               </button>
             )}
             {canEdit && (
-              <button className="button" onClick={changeStatus} disabled={Boolean(busy)}>
+              <button className="button" onClick={changeStatus} disabled={Boolean(busy) || (offline && Boolean(product.pendingOffline))}>
                 {busy === 'status' ? (
                   <>
                     <LoaderCircle className="spin" size={16} />{' '}
@@ -1344,7 +1363,7 @@ function ProductDetailsModal({
               </button>
             )}
             {canDelete && !product.isActive && (
-              <button className="button button--danger" onClick={remove} disabled={Boolean(busy)}>
+              <button className="button button--danger" onClick={remove} disabled={Boolean(busy) || offline} title={offline ? 'Connect to the internet to permanently delete an item.' : undefined}>
                 {busy === 'delete' ? (
                   <>
                     <LoaderCircle className="spin" size={16} /> Deleting…
@@ -1368,6 +1387,8 @@ function ProductDetailsModal({
         product && (
           <div className="product-details">
             {error && <div className="banking-alert">{error}</div>}
+            {product.pendingOffline && <div className="banking-alert" role="status">This item has pending offline changes and will sync when you reconnect.</div>}
+            {product.offlineHistoryLimited && <div className="banking-alert" role="status">Offline view: saved product details and stock history are available. Sales and user activity history require a connection.</div>}
             <div className="product-details__hero">
               <div className="product-details__identity">
                 <span className="inventory-card__icon">
@@ -1399,11 +1420,11 @@ function ProductDetailsModal({
               </div>
               <div>
                 <small>Units sold</small>
-                <strong>{product.salesSummary.unitsSold}</strong>
+                <strong>{product.offlineHistoryLimited ? 'Unavailable offline' : product.salesSummary.unitsSold}</strong>
               </div>
               <div>
                 <small>Net sales</small>
-                <strong>{money(product.salesSummary.netSales, currency)}</strong>
+                <strong>{product.offlineHistoryLimited ? 'Unavailable offline' : money(product.salesSummary.netSales, currency)}</strong>
               </div>
             </div>
             <div className="product-detail-tabs" role="tablist">
@@ -1417,7 +1438,7 @@ function ProductDetailsModal({
                 >
                   {value === 'stock' ? 'Stock history' : value[0].toUpperCase() + value.slice(1)}
                   {value === 'sales'
-                    ? ` (${product.sales.length})`
+                    ? product.offlineHistoryLimited ? '' : ` (${product.sales.length})`
                     : value === 'stock'
                       ? ` (${product.movements.length})`
                       : value === 'activity'
@@ -1467,20 +1488,20 @@ function ProductDetailsModal({
                 <div className="product-sales-summary">
                   <span>
                     <small>Gross sales</small>
-                    <strong>{money(product.salesSummary.grossSales, currency)}</strong>
+                    <strong>{product.offlineHistoryLimited ? 'Unavailable offline' : money(product.salesSummary.grossSales, currency)}</strong>
                   </span>
                   <span>
                     <small>Returns</small>
-                    <strong>{money(product.salesSummary.returnsValue, currency)}</strong>
+                    <strong>{product.offlineHistoryLimited ? 'Unavailable offline' : money(product.salesSummary.returnsValue, currency)}</strong>
                   </span>
                   <span>
                     <small>Net sales</small>
-                    <strong>{money(product.salesSummary.netSales, currency)}</strong>
+                    <strong>{product.offlineHistoryLimited ? 'Unavailable offline' : money(product.salesSummary.netSales, currency)}</strong>
                   </span>
                 </div>
                 <HistoryTable
                   headers={['Receipt', 'Date', 'Quantity', 'Amount', 'Cashier', 'Status']}
-                  empty="No sales recorded for this item."
+                  empty={product.offlineHistoryLimited ? 'Sales history requires an internet connection.' : 'No sales recorded for this item.'}
                   rows={product.sales.map((sale) => [
                     sale.sale.receiptNumber,
                     date(sale.sale.createdAt),
@@ -1847,13 +1868,16 @@ function OperationsModal({
           salePrice: num('salePrice'),
           costPrice: num('costPrice'),
           taxRateId: get('taxRateId') || undefined,
-          taxRate: Number(taxRates.find((rate) => rate.id === get('taxRateId'))?.rate ?? 0),
+          taxRate: Number(
+            taxRates.find((rate) => rate.id === get('taxRateId'))?.rate ??
+              (p?.taxRateId === get('taxRateId') ? p.taxRate : 0),
+          ),
           reorderLevel: num('reorderLevel'),
           allowFractionalSale,
           defaultWarehouseId: get('defaultWarehouseId') || undefined,
           ...(itemType === 'PRODUCT'
             ? p
-              ? { availableQuantity: num('availableQuantity') }
+              ? (offline ? {} : { availableQuantity: num('availableQuantity') })
               : { openingQuantity: num('openingQuantity') }
             : {}),
         },
@@ -2070,6 +2094,9 @@ function OperationsModal({
               Tax treatment
               <select name="taxRateId" defaultValue={p?.taxRateId ?? ''}>
                 <option value="">No tax (0%)</option>
+              {p?.taxRateId && !taxRates.some((rate) => rate.id === p.taxRateId) && (
+                <option value={p.taxRateId}>{p.taxRateName ?? 'Saved tax treatment'} · {p.taxRate}%</option>
+              )}
                 {taxRates.map((rate) => (
                   <option key={rate.id} value={rate.id}>{rate.name} · {rate.rate}%</option>
                 ))}
@@ -2131,10 +2158,12 @@ function OperationsModal({
                   step={allowFractionalSale ? '.5' : '1'}
                   defaultValue={p.stockQuantity}
                   required
+                  disabled={offline}
                 />
                 <small>
-                  Exact stock count in {p.unit || 'units'}. Changes are saved as an inventory
-                  adjustment.
+                  {offline
+                    ? 'Stock count corrections require a connection so inventory adjustments and accounting stay in sync. Use Restock for a queued stock receipt.'
+                    : `Exact stock count in ${p.unit || 'units'}. Changes are saved as an inventory adjustment.`}
                 </small>
               </label>
             )}
