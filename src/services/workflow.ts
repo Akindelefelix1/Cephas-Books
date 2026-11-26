@@ -44,6 +44,11 @@ export interface AppNotification {
   relatedId?: string;
   isRead: boolean;
   createdAt: string;
+  recipientId?: string | null;
+}
+export interface PushConfiguration {
+  enabled: boolean;
+  publicKey: string | null;
 }
 export interface WorkflowRule {
   id: string;
@@ -82,6 +87,11 @@ export const workflowApi = {
   readNotification: (id: string, isRead = true) =>
     req<AppNotification>(`/workflow/notifications/${id}/read`, 'PATCH', { isRead }),
   readAll: () => req<{ updated: number }>('/workflow/notifications/read-all', 'PATCH'),
+  pushConfiguration: () => req<PushConfiguration>('/workflow/notifications/push/config'),
+  subscribePush: (subscription: object) =>
+    req<{ id: string }>('/workflow/notifications/push-subscriptions', 'POST', subscription),
+  unsubscribePush: (endpoint: string) =>
+    req<{ removed: boolean }>('/workflow/notifications/push-subscriptions', 'DELETE', { endpoint }),
   rules: (filters = {}) => req<WorkflowRule[]>(`/workflow/rules?${query(filters)}`),
   createRule: (data: object) => req<WorkflowRule>('/workflow/rules', 'POST', data),
   ruleStatus: (id: string, status: string) =>

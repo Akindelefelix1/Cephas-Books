@@ -53,6 +53,7 @@ const routePermissions: Record<string, string> = {
   'ai-assistant': 'reports.view',
   'excel-sync': 'reports.view',
   approvals: 'approvals.review',
+  notifications: 'dashboard.view',
   branches: 'settings.manage',
   currencies: 'settings.manage',
   users: 'users.view',

@@ -55,7 +55,12 @@ import { can, canAccessRoute } from '@/utils/permissions';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { CommercePage } from '@/pages/CommercePage';
 import type { CommerceView } from '@/services/commerce';
-import { activateOfflineMode, getOfflineQueue, isOfflineEnabledForCurrentAccount, isWorkingOffline } from '@/services/offline';
+import {
+  activateOfflineMode,
+  getOfflineQueue,
+  isOfflineEnabledForCurrentAccount,
+  isWorkingOffline,
+} from '@/services/offline';
 import { refreshOfflineWorkspace, syncOfflineChanges } from '@/services/auth';
 import { getQueuedPosSales, syncQueuedPosSales } from '@/services/pos';
 import { appDialog } from '@/utils/appDialogs';
@@ -98,7 +103,9 @@ export function App() {
   const [logoutConfirmation, setLogoutConfirmation] = useState<Confirmation | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState('');
-  const [offlineCount, setOfflineCount] = useState(() => getOfflineQueue().length + getQueuedPosSales().length);
+  const [offlineCount, setOfflineCount] = useState(
+    () => getOfflineQueue().length + getQueuedPosSales().length,
+  );
   const [offlineMode, setOfflineMode] = useState(() => isWorkingOffline());
   const [syncing, setSyncing] = useState(false);
   const syncInProgress = useRef(false);
@@ -107,9 +114,14 @@ export function App() {
   const [syncMessage, setSyncMessage] = useState(() => {
     if (!isOfflineEnabledForCurrentAccount()) return '';
     try {
-      const counts = JSON.parse(localStorage.getItem('cephas:offline-prepared-counts') ?? '{}') as { saved?: number; failed?: number };
+      const counts = JSON.parse(localStorage.getItem('cephas:offline-prepared-counts') ?? '{}') as {
+        saved?: number;
+        failed?: number;
+      };
       return `Offline workspace ready · ${counts.saved ?? 0} sections saved${counts.failed ? ` · ${counts.failed} unavailable` : ''}`;
-    } catch { return 'Offline workspace is enabled on this device.'; }
+    } catch {
+      return 'Offline workspace is enabled on this device.';
+    }
   });
   const [identityReady, setIdentityReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(
@@ -117,11 +129,14 @@ export function App() {
   );
   const requestCloudSync = async () => {
     if (!navigator.onLine || syncInProgress.current) return;
-    if (!await appDialog(
-      'Back up and sync',
-      'Send queued changes to your cloud workspace and refresh the saved offline copy? You can keep working locally by cancelling.',
-      { confirmLabel: 'Back up and sync', cancelLabel: 'Keep working locally' },
-    )) return;
+    if (
+      !(await appDialog(
+        'Back up and sync',
+        'Send queued changes to your cloud workspace and refresh the saved offline copy? You can keep working locally by cancelling.',
+        { confirmLabel: 'Back up and sync', cancelLabel: 'Keep working locally' },
+      ))
+    )
+      return;
     syncInProgress.current = true;
     setSyncing(true);
     try {
@@ -131,7 +146,11 @@ export function App() {
       setSyncMessage('Your approved changes are backed up and your workspace is up to date.');
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 0) activateOfflineMode();
-      setSyncMessage(caught instanceof Error ? `Sync paused: ${caught.message}` : 'Sync paused. Try again when connected.');
+      setSyncMessage(
+        caught instanceof Error
+          ? `Sync paused: ${caught.message}`
+          : 'Sync paused. Try again when connected.',
+      );
     } finally {
       syncInProgress.current = false;
       setSyncing(false);
@@ -170,7 +189,12 @@ export function App() {
     };
     const onOnline = () => {
       refreshCount();
-      if (isOfflineEnabledForCurrentAccount() || localStorage.getItem('cephas:offline-active') === 'true' || getOfflineQueue().length || getQueuedPosSales().length)
+      if (
+        isOfflineEnabledForCurrentAccount() ||
+        localStorage.getItem('cephas:offline-active') === 'true' ||
+        getOfflineQueue().length ||
+        getQueuedPosSales().length
+      )
         void requestCloudSync();
     };
     const onInstall = (event: Event) => {
@@ -226,27 +250,50 @@ export function App() {
         const queuedWrites = getOfflineQueue();
         const queuedCurrency = queuedWrites.reduce((current, item) => {
           try {
-            const body = JSON.parse(item.body ?? '{}') as { data?: { defaultCurrency?: unknown }; baseCurrency?: unknown };
+            const body = JSON.parse(item.body ?? '{}') as {
+              data?: { defaultCurrency?: unknown };
+              baseCurrency?: unknown;
+            };
             if (item.method !== 'PATCH') return current;
-            if (item.path === '/organizations/current/admin/currencies' && typeof body.data?.defaultCurrency === 'string') return body.data.defaultCurrency;
-            if (item.path === '/organizations/current/onboarding/financial' && typeof body.baseCurrency === 'string') return body.baseCurrency.toUpperCase();
+            if (
+              item.path === '/organizations/current/admin/currencies' &&
+              typeof body.data?.defaultCurrency === 'string'
+            )
+              return body.data.defaultCurrency;
+            if (
+              item.path === '/organizations/current/onboarding/financial' &&
+              typeof body.baseCurrency === 'string'
+            )
+              return body.baseCurrency.toUpperCase();
             return current;
-          } catch { return current; }
+          } catch {
+            return current;
+          }
         }, profile.organization.baseCurrency);
         setDefaultCurrency(queuedCurrency);
         const queuedPreferences = queuedWrites.reduce<Record<string, string>>((current, item) => {
           try {
-            const body = JSON.parse(item.body ?? '{}') as { data?: Record<string, unknown> } & Record<string, unknown>;
+            const body = JSON.parse(item.body ?? '{}') as {
+              data?: Record<string, unknown>;
+            } & Record<string, unknown>;
             if (item.method !== 'PATCH') return current;
-            const values = item.path === '/organizations/current/admin/preferences'
-              ? body.data
-              : item.path === '/organizations/current/onboarding/financial' ? body : undefined;
+            const values =
+              item.path === '/organizations/current/admin/preferences'
+                ? body.data
+                : item.path === '/organizations/current/onboarding/financial'
+                  ? body
+                  : undefined;
             for (const [key, value] of Object.entries(values ?? {}))
               if (typeof value === 'string') current[key] = value;
             return current;
-          } catch { return current; }
+          } catch {
+            return current;
+          }
         }, {});
-        const financial: Record<string, string> = { ...(progress.onboardingData.financial ?? {}), ...queuedPreferences };
+        const financial: Record<string, string> = {
+          ...(progress.onboardingData.financial ?? {}),
+          ...queuedPreferences,
+        };
         if (financial.timezone) setReportingTimeZone(financial.timezone);
         if (financial.fiscalYearStart) setFiscalYearStartMonth(financial.fiscalYearStart);
         const complete = Boolean(progress.onboardingCompletedAt);
@@ -330,7 +377,10 @@ export function App() {
       return (
         <PosPage
           canConfigurePos={!identity.customRoleId && identity.role === 'OWNER'}
-          canApproveCredit={(!identity.customRoleId && ['OWNER', 'ADMIN', 'APPROVER'].includes(identity.role)) || identity.permissions.includes('credit.limit.approve')}
+          canApproveCredit={
+            (!identity.customRoleId && ['OWNER', 'ADMIN', 'APPROVER'].includes(identity.role)) ||
+            identity.permissions.includes('credit.limit.approve')
+          }
           onNavigate={navigate}
           salesperson={
             [identity.firstName, identity.lastName].filter(Boolean).join(' ') || identity.email
@@ -375,7 +425,10 @@ export function App() {
               'customers' | 'quotations' | 'invoices' | 'payments' | 'credit-notes' | 'receivables'
           }
           role={roleFor('sales.manage')}
-          canApproveCredit={(!identity.customRoleId && ['OWNER', 'ADMIN', 'APPROVER'].includes(identity.role)) || identity.permissions.includes('credit.limit.approve')}
+          canApproveCredit={
+            (!identity.customRoleId && ['OWNER', 'ADMIN', 'APPROVER'].includes(identity.role)) ||
+            identity.permissions.includes('credit.limit.approve')
+          }
           onNavigate={navigate}
         />
       );
@@ -471,7 +524,12 @@ export function App() {
       );
     if (['documents', 'approvals', 'notifications', 'workflows'].includes(active))
       return (
-        <WorkflowRecordsPage key={active} view={active as WorkflowView} role={identity.role} />
+        <WorkflowRecordsPage
+          key={active}
+          view={active as WorkflowView}
+          role={identity.role}
+          onNavigate={navigate}
+        />
       );
     if (active === 'profile')
       return (
@@ -540,10 +598,37 @@ export function App() {
     >
       {(offlineMode || offlineCount > 0 || installPrompt || syncMessage) && (
         <aside className="offline-banner" role="status">
-          <span>{offlineMode ? `Offline mode · ${offlineCount} change${offlineCount === 1 ? '' : 's'} waiting to sync` : offlineCount ? `${offlineCount} offline change${offlineCount === 1 ? '' : 's'} waiting to sync` : syncMessage || 'Use Cephas Books as an app on this device.'}</span>
-          {navigator.onLine && (offlineMode || offlineCount > 0 || isOfflineEnabledForCurrentAccount()) && <button className="button button--small button--ghost" onClick={() => void requestCloudSync()}>Back up &amp; sync</button>}
-          {(installPrompt || (isOfflineEnabledForCurrentAccount() && !window.matchMedia('(display-mode: standalone)').matches)) && <button className="button button--small" onClick={() => setInstallDialogOpen(true)}>Add app shortcut</button>}
-          {syncMessage && <button className="button button--small button--ghost" onClick={() => setSyncMessage('')}>Dismiss</button>}
+          <span>
+            {offlineMode
+              ? `Offline mode · ${offlineCount} change${offlineCount === 1 ? '' : 's'} waiting to sync`
+              : offlineCount
+                ? `${offlineCount} offline change${offlineCount === 1 ? '' : 's'} waiting to sync`
+                : syncMessage || 'Use Cephas Books as an app on this device.'}
+          </span>
+          {navigator.onLine &&
+            (offlineMode || offlineCount > 0 || isOfflineEnabledForCurrentAccount()) && (
+              <button
+                className="button button--small button--ghost"
+                onClick={() => void requestCloudSync()}
+              >
+                Back up &amp; sync
+              </button>
+            )}
+          {(installPrompt ||
+            (isOfflineEnabledForCurrentAccount() &&
+              !window.matchMedia('(display-mode: standalone)').matches)) && (
+            <button className="button button--small" onClick={() => setInstallDialogOpen(true)}>
+              Add app shortcut
+            </button>
+          )}
+          {syncMessage && (
+            <button
+              className="button button--small button--ghost"
+              onClick={() => setSyncMessage('')}
+            >
+              Dismiss
+            </button>
+          )}
         </aside>
       )}
       {content}
@@ -580,7 +665,10 @@ export function App() {
         onClose={() => setInstallDialogOpen(false)}
         footer={
           <>
-            <button className="button button--secondary" onClick={() => setInstallDialogOpen(false)}>
+            <button
+              className="button button--secondary"
+              onClick={() => setInstallDialogOpen(false)}
+            >
               Cancel
             </button>
             <button

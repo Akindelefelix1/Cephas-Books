@@ -20,6 +20,7 @@ import { Modal } from '@/components/ui/Modal';
 import { can, canAccessRoute } from '@/utils/permissions';
 import { getQueuedPosSales } from '@/services/pos';
 import { isWorkingOffline } from '@/services/offline';
+import { workflowApi } from '@/services/workflow';
 
 interface AppShellProps extends PropsWithChildren {
   active: string;
@@ -41,8 +42,30 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
   const [mobileOpen, setMobileOpen] = useState(false);
   const [online, setOnline] = useState(!isWorkingOffline());
   const [queuedSales, setQueuedSales] = useState(() => getQueuedPosSales().length);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationAccess = can(identity, 'dashboard.view');
   useEffect(() => {
-    const refresh = () => { setOnline(!isWorkingOffline()); setQueuedSales(getQueuedPosSales().length); };
+    if (!notificationAccess) return;
+    let active = true;
+    const refresh = () =>
+      void workflowApi
+        .summary()
+        .then((summary) => {
+          if (active) setUnreadNotifications(summary.unreadNotifications);
+        })
+        .catch(() => undefined);
+    refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [notificationAccess]);
+  useEffect(() => {
+    const refresh = () => {
+      setOnline(!isWorkingOffline());
+      setQueuedSales(getQueuedPosSales().length);
+    };
     window.addEventListener('online', refresh);
     window.addEventListener('offline', refresh);
     window.addEventListener('cephas:sync-state', refresh);
@@ -214,17 +237,32 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
             </kbd>
           </button>
           <div className="topbar__right">
-            <span title={online ? 'Connected to the server' : 'Working offline'} style={{ fontSize: 12, color: online ? '#16804a' : '#a35b00', whiteSpace: 'nowrap' }}>
-              {online ? 'Online' : 'Offline'}{queuedSales ? ` · ${queuedSales} sale${queuedSales === 1 ? '' : 's'} waiting to sync` : ''}
+            <span
+              title={online ? 'Connected to the server' : 'Working offline'}
+              style={{ fontSize: 12, color: online ? '#16804a' : '#a35b00', whiteSpace: 'nowrap' }}
+            >
+              {online ? 'Online' : 'Offline'}
+              {queuedSales
+                ? ` · ${queuedSales} sale${queuedSales === 1 ? '' : 's'} waiting to sync`
+                : ''}
             </span>
-            {can(identity, 'settings.manage') && (
+            {notificationAccess && (
               <button
                 className="icon-button notification-button"
                 title="Notifications"
+                aria-label={
+                  unreadNotifications
+                    ? `Notifications, ${unreadNotifications} unread`
+                    : 'Notifications'
+                }
                 onClick={() => navigate('notifications')}
               >
                 <Bell size={19} />
-                <i />
+                {unreadNotifications > 0 && (
+                  <span className="notification-count">
+                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  </span>
+                )}
               </button>
             )}
             <button

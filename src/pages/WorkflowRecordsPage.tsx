@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Bell, Download, FileText, Play, Plus, Trash2 } from 'lucide-react';
+import { Bell, BellRing, Download, FileText, Play, Plus, Smartphone, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { StatsGrid } from '@/components/ui/StatsGrid';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -14,6 +14,7 @@ import {
   type WorkflowRule,
   type WorkflowSummary,
   type WorkflowView,
+  type PushConfiguration,
 } from '@/services/workflow';
 
 const titles: Record<WorkflowView, string> = {
@@ -28,10 +29,7 @@ const descriptions: Record<WorkflowView, string> = {
   notifications: 'Review workflow, financial, operational, and system updates.',
   workflows: 'Configure and run traceable rules for repeatable business processes.',
 };
-const date = (value?: string) =>
-  value
-    ? formatBusinessDateTime(value)
-    : 'Never';
+const date = (value?: string) => (value ? formatBusinessDateTime(value) : 'Never');
 const money = (value?: string) =>
   value
     ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(value))
@@ -43,8 +41,21 @@ const base64ToBlob = (content: string, mime: string) => {
   const data = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   return new Blob([data.buffer as ArrayBuffer], { type: mime });
 };
+const decodeVapidKey = (value: string) => {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const raw = atob((value + padding).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+};
 
-export function WorkflowRecordsPage({ view, role }: { view: WorkflowView; role: string }) {
+export function WorkflowRecordsPage({
+  view,
+  role,
+  onNavigate,
+}: {
+  view: WorkflowView;
+  role: string;
+  onNavigate?: (id: string) => void;
+}) {
   const canManage = ['OWNER', 'ADMIN', 'ACCOUNTANT'].includes(role);
   const canApprove = canManage || role === 'APPROVER';
   const canDelete = ['OWNER', 'ADMIN'].includes(role);
@@ -58,6 +69,10 @@ export function WorkflowRecordsPage({ view, role }: { view: WorkflowView; role: 
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
+    [pushConfig, setPushConfig] = useState<PushConfiguration | null>(null),
+    [pushSupported, setPushSupported] = useState(false),
+    [pushEnabled, setPushEnabled] = useState(false),
+    [pushBusy, setPushBusy] = useState(false),
     [open, setOpen] = useState(false),
     [selected, setSelected] = useState<ApprovalRequest | null>(null);
   const load = useCallback(async () => {
@@ -81,6 +96,67 @@ export function WorkflowRecordsPage({ view, role }: { view: WorkflowView; role: 
     const timer = window.setTimeout(() => void load(), 150);
     return () => clearTimeout(timer);
   }, [load]);
+  useEffect(() => {
+    if (view !== 'notifications') return;
+    const timer = window.setInterval(() => void load(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [view, load]);
+  useEffect(() => {
+    if (view !== 'notifications') return;
+    const supported =
+      'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    setPushSupported(supported);
+    if (!supported) return;
+    let active = true;
+    void workflowApi
+      .pushConfiguration()
+      .then(async (config) => {
+        if (!active) return;
+        setPushConfig(config);
+        if (config.enabled && config.publicKey) {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.getSubscription();
+          if (active) setPushEnabled(Boolean(subscription));
+        }
+      })
+      .catch(() => {
+        if (active) setPushConfig({ enabled: false, publicKey: null });
+      });
+    return () => {
+      active = false;
+    };
+  }, [view]);
+  const togglePush = async () => {
+    if (!pushConfig?.enabled || !pushConfig.publicKey || !('serviceWorker' in navigator)) return;
+    setPushBusy(true);
+    setError('');
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const current = await registration.pushManager.getSubscription();
+      if (current) {
+        await workflowApi.unsubscribePush(current.endpoint);
+        await current.unsubscribe();
+        setPushEnabled(false);
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted')
+          throw new Error('Allow notifications in your browser settings to enable reminders.');
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: decodeVapidKey(pushConfig.publicKey),
+        });
+        await workflowApi.subscribePush({
+          ...subscription.toJSON(),
+          userAgent: navigator.userAgent,
+        });
+        setPushEnabled(true);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update device notifications');
+    } finally {
+      setPushBusy(false);
+    }
+  };
   const run = async (operation: () => Promise<unknown>, message: string) => {
     setBusy(true);
     setError('');
@@ -142,6 +218,42 @@ export function WorkflowRecordsPage({ view, role }: { view: WorkflowView; role: 
           ]}
         />
       )}
+      {view === 'notifications' && (
+        <section className="panel due-notification-preferences" aria-label="Reminder delivery">
+          <div>
+            <strong>Due date reminders</strong>
+            <p>
+              Finance users receive in-app and email reminders for invoices and approved supplier
+              bills, including weekly follow-ups while overdue.
+            </p>
+          </div>
+          {pushConfig?.enabled && (
+            <button
+              className="button button--secondary due-push-toggle"
+              disabled={pushBusy}
+              onClick={() => void togglePush()}
+            >
+              {pushEnabled ? <BellRing size={17} /> : <Smartphone size={17} />}
+              {pushBusy
+                ? 'Updating…'
+                : pushEnabled
+                  ? 'Turn off device alerts'
+                  : 'Enable device alerts'}
+            </button>
+          )}
+          {pushConfig && !pushConfig.enabled && (
+            <small className="due-push-unavailable">
+              Device alerts are not configured; in-app and email reminders remain available.
+            </small>
+          )}
+          {!pushSupported && (
+            <small className="due-push-unavailable">
+              Device alerts are not supported by this browser; in-app and email reminders remain
+              available.
+            </small>
+          )}
+        </section>
+      )}
       <section className="panel register-panel workflow-records-panel">
         <Filters
           view={view}
@@ -188,6 +300,7 @@ export function WorkflowRecordsPage({ view, role }: { view: WorkflowView; role: 
               setSelected(approval);
               setOpen(true);
             }}
+            onNavigate={onNavigate}
           />
         )}
       </section>
@@ -263,6 +376,7 @@ function RecordsTable({
   canDelete,
   onRun,
   onSelect,
+  onNavigate,
 }: {
   view: WorkflowView;
   role: string;
@@ -273,6 +387,7 @@ function RecordsTable({
   canDelete: boolean;
   onRun: (op: () => Promise<unknown>, message: string) => Promise<void>;
   onSelect: (row: ApprovalRequest) => void;
+  onNavigate?: (id: string) => void;
 }) {
   const download = async (item: DocumentRecord) => {
     const result = await workflowApi.downloadDocument(item.id);
@@ -347,9 +462,19 @@ function RecordsTable({
                         <button
                           aria-label="Delete document"
                           disabled={busy}
-                          onClick={() => void appDialog('Delete document?', 'Permanently delete this document?', { confirmLabel: 'Delete document', cancelLabel: 'Cancel' }).then((confirmed) => {
-                            if (confirmed) void onRun(() => workflowApi.deleteDocument(row.id), 'Document deleted');
-                          })}
+                          onClick={() =>
+                            void appDialog(
+                              'Delete document?',
+                              'Permanently delete this document?',
+                              { confirmLabel: 'Delete document', cancelLabel: 'Cancel' },
+                            ).then((confirmed) => {
+                              if (confirmed)
+                                void onRun(
+                                  () => workflowApi.deleteDocument(row.id),
+                                  'Document deleted',
+                                );
+                            })
+                          }
                         >
                           <Trash2 size={15} />
                         </button>
@@ -366,20 +491,43 @@ function RecordsTable({
                       </button>
                     )}
                   {view === 'notifications' && (
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        void onRun(
-                          () =>
-                            workflowApi.readNotification(row.id, !(row as AppNotification).isRead),
-                          (row as AppNotification).isRead
-                            ? 'Notification marked unread'
-                            : 'Notification marked read',
-                        )
-                      }
-                    >
-                      {(row as AppNotification).isRead ? 'Mark unread' : 'Mark read'}
-                    </button>
+                    <>
+                      {onNavigate &&
+                        ['INVOICE', 'BILL'].includes(
+                          (row as AppNotification).relatedType || '',
+                        ) && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              onNavigate(
+                                (row as AppNotification).relatedType === 'BILL'
+                                  ? 'bills'
+                                  : 'invoices',
+                              )
+                            }
+                          >
+                            Open{' '}
+                            {(row as AppNotification).relatedType === 'BILL' ? 'bill' : 'invoice'}
+                          </button>
+                        )}
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void onRun(
+                            () =>
+                              workflowApi.readNotification(
+                                row.id,
+                                !(row as AppNotification).isRead,
+                              ),
+                            (row as AppNotification).isRead
+                              ? 'Notification marked unread'
+                              : 'Notification marked read',
+                          )
+                        }
+                      >
+                        {(row as AppNotification).isRead ? 'Mark unread' : 'Mark read'}
+                      </button>
+                    </>
                   )}
                   {view === 'workflows' && canManage && (
                     <>
@@ -416,9 +564,19 @@ function RecordsTable({
                         <button
                           aria-label="Delete workflow"
                           disabled={busy}
-                          onClick={() => void appDialog('Delete workflow?', 'This workflow will be permanently deleted.', { confirmLabel: 'Delete workflow', cancelLabel: 'Cancel' }).then((confirmed) => {
-                            if (confirmed) void onRun(() => workflowApi.deleteRule(row.id), 'Workflow deleted');
-                          })}
+                          onClick={() =>
+                            void appDialog(
+                              'Delete workflow?',
+                              'This workflow will be permanently deleted.',
+                              { confirmLabel: 'Delete workflow', cancelLabel: 'Cancel' },
+                            ).then((confirmed) => {
+                              if (confirmed)
+                                void onRun(
+                                  () => workflowApi.deleteRule(row.id),
+                                  'Workflow deleted',
+                                );
+                            })
+                          }
                         >
                           <Trash2 size={15} />
                         </button>

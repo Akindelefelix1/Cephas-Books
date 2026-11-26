@@ -1456,3 +1456,10 @@
 .sync-progress .spin {
   color: #1838ce;
 }
+
+.notification-button { position: relative; }
+.notification-count { position: absolute; top: -5px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; display: grid; place-items: center; border-radius: 999px; background: #d92d20; color: #fff; font-size: 10px; line-height: 1; font-weight: 700; border: 2px solid var(--surface, #fff); }
+.due-notification-preferences { margin-bottom: 16px; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.due-notification-preferences p { margin: 5px 0 0; color: var(--text-muted, #667085); font-size: 13px; line-height: 1.5; }
+.due-push-toggle { flex: 0 0 auto; }
+.due-push-unavailable { color: var(--text-muted, #667085); }
