@@ -53,7 +53,6 @@ const routePermissions: Record<string, string> = {
   'ai-assistant': 'reports.view',
   'excel-sync': 'reports.view',
   approvals: 'approvals.review',
-  notifications: 'dashboard.view',
   branches: 'settings.manage',
   currencies: 'settings.manage',
   users: 'users.view',
@@ -61,6 +60,9 @@ const routePermissions: Record<string, string> = {
   integrations: 'settings.manage',
   security: 'settings.manage',
   settings: 'settings.manage',
+};
+const anyRoutePermissions: Record<string, string[]> = {
+  notifications: ['dashboard.view', 'sales.view', 'purchases.view'],
 };
 
 const legacyPermission: Record<string, string> = {
@@ -84,4 +86,6 @@ export const can = (identity: PermissionIdentity, permission: string) =>
   Boolean(permissionImplies[permission]?.some((implied) => identity.permissions.includes(implied)));
 
 export const canAccessRoute = (identity: PermissionIdentity, route: string) =>
-  !routePermissions[route] || can(identity, routePermissions[route]);
+  anyRoutePermissions[route]
+    ? anyRoutePermissions[route].some((permission) => can(identity, permission))
+    : !routePermissions[route] || can(identity, routePermissions[route]);

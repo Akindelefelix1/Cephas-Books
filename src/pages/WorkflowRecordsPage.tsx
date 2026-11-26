@@ -6,6 +6,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { confirmAction } from '@/utils/actions';
 import { appDialog } from '@/utils/appDialogs';
 import { formatBusinessDateTime } from '@/utils/financial-configuration';
+import { isWorkingOffline } from '@/services/offline';
 import {
   workflowApi,
   type AppNotification,
@@ -66,6 +67,7 @@ export function WorkflowRecordsPage({
   >([]);
   const [search, setSearch] = useState(''),
     [status, setStatus] = useState(''),
+    [online, setOnline] = useState(() => !isWorkingOffline()),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -75,38 +77,83 @@ export function WorkflowRecordsPage({
     [pushBusy, setPushBusy] = useState(false),
     [open, setOpen] = useState(false),
     [selected, setSelected] = useState<ApprovalRequest | null>(null);
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const overview = await workflowApi.summary();
-      setSummary(overview);
-      if (view === 'documents') setRows(await workflowApi.documents({ search, status }));
-      else if (view === 'approvals') setRows(await workflowApi.approvals({ search, status }));
-      else if (view === 'notifications')
-        setRows(await workflowApi.notifications({ category: status, unread: search }));
-      else setRows(await workflowApi.rules({ search, status }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to load workflow records');
-    } finally {
-      setLoading(false);
-    }
-  }, [view, search, status]);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setError('');
+      try {
+        if (view === 'notifications') {
+          const notifications = await workflowApi.notifications({
+            category: status,
+            unread: search,
+          });
+          let unreadNotifications: number;
+          try {
+            unreadNotifications = (await workflowApi.notificationsSummary()).unreadNotifications;
+          } catch (summaryError) {
+            if (online) throw summaryError;
+            // Older offline snapshots predate the dedicated count resource.
+            unreadNotifications = notifications.filter(
+              (notification) => !notification.isRead,
+            ).length;
+          }
+          setRows(notifications);
+          setSummary({
+            documents: 0,
+            pendingApprovals: 0,
+            unreadNotifications,
+            activeRules: 0,
+            runs: 0,
+            failures: 0,
+          });
+        } else {
+          const overview = await workflowApi.summary();
+          setSummary(overview);
+          if (view === 'documents') setRows(await workflowApi.documents({ search, status }));
+          else if (view === 'approvals') setRows(await workflowApi.approvals({ search, status }));
+          else setRows(await workflowApi.rules({ search, status }));
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Unable to load workflow records');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [view, search, status],
+  );
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 150);
     return () => clearTimeout(timer);
   }, [load]);
   useEffect(() => {
-    if (view !== 'notifications') return;
-    const timer = window.setInterval(() => void load(), 60_000);
+    const refresh = () => {
+      const connected = !isWorkingOffline();
+      setOnline(connected);
+      if (connected) void load();
+    };
+    window.addEventListener('online', refresh);
+    window.addEventListener('offline', refresh);
+    window.addEventListener('cephas:sync-state', refresh);
+    return () => {
+      window.removeEventListener('online', refresh);
+      window.removeEventListener('offline', refresh);
+      window.removeEventListener('cephas:sync-state', refresh);
+    };
+  }, [load]);
+  useEffect(() => {
+    if (view !== 'notifications' || !online) return;
+    const timer = window.setInterval(() => void load(true), 60_000);
     return () => window.clearInterval(timer);
-  }, [view, load]);
+  }, [view, load, online]);
   useEffect(() => {
     if (view !== 'notifications') return;
     const supported =
       'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     setPushSupported(supported);
-    if (!supported) return;
+    if (!supported || !online) {
+      setPushConfig(null);
+      return;
+    }
     let active = true;
     void workflowApi
       .pushConfiguration()
@@ -120,14 +167,15 @@ export function WorkflowRecordsPage({
         }
       })
       .catch(() => {
-        if (active) setPushConfig({ enabled: false, publicKey: null });
+        if (active) setPushConfig(null);
       });
     return () => {
       active = false;
     };
-  }, [view]);
+  }, [view, online]);
   const togglePush = async () => {
-    if (!pushConfig?.enabled || !pushConfig.publicKey || !('serviceWorker' in navigator)) return;
+    if (!online || !pushConfig?.enabled || !pushConfig.publicKey || !('serviceWorker' in navigator))
+      return;
     setPushBusy(true);
     setError('');
     try {
@@ -200,7 +248,7 @@ export function WorkflowRecordsPage({
           </button>
         )}
       </div>
-      {summary && (
+      {summary && view !== 'notifications' && (
         <StatsGrid
           stats={[
             { label: 'Documents', value: String(summary.documents) },
@@ -230,15 +278,17 @@ export function WorkflowRecordsPage({
           {pushConfig?.enabled && (
             <button
               className="button button--secondary due-push-toggle"
-              disabled={pushBusy}
+              disabled={pushBusy || !online}
               onClick={() => void togglePush()}
             >
               {pushEnabled ? <BellRing size={17} /> : <Smartphone size={17} />}
-              {pushBusy
-                ? 'Updating…'
-                : pushEnabled
-                  ? 'Turn off device alerts'
-                  : 'Enable device alerts'}
+              {!online
+                ? 'Connect to manage device alerts'
+                : pushBusy
+                  ? 'Updating…'
+                  : pushEnabled
+                    ? 'Turn off device alerts'
+                    : 'Enable device alerts'}
             </button>
           )}
           {pushConfig && !pushConfig.enabled && (
@@ -252,6 +302,12 @@ export function WorkflowRecordsPage({
               available.
             </small>
           )}
+          {!online && (
+            <small className="due-push-unavailable">
+              Saved reminders are available offline. Connect to refresh reminders, sync read status,
+              or change device-alert settings.
+            </small>
+          )}
         </section>
       )}
       <section className="panel register-panel workflow-records-panel">
@@ -262,6 +318,12 @@ export function WorkflowRecordsPage({
           onSearch={setSearch}
           onStatus={setStatus}
         />
+        {view === 'notifications' && !online && (
+          <div className="offline-data-notice" role="status">
+            Showing the last notifications saved on this device. New due-date reminders arrive when
+            you reconnect.
+          </div>
+        )}
         {view === 'notifications' && summary?.unreadNotifications ? (
           <div className="workflow-toolbar">
             <span>
@@ -269,7 +331,7 @@ export function WorkflowRecordsPage({
               {summary.unreadNotifications === 1 ? '' : 's'}
             </span>
             <button
-              disabled={busy}
+              disabled={busy || !online}
               onClick={() =>
                 void run(() => workflowApi.readAll(), 'All notifications marked as read')
               }
@@ -292,6 +354,7 @@ export function WorkflowRecordsPage({
             role={role}
             rows={rows}
             busy={busy}
+            online={online}
             canManage={canManage}
             canApprove={canApprove}
             canDelete={canDelete}
@@ -371,6 +434,7 @@ function RecordsTable({
   role,
   rows,
   busy,
+  online,
   canManage,
   canApprove,
   canDelete,
@@ -382,6 +446,7 @@ function RecordsTable({
   role: string;
   rows: Array<DocumentRecord | ApprovalRequest | AppNotification | WorkflowRule>;
   busy: boolean;
+  online: boolean;
   canManage: boolean;
   canApprove: boolean;
   canDelete: boolean;
@@ -426,7 +491,7 @@ function RecordsTable({
                   {view === 'documents' && (
                     <>
                       <button
-                        disabled={busy}
+                        disabled={busy || !online}
                         onClick={() =>
                           void onRun(
                             () => download(row as DocumentRecord),
@@ -511,7 +576,7 @@ function RecordsTable({
                           </button>
                         )}
                       <button
-                        disabled={busy}
+                        disabled={busy || !online}
                         onClick={() =>
                           void onRun(
                             () =>

@@ -50,6 +50,9 @@ export interface PushConfiguration {
   enabled: boolean;
   publicKey: string | null;
 }
+export interface NotificationSummary {
+  unreadNotifications: number;
+}
 export interface WorkflowRule {
   id: string;
   name: string;
@@ -82,6 +85,7 @@ export const workflowApi = {
     req<ApprovalRequest>(`/workflow/approvals/${id}/decision`, 'PATCH', data),
   notifications: (filters = {}) =>
     req<AppNotification[]>(`/workflow/notifications?${query(filters)}`),
+  notificationsSummary: () => req<NotificationSummary>('/workflow/notifications/summary'),
   createNotification: (data: object) =>
     req<AppNotification>('/workflow/notifications', 'POST', data),
   readNotification: (id: string, isRead = true) =>

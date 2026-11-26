@@ -43,7 +43,7 @@ export const OFFLINE_WORKSPACE_READS = [
   '/banking/transactions?status=UNRECONCILED',
   '/commerce/channels', '/commerce/orders', '/commerce/catalog',
   '/workflow/summary', '/workflow/documents?', '/workflow/approvals?',
-  '/workflow/notifications?', '/workflow/rules?', '/insights/reports?',
+  '/workflow/notifications?', '/workflow/notifications/summary', '/workflow/rules?', '/insights/reports?',
   '/insights/analytics?', '/insights/saved-reports?archived=',
   '/insights/saved-reports?archived=true', '/insights/saved-reports?archived=all', '/insights/ai/history',
   '/insights/workbooks', '/pos/registers', '/pos/branches', '/pos/shifts/current',
@@ -98,7 +98,9 @@ function expectedOfflineReads(profile?: { role?: string; customRoleId?: string; 
     }
     if (path.startsWith('/workflow/')) {
       if (path === '/workflow/approvals?') return can('approvals.review');
-      if (path === '/workflow/summary' || path === '/workflow/documents?' || path === '/workflow/notifications?')
+      if (path === '/workflow/notifications?' || path === '/workflow/notifications/summary')
+        return can('dashboard.view') || can('sales.view') || can('purchases.view');
+      if (path === '/workflow/summary' || path === '/workflow/documents?')
         return can('dashboard.view');
     }
     if (path.startsWith('/insights/')) return can('reports.view');

@@ -43,13 +43,16 @@ export function AppShell({ active, onNavigate, onQuickCreate, identity, children
   const [online, setOnline] = useState(!isWorkingOffline());
   const [queuedSales, setQueuedSales] = useState(() => getQueuedPosSales().length);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const notificationAccess = can(identity, 'dashboard.view');
+  const notificationAccess =
+    can(identity, 'dashboard.view') ||
+    can(identity, 'sales.view') ||
+    can(identity, 'purchases.view');
   useEffect(() => {
     if (!notificationAccess) return;
     let active = true;
     const refresh = () =>
       void workflowApi
-        .summary()
+        .notificationsSummary()
         .then((summary) => {
           if (active) setUnreadNotifications(summary.unreadNotifications);
         })

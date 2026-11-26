@@ -1463,3 +1463,4 @@
 .due-notification-preferences p { margin: 5px 0 0; color: var(--text-muted, #667085); font-size: 13px; line-height: 1.5; }
 .due-push-toggle { flex: 0 0 auto; }
 .due-push-unavailable { color: var(--text-muted, #667085); }
+.offline-data-notice { margin: 14px 0; padding: 11px 14px; border: 1px solid #d6e4ff; border-radius: 10px; background: #f5f8ff; color: #344054; font-size: 0.875rem; line-height: 1.45; }
