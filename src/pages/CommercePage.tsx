@@ -418,7 +418,7 @@ export function CommercePage({ view, canManage }: { view: CommerceView; canManag
         }}
         footer={null}
       >
-        <form className="form-grid" onSubmit={(event) => void saveChannel(event)}>
+        <form className="form-grid" autoComplete="off" onSubmit={(event) => void saveChannel(event)}>
           <label className="full">
             Channel name
             <input

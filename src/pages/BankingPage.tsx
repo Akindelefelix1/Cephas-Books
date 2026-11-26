@@ -832,6 +832,7 @@ function AccountModal({
       <form
         id="account-form"
         className="form-grid"
+        autoComplete="off"
         onSubmit={(e: FormEvent<HTMLFormElement>) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);

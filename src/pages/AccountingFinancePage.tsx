@@ -506,6 +506,7 @@ function EntryModal({
       <form
         id="accounting-form"
         className="form-grid"
+        autoComplete="off"
         onSubmit={(e: FormEvent<HTMLFormElement>) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget),
@@ -740,6 +741,7 @@ function AssetDepreciationModal({
           {!data.configured && canManage && (
             <form
               className="form-grid asset-depreciation__settings"
+              autoComplete="off"
               onSubmit={(event: FormEvent<HTMLFormElement>) => {
                 event.preventDefault();
                 const form = new FormData(event.currentTarget);

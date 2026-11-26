@@ -312,6 +312,7 @@ export function UsersPage() {
         <form
           id="role-form"
           className="form-grid"
+          autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
             const data = {
@@ -803,7 +804,7 @@ function BranchSettings() {
           </>
         }
       >
-        <form id="branch-form" className="form-grid" onSubmit={saveBranch}>
+        <form id="branch-form" className="form-grid" autoComplete="off" onSubmit={saveBranch}>
           <label className="full">
             Branch name
             <input name="name" defaultValue={editing?.name} required />
@@ -837,7 +838,7 @@ function BranchSettings() {
           </>
         }
       >
-        <form id="department-form" className="form-grid" onSubmit={saveDepartment}>
+        <form id="department-form" className="form-grid" autoComplete="off" onSubmit={saveDepartment}>
           <label className="full">
             Department name
             <input name="name" autoFocus required />
@@ -909,6 +910,7 @@ function CurrencySettings() {
         <form
           id="currency-form"
           className="form-grid"
+          autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);

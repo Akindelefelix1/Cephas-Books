@@ -1342,14 +1342,14 @@ function ProductDetailsModal({
               <button
                 className="button button--secondary"
                 onClick={restock}
-                disabled={Boolean(busy) || (offline && Boolean(product.pendingOffline))}
-                title={offline && product.pendingOffline ? 'Sync this new item before recording stock against it.' : undefined}
+                disabled={Boolean(busy) || (offline && product.id.startsWith('offline-product:'))}
+                title={offline && product.id.startsWith('offline-product:') ? 'Sync this new item before recording stock against it.' : undefined}
               >
                 <PackagePlus size={16} /> Restock
               </button>
             )}
             {canEdit && (
-              <button className="button" onClick={changeStatus} disabled={Boolean(busy) || (offline && Boolean(product.pendingOffline))}>
+              <button className="button" onClick={changeStatus} disabled={Boolean(busy) || (offline && product.id.startsWith('offline-product:'))}>
                 {busy === 'status' ? (
                   <>
                     <LoaderCircle className="spin" size={16} />{' '}
@@ -1710,7 +1710,7 @@ function TaxRatesModal({
     setBusy(true); setError('');
     try {
       const payload = {
-        name: String(form.get('name') ?? '').trim(),
+        name: String(form.get('taxRateDisplayName') ?? '').trim(),
         rate: Number(form.get('rate')),
         description: String(form.get('description') ?? '').trim() || undefined,
       };
@@ -1737,8 +1737,8 @@ function TaxRatesModal({
       <div className="tax-rate-manager">
         {offline && <div className="banking-alert" role="status">Tax rates are read-only offline. Reconnect to make changes.</div>}
         <p>Configure rates once, assign them to products or services, and use the same treatment on sales documents. Saved invoices and receipts retain their original tax snapshots.</p>
-        <form key={editing?.id ?? 'new-tax-rate'} className="form-grid tax-rate-manager__form" onSubmit={(event) => void save(event)}>
-          <label>Rate name<input name="name" required maxLength={100} defaultValue={editing?.name ?? ''} placeholder="e.g. Standard VAT" /></label>
+        <form key={editing?.id ?? 'new-tax-rate'} className="form-grid tax-rate-manager__form" autoComplete="off" onSubmit={(event) => void save(event)}>
+          <label>Rate name<input name="taxRateDisplayName" autoComplete="off" required maxLength={100} defaultValue={editing?.name ?? ''} placeholder="e.g. Standard VAT" /></label>
           <label>Rate (%)<input name="rate" type="number" min="0" max="100" step=".0001" required defaultValue={editing?.rate ?? ''} /></label>
           <label className="full">Description <small>Optional</small><input name="description" maxLength={500} defaultValue={editing?.description ?? ''} placeholder="Tax jurisdiction or treatment notes" /></label>
           {error && <p className="form-error full" role="alert">{error}</p>}
@@ -1854,7 +1854,14 @@ function OperationsModal({
   const handle = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const f = new FormData(event.currentTarget);
-    const get = (name: string) => String(f.get(name) || '');
+    const get = (name: string) => {
+      const field = name === 'name'
+        ? view === 'products' ? 'inventoryItemName' : view === 'projects' ? 'projectDisplayName' : 'stockLocationName'
+        : name === 'code'
+          ? view === 'projects' ? 'projectCode' : 'stockLocationCode'
+          : name;
+      return String(f.get(field) || '');
+    };
     const num = (name: string) => Number(get(name));
     if (view === 'products')
       submit(
@@ -1983,7 +1990,7 @@ function OperationsModal({
         </>
       }
     >
-      <form id="operations-form" className="form-grid" onSubmit={handle}>
+      <form id="operations-form" className="form-grid" autoComplete="off" onSubmit={handle}>
         {view === 'products' && (
           <>
             <label>
@@ -1992,7 +1999,7 @@ function OperationsModal({
             </label>
             <label>
               Item name
-              <input name="name" required defaultValue={p?.name} />
+              <input name="inventoryItemName" autoComplete="off" required defaultValue={p?.name} />
             </label>
             <label>
               Type
@@ -2192,11 +2199,11 @@ function OperationsModal({
           <>
             <label>
               Code
-              <input name="code" required defaultValue={w?.code} />
+              <input name="stockLocationCode" autoComplete="off" required defaultValue={w?.code} />
             </label>
             <label>
               Name
-              <input name="name" required defaultValue={w?.name} />
+              <input name="stockLocationName" autoComplete="off" required defaultValue={w?.name} />
             </label>
             <label>
               Manager
@@ -2315,11 +2322,11 @@ function OperationsModal({
           <>
             <label>
               Project code
-              <input name="code" required defaultValue={project?.code} />
+              <input name="projectCode" autoComplete="off" required defaultValue={project?.code} />
             </label>
             <label>
               Project name
-              <input name="name" required defaultValue={project?.name} />
+              <input name="projectDisplayName" autoComplete="off" required defaultValue={project?.name} />
             </label>
             <label>
               Client
@@ -2426,12 +2433,13 @@ function ProjectAiPage({ canEdit }: { canEdit: boolean }) {
       <section className="panel register-panel">
         <form
           className="form-grid"
+          autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
             const f = new FormData(event.currentTarget);
             const next = {
-              code: String(f.get('code')),
-              name: String(f.get('name')),
+              code: String(f.get('projectCode')),
+              name: String(f.get('projectDisplayName')),
               objective: String(f.get('objective')),
               owner: String(f.get('owner')),
               startDate: String(f.get('startDate')),
@@ -2463,11 +2471,11 @@ function ProjectAiPage({ canEdit }: { canEdit: boolean }) {
         >
           <label>
             Project code
-            <input name="code" required />
+            <input name="projectCode" autoComplete="off" required />
           </label>
           <label>
             Project name
-            <input name="name" required />
+            <input name="projectDisplayName" autoComplete="off" required />
           </label>
           <label>
             Owner

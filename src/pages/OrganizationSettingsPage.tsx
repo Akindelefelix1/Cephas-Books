@@ -344,6 +344,7 @@ export function OrganizationSettingsPage({
       {view === 'settings' && (
         <form
           className="panel settings-api-panel"
+          autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
@@ -416,6 +417,7 @@ export function OrganizationSettingsPage({
       {view === 'settings' && (
         <form
           className="panel settings-api-panel financial-config-panel"
+          autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
@@ -492,7 +494,7 @@ export function OrganizationSettingsPage({
               </button>
             )}
           </header>
-          <form className="location-configuration" onSubmit={(event) => {
+          <form className="location-configuration" autoComplete="off" onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             void saveSection('branches', {
@@ -1105,7 +1107,7 @@ export function OrganizationSettingsPage({
                   {
                     id,
                     regionId: String(form.get('regionId')),
-                    name: String(form.get('name')),
+                    name: String(form.get('organizationBranchName')),
                     address: String(form.get('address')),
                     status: String(form.get('status') || 'Active'),
                     managerIds,
@@ -1115,9 +1117,9 @@ export function OrganizationSettingsPage({
               editingLocationId === null ? 'Branch added' : 'Branch updated',
             );
           if (kind === 'currency') {
-            const code = String(form.get('code')).toUpperCase();
+            const code = String(form.get('currencyIsoCode')).toUpperCase();
             const catalogueItem = currencyCatalogue.find(([itemCode]) => itemCode === code);
-            const name = String(form.get('name') || catalogueItem?.[1] || code).trim();
+            const name = String(form.get('currencyDisplayName') || catalogueItem?.[1] || code).trim();
             const symbol = String(form.get('symbol') || catalogueItem?.[2] || code).trim();
             if (!/^[A-Z]{3}$/.test(code) || !name || !symbol) return;
             void saveSection(
@@ -1927,6 +1929,7 @@ function CreateDialog({
       <form
         id="organization-dialog"
         className="form-grid"
+        autoComplete="off"
         onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
           onSubmit(dialog, new FormData(event.currentTarget));
@@ -1985,7 +1988,7 @@ function CreateDialog({
           <>
             <label>
               {hierarchy.locationLabel} name
-              <input name="name" defaultValue={editingBranch?.name} required autoFocus />
+              <input name="organizationBranchName" autoComplete="off" defaultValue={editingBranch?.name} required autoFocus />
             </label>
             <label>
               Address
@@ -2039,14 +2042,14 @@ function CreateDialog({
           <>
             <label>
               ISO 4217 currency code
-              <input name="code" list="iso4217-settings-currency-codes" defaultValue={editingCurrency?.code} maxLength={3} minLength={3} pattern="[A-Za-z]{3}" autoCapitalize="characters" required autoFocus disabled={Boolean(editingCurrency)} />
+              <input name="currencyIsoCode" autoComplete="off" list="iso4217-settings-currency-codes" defaultValue={editingCurrency?.code} maxLength={3} minLength={3} pattern="[A-Za-z]{3}" autoCapitalize="characters" required autoFocus disabled={Boolean(editingCurrency)} />
               <datalist id="iso4217-settings-currency-codes">{currencyCatalogue.map(([code]) => <option key={code} value={code} />)}</datalist>
-              {editingCurrency && <input type="hidden" name="code" value={editingCurrency.code} />}
+              {editingCurrency && <input type="hidden" name="currencyIsoCode" value={editingCurrency.code} />}
               <small>Enter any internationally recognised three-letter ISO code.</small>
             </label>
             <label>
               Currency name
-              <input name="name" defaultValue={editingCurrency?.name} maxLength={80} required />
+              <input name="currencyDisplayName" autoComplete="off" defaultValue={editingCurrency?.name} maxLength={80} required />
             </label>
             <label>
               Currency symbol

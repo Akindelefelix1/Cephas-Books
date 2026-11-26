@@ -278,8 +278,8 @@ export function PosPage({
     try {
       if (setup === 'REGISTER' || setup === 'EDIT') {
         const registerData = {
-          code: String(f.get('code') || ''),
-          name: String(f.get('name') || ''),
+          code: String(f.get('posRegisterCode') || ''),
+          name: String(f.get('posRegisterName') || ''),
           warehouseId: String(f.get('warehouseId') || ''),
           assignedStaffId: String(f.get('assignedStaffId') || ''),
           branchId: String(f.get('branchId') || ''),
@@ -358,7 +358,7 @@ export function PosPage({
         setSetup(null);
       } else {
         const c = await salesApi.createCustomer({
-          displayName: String(f.get('name')),
+          displayName: String(f.get('posCustomerDisplayName')),
           phone: String(f.get('phone') || '') || undefined,
         });
         setCustomers((x) => [c, ...x]);
@@ -1219,16 +1219,16 @@ export function PosPage({
         }}
         footer={null}
       >
-        <form className="form-grid" onSubmit={(e) => void submit(e)}>
+        <form className="form-grid" autoComplete="off" onSubmit={(e) => void submit(e)}>
           {setup === 'REGISTER' || setup === 'EDIT' ? (
             <>
               <label>
                 Register code
-                <input name="code" required defaultValue={editingRegister?.code || ''} />
+                <input name="posRegisterCode" autoComplete="off" autoCapitalize="characters" spellCheck={false} required defaultValue={editingRegister?.code || ''} />
               </label>
               <label>
                 Name
-                <input name="name" required defaultValue={editingRegister?.name || ''} />
+                <input name="posRegisterName" autoComplete="off" required maxLength={120} defaultValue={editingRegister?.name || ''} />
               </label>
               <label className="full">
                 Assigned staff
@@ -1287,6 +1287,7 @@ export function PosPage({
                 <input
                   name="terminalId"
                   maxLength={128}
+                  autoComplete="off"
                   placeholder="Serial number or device label"
                   defaultValue={editingRegister?.terminalId || ''}
                 />
@@ -1442,7 +1443,7 @@ export function PosPage({
             <>
               <label className="full">
                 Customer name
-                <input name="name" required />
+                <input name="posCustomerDisplayName" autoComplete="off" required />
               </label>
               <label className="full">
                 Phone

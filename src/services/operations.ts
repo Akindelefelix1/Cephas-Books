@@ -234,7 +234,7 @@ const applyQueuedProductWrites = (serverProducts: Product[]): Product[] => {
         taxRateId: typeof body.taxRateId === 'string' ? body.taxRateId : null,
         reorderLevel: String(body.reorderLevel ?? 0), allowFractionalSale: Boolean(body.allowFractionalSale),
         stockQuantity: String(body.type === 'SERVICE' ? 0 : quantity),
-        stockValue: String(body.type === 'SERVICE' ? 0 : quantity * Number(body.costPrice ?? 0)),
+        stockValue: String(body.type === 'SERVICE' ? 0 : quantity * Number(body.salePrice ?? 0)),
         defaultWarehouseId: typeof body.defaultWarehouseId === 'string' ? body.defaultWarehouseId : undefined,
         isActive: true, createdAt: write.queuedAt, updatedAt: write.queuedAt,
         pendingOffline: true, offlineQueueId: write.id,
@@ -246,7 +246,7 @@ const applyQueuedProductWrites = (serverProducts: Product[]): Product[] => {
     if (write.path.endsWith('/restock')) {
       const delta = Number(body.quantity ?? 0);
       product.stockQuantity = String(Number(product.stockQuantity) + delta);
-      product.stockValue = String(Number(product.stockValue) + delta * Number(body.unitCost ?? product.costPrice));
+      product.stockValue = String(Number(product.stockQuantity) * Number(product.salePrice));
     } else if (write.path.endsWith('/status')) {
       product.isActive = Boolean(body.isActive);
     } else {
@@ -255,6 +255,7 @@ const applyQueuedProductWrites = (serverProducts: Product[]): Product[] => {
       if ('costPrice' in body) product.costPrice = String(body.costPrice);
       if ('taxRate' in body) product.taxRate = String(body.taxRate);
       if ('reorderLevel' in body) product.reorderLevel = String(body.reorderLevel);
+      if ('salePrice' in body) product.stockValue = String(Number(product.stockQuantity) * Number(product.salePrice));
     }
     product.pendingOffline = true;
     product.updatedAt = write.queuedAt;
@@ -290,22 +291,73 @@ const savePosCatalog = (warehouseId: string, products: Product[]) => {
   }
 };
 export const operationsApi = {
-  summary: () => req<OperationsSummary>('/operations/summary'),
+  summary: async () => {
+    const summary = await req<OperationsSummary>('/operations/summary');
+    if (!productWrites().length) return summary;
+    const products = applyQueuedProductWrites(await req<Product[]>('/operations/products?'))
+      .filter((product) => product.isActive);
+    const stockedProducts = products.filter((product) => product.type === 'PRODUCT');
+    return {
+      ...summary,
+      products: products.length,
+      inventoryValue: String(stockedProducts.reduce(
+        (total, product) => total + Number(product.stockQuantity) * Number(product.salePrice), 0,
+      )),
+      lowStock: stockedProducts.filter((product) => Number(product.stockQuantity) > 0 && Number(product.stockQuantity) <= Number(product.reorderLevel)).length,
+      outOfStock: stockedProducts.filter((product) => Number(product.stockQuantity) <= 0).length,
+    };
+  },
   taxRates: (includeInactive = false) => req<TaxRate[]>(`/operations/tax-rates${includeInactive ? '?includeInactive=true' : ''}`),
   createTaxRate: (data: { name: string; rate: number; description?: string }) => req<TaxRate>('/operations/tax-rates', 'POST', data),
   updateTaxRate: (id: string, data: { name: string; rate: number; description?: string }) => req<TaxRate>(`/operations/tax-rates/${id}`, 'PATCH', data),
   taxRateStatus: (id: string, isActive: boolean) => req<TaxRate>(`/operations/tax-rates/${id}/status`, 'PATCH', { isActive }),
   branchInventory: async () => {
-    const report = await req<BranchInventory>('/operations/branch-inventory');
+    const savedReport = await req<BranchInventory>('/operations/branch-inventory');
+    // Never apply outbox projections to the cached snapshot object itself: a
+    // repeated render would otherwise apply the same transfer or receipt twice.
+    const report = JSON.parse(JSON.stringify(savedReport)) as BranchInventory;
+    const productCosts = new Map(
+      applyQueuedProductWrites(await req<Product[]>('/operations/products?').catch(() => []))
+        .map((product) => [product.id, Number(product.costPrice)]),
+    );
     const queued = getOfflineQueue().filter(
       (write) => write.method === 'POST' && (
         ['/operations/transfers', '/operations/movements'].includes(write.path) ||
-        /^\/operations\/products\/[^/]+\/restock$/.test(write.path)
+        /^\/operations\/products\/[^/]+\/restock$/.test(write.path) ||
+        write.path === '/operations/products'
       ),
     );
     for (const write of queued) {
       try {
         const body = JSON.parse(write.body || '{}') as Record<string, unknown>;
+        if (write.path === '/operations/products') {
+          const quantity = Number(body.type === 'SERVICE' ? 0 : body.openingQuantity ?? 0);
+          const warehouseId = typeof body.defaultWarehouseId === 'string' ? body.defaultWarehouseId : '';
+          const branch = report.branches.find((row) => row.warehouseId === warehouseId);
+          if (body.type === 'PRODUCT' && Number.isFinite(quantity)) {
+            const productId = queuedProductId(write.id);
+            if (!report.products.some((row) => row.productId === productId)) {
+              const reorderLevel = Number(body.reorderLevel ?? 0);
+              report.products.push({
+                productId, sku: String(body.sku ?? ''), productName: String(body.name ?? ''),
+                unit: String(body.unit ?? 'unit'), reorderLevel: String(reorderLevel),
+                totalQuantity: String(quantity),
+                locations: report.branches.map((locationBranch) => {
+                  const locationQuantity = locationBranch.id === branch?.id ? quantity : 0;
+                  const status = locationQuantity <= 0 ? 'OUT_OF_STOCK' :
+                    locationQuantity <= reorderLevel ? 'LOW_STOCK' : 'IN_STOCK';
+                  return {
+                    branchId: locationBranch.id, branchName: locationBranch.name,
+                    code: locationBranch.code, quantity: String(locationQuantity), status,
+                  };
+                }),
+              });
+              if (branch && quantity > 0)
+                branch.inventoryValue = String(Number(branch.inventoryValue) + quantity * Number(body.costPrice ?? 0));
+            }
+          }
+          continue;
+        }
         const productId = typeof body.productId === 'string'
           ? body.productId
           : write.path.match(/^\/operations\/products\/([^/]+)\/restock$/)?.[1];
@@ -314,6 +366,9 @@ export const operationsApi = {
           const branch = report.branches.find((row) => row.warehouseId === warehouseId);
           const location = product?.locations.find((row) => row.branchId === branch?.id);
           if (!product || !location || !Number.isFinite(delta)) return;
+          if (branch) branch.inventoryValue = String(
+            Number(branch.inventoryValue) + delta * (productCosts.get(productId ?? '') ?? 0),
+          );
           location.quantity = String(Number(location.quantity) + delta);
           product.totalQuantity = String(Number(product.totalQuantity) + delta);
           location.status = Number(location.quantity) <= 0
@@ -347,7 +402,22 @@ export const operationsApi = {
     }
     return { ...report, pendingOfflineChanges: queued.length };
   },
-  products: async (filters: Record<string, string> = {}) => applyQueuedProductWrites(await req<Product[]>(`/operations/products?${query(filters)}`)),
+  products: async (filters: Record<string, string> = {}) => {
+    const hasPendingWrites = productWrites().length > 0;
+    const serverFilters = hasPendingWrites && !filters.warehouseId ? {} : filters;
+    const products = applyQueuedProductWrites(await req<Product[]>(`/operations/products?${query(serverFilters)}`));
+    const search = String(filters.search ?? '').trim().toLowerCase();
+    const status = String(filters.status ?? '');
+    const category = String(filters.category ?? '').trim().toLowerCase();
+    return products.filter((product) =>
+      (!search || `${product.name} ${product.sku} ${product.category ?? ''}`.toLowerCase().includes(search)) &&
+      (!category || (product.category ?? '').toLowerCase() === category) &&
+      (!filters.warehouseId || !product.id.startsWith('offline-product:') || product.defaultWarehouseId === filters.warehouseId) &&
+      (status === 'active' ? product.isActive : status === 'archived' ? !product.isActive :
+        status === 'low_stock' ? Number(product.stockQuantity) > 0 && Number(product.stockQuantity) <= Number(product.reorderLevel) :
+        status === 'out_of_stock' ? Number(product.stockQuantity) <= 0 : true),
+    );
+  },
   productsPage: async (filters: Record<string, string> = {}) => {
     if (isWorkingOffline() || productWrites().length) {
       const all = await operationsApi.products();
@@ -395,7 +465,18 @@ export const operationsApi = {
       sales: [], offlineHistoryLimited: true,
     } as ProductDetails;
   },
-  categories: () => req<ProductCategory[]>('/operations/product-categories'),
+  categories: async () => {
+    const categories = [...await req<ProductCategory[]>('/operations/product-categories')];
+    for (const write of getOfflineQueue().filter((item) => item.path === '/operations/product-categories' && item.method === 'POST')) {
+      try {
+        const body = JSON.parse(write.body || '{}') as { name?: string };
+        const name = String(body.name ?? '').trim();
+        if (name && !categories.some((category) => category.name.toLowerCase() === name.toLowerCase()))
+          categories.push({ id: `offline-category:${write.id}`, name });
+      } catch { /* Preserve the saved categories if a queued row is malformed. */ }
+    }
+    return categories.sort((a, b) => a.name.localeCompare(b.name));
+  },
   createCategory: async (name: string) => {
     const result = await req<ProductCategory | { queuedOffline: true }>('/operations/product-categories', 'POST', { name });
     if ('queuedOffline' in result) {
